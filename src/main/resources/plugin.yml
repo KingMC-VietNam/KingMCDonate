@@ -1,0 +1,59 @@
+name: KingMCDonate
+version: '$version'
+main: net.kingmc.plugin.kingmcdonate.KingMCDonate
+api-version: '1.16'
+folia-supported: true
+load: POSTWORLD
+authors: [KhanhHuynh]
+
+depend: [PacketEvents]
+softdepend: [PlayerPoints, Vault, PlaceholderAPI, floodgate]
+
+# Downloaded from Maven Central at load time (Paper/Spigot 1.16.5+ library loader).
+libraries:
+  - org.jetbrains.kotlin:kotlin-stdlib:2.4.0-Beta2
+  - com.github.cryptomorin:XSeries:11.3.0
+  - com.google.code.gson:gson:2.10.1
+  - com.google.zxing:core:3.5.1
+  - com.zaxxer:HikariCP:5.1.0
+  - org.xerial:sqlite-jdbc:3.45.1.0
+  - com.mysql:mysql-connector-j:8.0.33
+
+commands:
+  napthe:
+    description: Mở GUI nạp thẻ hoặc nạp nhanh
+    usage: /napthe [loại] [mệnh giá] [seri] [pin]
+    permission: kingmcdonate.napthe
+  bank:
+    description: Nạp tiền qua QR ngân hàng
+    usage: /bank <số tiền>
+    permission: kingmcdonate.bank
+  topnap:
+    description: Xem top nạp
+    usage: /topnap
+    permission: kingmcdonate.topnap
+  lichsunap:
+    description: Xem lịch sử nạp
+    usage: /lichsunap [player]
+    permission: kingmcdonate.lichsu
+  kingmcdonate:
+    description: Lệnh quản trị KingMCDonate
+    usage: /kingmcdonate <reload|lichsu|confirm|cancel|fakecard|fakebank>
+    permission: kingmcdonate.admin
+
+permissions:
+  kingmcdonate.napthe:
+    description: Cho phép nạp thẻ
+    default: true
+  kingmcdonate.bank:
+    description: Cho phép nạp qua ngân hàng
+    default: true
+  kingmcdonate.topnap:
+    description: Cho phép xem top nạp
+    default: true
+  kingmcdonate.lichsu:
+    description: Cho phép xem lịch sử nạp
+    default: true
+  kingmcdonate.admin:
+    description: Quyền quản trị KingMCDonate
+    default: op
