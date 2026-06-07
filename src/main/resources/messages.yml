@@ -1,0 +1,11 @@
+# Chung
+no-permission: "&cBạn không có quyền dùng lệnh này."
+player-only: "&cLệnh này chỉ dùng được trong game."
+unknown-command: "&cLệnh không hợp lệ. Gõ &e/kingmcdonate&c để xem trợ giúp."
+
+# Quản trị
+reload-success: "&aĐã tải lại cấu hình &#55FFFF(config + messages + provider trả thưởng)&a."
+reload-failed: "&cTải lại thất bại: &e{error}&c. Giữ nguyên cấu hình cũ."
+
+# Trả thưởng / provider
+currency-unavailable: "&cHệ thống trả thưởng đang không khả dụng, vui lòng liên hệ quản trị."

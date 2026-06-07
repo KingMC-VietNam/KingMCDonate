@@ -8,7 +8,10 @@ import java.util.logging.Logger
  * name) that adds a debug-mode guard. Warnings and errors are always emitted;
  * [debug] lines only when [debugMode] is enabled.
  */
-class PluginLogger(private val logger: Logger, @Volatile var debugMode: Boolean = false) {
+class PluginLogger(
+    @PublishedApi internal val logger: Logger,
+    @Volatile var debugMode: Boolean = false,
+) {
 
     fun info(message: String) = logger.info(message)
 
@@ -19,8 +22,11 @@ class PluginLogger(private val logger: Logger, @Volatile var debugMode: Boolean 
     fun error(message: String, throwable: Throwable) =
         logger.log(Level.SEVERE, message, throwable)
 
-    /** Emitted only when debug mode is enabled. */
-    fun debug(message: String) {
-        if (debugMode) logger.info("[DEBUG] $message")
+    /**
+     * Emitted only when debug mode is enabled. Takes a lambda so the message is
+     * built lazily — no string work happens when debug is off.
+     */
+    inline fun debug(message: () -> String) {
+        if (debugMode) logger.info("[DEBUG] ${message()}")
     }
 }

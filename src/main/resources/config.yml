@@ -1,0 +1,45 @@
+# ============================================================
+#  KingMCDonate — cấu hình chính
+# ============================================================
+
+# Tiền tố hiển thị ở đầu mọi tin nhắn gửi người chơi.
+# Hỗ trợ màu & và mã hex &#RRGGBB (gradient tự ghép nhiều mã hex thủ công).
+prefix: "&#55FFFF[KingMCDonate]&r "
+
+# Bật log debug để dựng lại toàn bộ luồng một giao dịch khi cần truy vết.
+# Khi tắt, các log mức debug sẽ không hiện (cảnh báo/lỗi vẫn luôn hiện).
+debug: false
+
+# Định danh DUY NHẤT của node này trong mạng nhiều server.
+# Bắt buộc đặt khác nhau cho mỗi server con khi chạy multi-server (dùng chung MySQL).
+server-id: "default"
+
+database:
+  # Loại CSDL: "sqlite" (mặc định, nhúng sẵn) hoặc "mysql".
+  # Multi-server BẮT BUỘC dùng mysql.
+  type: "sqlite"
+
+  # Áp dụng khi type = sqlite. File lưu trong thư mục plugin.
+  sqlite:
+    file: "data.db"
+
+  # Áp dụng khi type = mysql.
+  mysql:
+    host: "localhost"
+    port: 3306
+    database: "kingmcdonate"
+    username: "root"
+    password: ""
+    # Số kết nối tối đa trong pool.
+    pool-size: 10
+
+currency:
+  # Cổng trả thưởng đang dùng: "playerpoints" | "command" | "vault".
+  provider: "playerpoints"
+  # Cổng dự phòng khi provider chính không khả dụng (để trống = chặn nhận giao dịch).
+  # Khuyến nghị đặt "command" để không bao giờ trao thưởng thất bại âm thầm.
+  fallback: "command"
+  # Lệnh console chạy khi dùng provider "command" (hoặc fallback).
+  # Biến: {player} = tên người chơi, {amount} = số point/tiền.
+  commands:
+    - "points give {player} {amount}"

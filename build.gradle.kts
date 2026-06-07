@@ -12,7 +12,9 @@ repositories {
     maven("https://repo.codemc.io/repository/maven-public/")
     // FoliaLib
     maven("https://repo.tcoded.com/releases")
-    // XSeries fallback
+    // PlayerPoints (Rosewood)
+    maven("https://repo.rosewooddev.io/repository/public/")
+    // XSeries fallback + VaultAPI
     maven("https://jitpack.io")
 }
 
@@ -20,6 +22,10 @@ dependencies {
     // --- Server API + provided plugins: compile-only ---
     compileOnly("com.destroystokyo.paper:paper-api:1.16.5-R0.1-SNAPSHOT")
     compileOnly("com.github.retrooper:packetevents-spigot:2.5.0")
+
+    // --- Soft-depend currency APIs: compile against, provided at runtime by the actual plugins ---
+    compileOnly("org.black_ixx:playerpoints:3.2.6")
+    compileOnly("com.github.MilkBowl:VaultAPI:1.7") { exclude(group = "org.bukkit") }
 
     // --- Shaded + relocated (not on Maven Central, so the libraries: loader can't fetch them) ---
     implementation("com.tcoded:FoliaLib:0.5.1")                 // Folia-safe scheduler
@@ -33,6 +39,14 @@ dependencies {
     compileOnly("com.zaxxer:HikariCP:5.1.0")
     compileOnly("org.xerial:sqlite-jdbc:3.45.1.0")
     compileOnly("com.mysql:mysql-connector-j:8.0.33")
+
+    // --- Unit tests: JUnit 5 + a real SQLite-backed pool for the migration runner ---
+    // stdlib is provided at runtime via libraries: for the plugin, but tests run in a plain JVM.
+    testImplementation("org.jetbrains.kotlin:kotlin-stdlib:2.4.0-Beta2")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    testImplementation("com.zaxxer:HikariCP:5.1.0")
+    testImplementation("org.xerial:sqlite-jdbc:3.45.1.0")
 }
 
 kotlin {
@@ -54,6 +68,10 @@ tasks {
     runServer {
         minecraftVersion("1.20.4")
         jvmArgs("-Xms2G", "-Xmx2G")
+    }
+
+    test {
+        useJUnitPlatform()
     }
 
     processResources {
