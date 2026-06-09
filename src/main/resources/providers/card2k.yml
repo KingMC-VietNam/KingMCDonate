@@ -1,0 +1,5 @@
+# Cổng gạch thẻ card2k — lấy partner-id/partner-key tại bảng điều khiển card2k.net.
+partner-id: ""
+partner-key: ""
+# Bật chế độ sandbox để test (gọi sandbox.card2k.net thay vì card2k.net).
+sandbox: false

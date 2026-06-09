@@ -17,7 +17,8 @@ class PlayerPointsCurrency : CurrencyProvider {
     override fun isAvailable() = true
 
     override fun give(uuid: UUID, amount: Long) {
-        api.give(uuid, amount.toInt())
+        // PlayerPoints takes an int; clamp so a misconfigured large value can't overflow into a negative deduction.
+        api.give(uuid, amount.coerceIn(0, Int.MAX_VALUE.toLong()).toInt())
     }
 
     override fun balance(uuid: UUID): Long = api.look(uuid).toLong()

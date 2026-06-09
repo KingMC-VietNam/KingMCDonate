@@ -34,12 +34,17 @@ class Migration0001 : Migration {
             CREATE TABLE IF NOT EXISTS card_payments (
                 id             $id,
                 player_uuid    VARCHAR(36) NOT NULL,
+                player_name    VARCHAR(16),
                 card_type      VARCHAR(32) NOT NULL,
                 amount         BIGINT NOT NULL,
                 serial         VARCHAR(64),
                 pin            VARCHAR(64),
                 status         VARCHAR(16) NOT NULL,
                 reference_code VARCHAR(32) NOT NULL UNIQUE,
+                card_provider  VARCHAR(32),
+                transaction_id VARCHAR(128),
+                owner_server   VARCHAR(64) NOT NULL DEFAULT '',
+                point          BIGINT NOT NULL DEFAULT 0,
                 created_at     BIGINT NOT NULL,
                 updated_at     BIGINT NOT NULL
             )

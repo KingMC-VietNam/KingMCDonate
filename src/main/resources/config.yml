@@ -43,3 +43,55 @@ currency:
   # Biến: {player} = tên người chơi, {amount} = số point/tiền.
   commands:
     - "points give {player} {amount}"
+
+# ============================================================
+#  Nạp thẻ
+# ============================================================
+card:
+  # Cổng gạch thẻ đang dùng: "thesieutoc" | "card2k".
+  # Credential đặt trong providers/<tên>.yml.
+  provider: "thesieutoc"
+
+  # Các loại thẻ được mở: VIETTEL, MOBIFONE, VINAPHONE, GARENA, VCOIN, ZING, GATE.
+  card-types:
+    - VIETTEL
+    - MOBIFONE
+    - VINAPHONE
+    - GARENA
+    - VCOIN
+    - ZING
+
+  # Mệnh giá (VNĐ) -> số point trao thưởng cho mỗi lần nạp thành công.
+  denominations:
+    10000: 100
+    20000: 200
+    50000: 500
+    100000: 1000
+    200000: 2000
+    500000: 5000
+    1000000: 10000
+
+  # (Tùy chọn) Lệnh console thưởng thêm theo mệnh giá.
+  # Biến: {player}, {amount} (VNĐ), {point}.
+  # Ví dụ:
+  #   100000:
+  #     - "crate give {player} vip 1"
+  commands: {}
+
+  # Chu kỳ poll lại các đơn đang chờ cổng xử lý (giây).
+  poll-interval: 15
+
+  # Đơn chờ quá thời gian này sẽ bị đánh dấu thất bại (phút).
+  timeout: 30
+
+  # Dùng AnvilGUI để nhập seri/PIN; false = nhập qua chat.
+  use-anvil: true
+
+# ============================================================
+#  HTTP (gọi cổng thanh toán)
+# ============================================================
+http:
+  connect-timeout-seconds: 10
+  request-timeout-seconds: 30
+  # Số lần thử lại khi lỗi mạng / cổng trả 5xx.
+  max-retries: 3

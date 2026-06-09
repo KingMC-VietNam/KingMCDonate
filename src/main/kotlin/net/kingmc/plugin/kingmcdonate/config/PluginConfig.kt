@@ -14,6 +14,8 @@ class PluginConfig(root: ConfigurationSection) {
     val serverId: String = root.getString("server-id", "default")!!
     val database: DatabaseConfig = DatabaseConfig(root.getConfigurationSection("database"))
     val currency: CurrencyConfig = CurrencyConfig(root.getConfigurationSection("currency"))
+    val card: CardConfig = CardConfig(root.getConfigurationSection("card"))
+    val http: HttpConfig = HttpConfig(root.getConfigurationSection("http"))
 
     class DatabaseConfig(section: ConfigurationSection?) {
         /** `sqlite` (default) or `mysql`. */
@@ -34,5 +36,38 @@ class PluginConfig(root: ConfigurationSection) {
         val fallback: String = section?.getString("fallback", "")?.lowercase() ?: ""
         /** Console commands for the Command provider; `{player}` / `{amount}` substituted. */
         val commands: List<String> = section?.getStringList("commands") ?: emptyList()
+    }
+
+    class CardConfig(section: ConfigurationSection?) {
+        /** Active card gateway: `thesieutoc` | `card2k`. */
+        val provider: String = section?.getString("provider", "thesieutoc")?.lowercase() ?: "thesieutoc"
+        /** Card type names enabled for top-up (resolved to `CardType` by the registry). */
+        val cardTypes: List<String> = section?.getStringList("card-types") ?: emptyList()
+        /** Denomination (VNĐ) -> points granted. */
+        val denominations: Map<Long, Long> = readLongMap(section, "denominations")
+        /** Denomination (VNĐ) -> console reward commands; `{player}`/`{amount}`/`{point}` substituted. */
+        val commands: Map<Long, List<String>> = readCommandMap(section)
+        /** How often WAITING orders are re-polled, in seconds. */
+        val pollIntervalSeconds: Long = section?.getLong("poll-interval", 15L) ?: 15L
+        /** A WAITING order older than this many minutes is marked FAILED. */
+        val timeoutMinutes: Long = section?.getLong("timeout", 30L) ?: 30L
+        /** Use AnvilGUI for serial/PIN input; false = chat input. */
+        val useAnvil: Boolean = section?.getBoolean("use-anvil", true) ?: true
+
+        private fun readLongMap(section: ConfigurationSection?, key: String): Map<Long, Long> {
+            val sub = section?.getConfigurationSection(key) ?: return emptyMap()
+            return sub.getKeys(false).mapNotNull { k -> k.toLongOrNull()?.let { it to sub.getLong(k) } }.toMap()
+        }
+
+        private fun readCommandMap(section: ConfigurationSection?): Map<Long, List<String>> {
+            val sub = section?.getConfigurationSection("commands") ?: return emptyMap()
+            return sub.getKeys(false).mapNotNull { k -> k.toLongOrNull()?.let { it to sub.getStringList(k) } }.toMap()
+        }
+    }
+
+    class HttpConfig(section: ConfigurationSection?) {
+        val connectTimeoutSeconds: Long = section?.getLong("connect-timeout-seconds", 10L) ?: 10L
+        val requestTimeoutSeconds: Long = section?.getLong("request-timeout-seconds", 30L) ?: 30L
+        val maxRetries: Int = section?.getInt("max-retries", 3) ?: 3
     }
 }

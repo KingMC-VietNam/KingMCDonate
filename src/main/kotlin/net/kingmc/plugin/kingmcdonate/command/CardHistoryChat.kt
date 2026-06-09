@@ -1,0 +1,64 @@
+package net.kingmc.plugin.kingmcdonate.command
+
+import net.kingmc.plugin.kingmcdonate.config.MessageKeys
+import net.kingmc.plugin.kingmcdonate.config.Messages
+import net.kingmc.plugin.kingmcdonate.database.dao.CardPaymentDao
+import net.kingmc.plugin.kingmcdonate.payment.CardDisplay
+import net.kingmc.plugin.kingmcdonate.util.Scheduler
+import net.kingmc.plugin.kingmcdonate.util.Text
+import org.bukkit.Bukkit
+import org.bukkit.command.CommandSender
+import java.util.UUID
+
+/** Prints a player's recent card history to a command sender as a chat list. */
+object CardHistoryChat {
+
+    private const val LIMIT = 10
+
+    /** Resolve [targetName] (online first, else an offline lookup off-thread) then show their history. */
+    fun showByName(
+        sender: CommandSender,
+        targetName: String,
+        cardPaymentDao: CardPaymentDao,
+        scheduler: Scheduler,
+        messages: Messages,
+    ) {
+        val online = Bukkit.getPlayerExact(targetName)
+        if (online != null) {
+            show(sender, online.uniqueId, cardPaymentDao, scheduler, messages)
+            return
+        }
+        scheduler.runIo {
+            @Suppress("DEPRECATION")
+            val uuid = Bukkit.getOfflinePlayer(targetName).uniqueId
+            show(sender, uuid, cardPaymentDao, scheduler, messages)
+        }
+    }
+
+    fun show(
+        sender: CommandSender,
+        targetUuid: UUID,
+        cardPaymentDao: CardPaymentDao,
+        scheduler: Scheduler,
+        messages: Messages,
+    ) {
+        scheduler.runIo {
+            val payments = cardPaymentDao.findByPlayer(targetUuid, LIMIT)
+            messages.send(sender, MessageKeys.HISTORY_HEADER)
+            if (payments.isEmpty()) {
+                messages.send(sender, MessageKeys.HISTORY_EMPTY)
+                return@runIo
+            }
+            for (payment in payments) {
+                messages.send(
+                    sender,
+                    MessageKeys.HISTORY_ENTRY,
+                    "type" to payment.cardType,
+                    "amount" to Text.formatMoney(payment.amount),
+                    "status" to CardDisplay.statusText(payment.status),
+                    "time" to CardDisplay.time(payment.createdAt),
+                )
+            }
+        }
+    }
+}

@@ -40,7 +40,7 @@ class Database(
             Dialect.MYSQL -> {
                 hikari.jdbcUrl =
                     "jdbc:mysql://${config.mysqlHost}:${config.mysqlPort}/${config.mysqlDatabase}" +
-                    "?useSSL=false&serverTimezone=UTC"
+                    "?useSSL=false"
                 hikari.driverClassName = "com.mysql.cj.jdbc.Driver"
                 hikari.username = config.mysqlUsername
                 hikari.password = config.mysqlPassword

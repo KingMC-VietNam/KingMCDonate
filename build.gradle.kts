@@ -47,6 +47,10 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testImplementation("com.zaxxer:HikariCP:5.1.0")
     testImplementation("org.xerial:sqlite-jdbc:3.45.1.0")
+    // Gson is provided at runtime via libraries: for the plugin; tests exercise the card adapters directly.
+    testImplementation("com.google.code.gson:gson:2.10.1")
+    // paper-api on the test classpath so the typed config holders (which reference Bukkit types) load.
+    testImplementation("com.destroystokyo.paper:paper-api:1.16.5-R0.1-SNAPSHOT")
 }
 
 kotlin {
