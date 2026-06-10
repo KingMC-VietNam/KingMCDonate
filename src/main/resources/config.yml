@@ -52,7 +52,8 @@ card:
   # Credential đặt trong providers/<tên>.yml.
   provider: "thesieutoc"
 
-  # Các loại thẻ được mở: VIETTEL, MOBIFONE, VINAPHONE, GARENA, VCOIN, ZING, GATE.
+  # Các loại thẻ được mở. Mọi loại dùng chung bộ mệnh giá ở "denominations" bên dưới.
+  # Loại hợp lệ: VIETTEL, MOBIFONE, VINAPHONE, GARENA, VCOIN, ZING, GATE.
   card-types:
     - VIETTEL
     - MOBIFONE
@@ -61,22 +62,23 @@ card:
     - VCOIN
     - ZING
 
-  # Mệnh giá (VNĐ) -> số point trao thưởng cho mỗi lần nạp thành công.
+  # Mệnh giá (VNĐ) -> số point trao thưởng (NGUỒN POINT của thẻ; chiết khấu đã tính sẵn ở đây).
+  # Bộ mệnh giá chuẩn nhà mạng VN, nhỏ -> lớn. Người chơi tự chọn đúng mệnh giá thẻ của mình.
+  # Point của nạp bank tính theo tỉ lệ riêng (bank.point-rate) — thường cao hơn thẻ cùng số tiền.
   denominations:
     10000: 100
     20000: 200
+    30000: 300
     50000: 500
     100000: 1000
     200000: 2000
+    300000: 3000
     500000: 5000
     1000000: 10000
 
-  # (Tùy chọn) Lệnh console thưởng thêm theo mệnh giá.
-  # Biến: {player}, {amount} (VNĐ), {point}.
-  # Ví dụ:
-  #   100000:
-  #     - "crate give {player} vip 1"
-  commands: {}
+  # Tạm khoá nhận đơn thẻ mới + báo người chơi đang bảo trì.
+  # Các đơn đang xử lý dở vẫn được poll tới khi xong (không bị ảnh hưởng).
+  maintenance: false
 
   # Chu kỳ poll lại các đơn đang chờ cổng xử lý (giây).
   poll-interval: 15
@@ -86,6 +88,21 @@ card:
 
   # Dùng AnvilGUI để nhập seri/PIN; false = nhập qua chat.
   use-anvil: true
+
+# ============================================================
+#  Lệnh thưởng theo mốc (dùng chung thẻ + bank)
+# ============================================================
+# Lệnh thưởng THÊM (ngoài point) chạy theo MỐC số tiền nạp. Khác currency.commands ở trên
+# (vốn là cơ chế cộng point của provider "command"); đây là phần thưởng kèm như quà/rank.
+rewards:
+  # Khoá theo ngưỡng VNĐ. Mỗi lần nạp chỉ chạy MỐC CAO NHẤT <= số tiền (vd nạp 100k -> mốc 100000).
+  # Prefix mỗi dòng: console: (mặc định) | player: (chạy dưới quyền người chơi).
+  # Biến: {player} {amount} (VNĐ) {point} (point thực nhận) {ref} (mã giao dịch).
+  commands:
+    # 0:
+    #   - "console: broadcast &e{player} &7vừa ủng hộ &a{amount}đ"
+    # 100000:
+    #   - "console: crate give {player} vip 1"
 
 # ============================================================
 #  HTTP (gọi cổng thanh toán)

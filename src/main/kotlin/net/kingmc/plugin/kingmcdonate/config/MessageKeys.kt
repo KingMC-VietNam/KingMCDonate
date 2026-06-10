@@ -18,6 +18,7 @@ object MessageKeys {
     const val CARD_SERIAL_TOO_LONG = "card-serial-too-long"
     const val CARD_PIN_TOO_LONG = "card-pin-too-long"
     const val CARD_UNAVAILABLE = "card-unavailable"
+    const val CARD_MAINTENANCE = "card-maintenance"
     const val CARD_INPUT_SERIAL = "card-input-serial"
     const val CARD_INPUT_PIN = "card-input-pin"
     const val CARD_INPUT_CANCELLED = "card-input-cancelled"

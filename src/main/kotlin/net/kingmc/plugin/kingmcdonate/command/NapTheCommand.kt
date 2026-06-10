@@ -30,6 +30,10 @@ class NapTheCommand(
             return true
         }
         if (args.size != QUICK_ARGS) {
+            if (config().card.maintenance) {
+                messages().send(sender, MessageKeys.CARD_MAINTENANCE)
+                return true
+            }
             menu.openTypeMenu(sender)
             return true
         }

@@ -15,6 +15,7 @@ class PluginConfig(root: ConfigurationSection) {
     val database: DatabaseConfig = DatabaseConfig(root.getConfigurationSection("database"))
     val currency: CurrencyConfig = CurrencyConfig(root.getConfigurationSection("currency"))
     val card: CardConfig = CardConfig(root.getConfigurationSection("card"))
+    val rewards: RewardsConfig = RewardsConfig(root.getConfigurationSection("rewards"))
     val http: HttpConfig = HttpConfig(root.getConfigurationSection("http"))
 
     class DatabaseConfig(section: ConfigurationSection?) {
@@ -43,10 +44,10 @@ class PluginConfig(root: ConfigurationSection) {
         val provider: String = section?.getString("provider", "thesieutoc")?.lowercase() ?: "thesieutoc"
         /** Card type names enabled for top-up (resolved to `CardType` by the registry). */
         val cardTypes: List<String> = section?.getStringList("card-types") ?: emptyList()
-        /** Denomination (VNĐ) -> points granted. */
+        /** Denomination (VNĐ) -> points granted; the single source of card points. */
         val denominations: Map<Long, Long> = readLongMap(section, "denominations")
-        /** Denomination (VNĐ) -> console reward commands; `{player}`/`{amount}`/`{point}` substituted. */
-        val commands: Map<Long, List<String>> = readCommandMap(section)
+        /** When true, new card intake is blocked with a maintenance notice; in-flight orders still settle. */
+        val maintenance: Boolean = section?.getBoolean("maintenance", false) ?: false
         /** How often WAITING orders are re-polled, in seconds. */
         val pollIntervalSeconds: Long = section?.getLong("poll-interval", 15L) ?: 15L
         /** A WAITING order older than this many minutes is marked FAILED. */
@@ -58,6 +59,20 @@ class PluginConfig(root: ConfigurationSection) {
             val sub = section?.getConfigurationSection(key) ?: return emptyMap()
             return sub.getKeys(false).mapNotNull { k -> k.toLongOrNull()?.let { it to sub.getLong(k) } }.toMap()
         }
+    }
+
+    /**
+     * Reward commands shared by every donation method (card and bank), keyed by a VNĐ
+     * threshold. A successful top-up runs the single highest tier whose threshold is
+     * `<=` the amount paid; `{player}`/`{amount}`/`{point}`/`{ref}` are substituted and
+     * each line may carry a `console:`/`player:`/`op:` context prefix.
+     */
+    class RewardsConfig(section: ConfigurationSection?) {
+        val commands: Map<Long, List<String>> = readCommandMap(section)
+
+        /** Commands of the highest threshold `<=` [amount]; empty when none qualifies. */
+        fun commandsFor(amount: Long): List<String> =
+            commands.filterKeys { it <= amount }.maxByOrNull { it.key }?.value ?: emptyList()
 
         private fun readCommandMap(section: ConfigurationSection?): Map<Long, List<String>> {
             val sub = section?.getConfigurationSection("commands") ?: return emptyMap()

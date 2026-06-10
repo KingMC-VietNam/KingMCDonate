@@ -38,6 +38,10 @@ class CardPaymentService(
 
     /** Validate and start a card top-up for an online [player]. */
     fun submit(player: Player, type: CardType, declaredAmount: Long, serial: String, pin: String) {
+        if (config().card.maintenance) {
+            messages().send(player, MessageKeys.CARD_MAINTENANCE)
+            return
+        }
         if (!providers.isAvailable) {
             messages().send(player, MessageKeys.CARD_UNAVAILABLE)
             return
@@ -190,16 +194,22 @@ class CardPaymentService(
             } catch (e: Exception) {
                 logger.error("Card $referenceCode: reward credit failed uuid=$uuid point=$point; reconcile manually.", e)
             }
-            val commands = config().card.commands[declaredAmount] ?: return@runNextTick
-            val playerName = name ?: Bukkit.getOfflinePlayer(uuid).name ?: return@runNextTick
-            val console = Bukkit.getConsoleSender()
-            for (template in commands) {
-                val command = template
-                    .replace("{player}", playerName)
-                    .replace("{amount}", declaredAmount.toString())
-                    .replace("{point}", point.toString())
-                Bukkit.dispatchCommand(console, command)
-            }
+            val commands = config().rewards.commandsFor(declaredAmount)
+            if (commands.isEmpty()) return@runNextTick
+            val playerName = name ?: Bukkit.getOfflinePlayer(uuid).name ?: uuid.toString()
+            RewardCommands.run(
+                commands,
+                uuid,
+                playerName,
+                mapOf(
+                    "player" to playerName,
+                    "amount" to declaredAmount.toString(),
+                    "point" to point.toString(),
+                    "ref" to referenceCode,
+                ),
+                scheduler,
+                logger,
+            )
         }
     }
 
