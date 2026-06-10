@@ -140,7 +140,23 @@ class CardPaymentService(
             return
         }
 
-        val point = config().card.denominations[declaredAmount] ?: 0L
+        val point = config().card.denominations[declaredAmount]
+        if (point == null) {
+            cardPaymentDao.resolve(referenceCode, PaymentStatus.FAILED, 0, System.currentTimeMillis())
+            logger.warn("Card $referenceCode: amount $declaredAmount is not a configured denomination; not rewarded.")
+            message(uuid, MessageKeys.CARD_WRONG_DENOMINATION)
+            return
+        }
+
+        if (!currency.active.isAvailable()) {
+            // Reward backend is down: keep the order open instead of flipping it SUCCESS so points
+            // are never credited silently and the poll service can settle it once currency returns.
+            cardPaymentDao.markWaiting(referenceCode, outcome.transactionId, System.currentTimeMillis())
+            logger.error("Card $referenceCode: currency provider unavailable; left WAITING, reward not credited.")
+            message(uuid, MessageKeys.CURRENCY_UNAVAILABLE)
+            return
+        }
+
         val now = System.currentTimeMillis()
         val rows = cardPaymentDao.resolve(referenceCode, PaymentStatus.SUCCESS, point, now)
         if (rows != 1) {

@@ -125,7 +125,7 @@ class KingMCDonate : JavaPlugin() {
         val router = CommandRouter { configManager.messages }.apply {
             register(ReloadCommand(configManager, currency, card.providers))
             register(LichSuSubCommand(card.cardPaymentDao, scheduler) { configManager.messages })
-            register(FakeCardSubCommand(card.service) { configManager.messages })
+            register(FakeCardSubCommand(card.service, { configManager.config }) { configManager.messages })
         }
         getCommand("kingmcdonate")?.apply {
             setExecutor(router)

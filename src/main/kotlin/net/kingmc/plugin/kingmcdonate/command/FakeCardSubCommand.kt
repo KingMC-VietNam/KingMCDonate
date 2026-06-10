@@ -2,6 +2,7 @@ package net.kingmc.plugin.kingmcdonate.command
 
 import net.kingmc.plugin.kingmcdonate.config.MessageKeys
 import net.kingmc.plugin.kingmcdonate.config.Messages
+import net.kingmc.plugin.kingmcdonate.config.PluginConfig
 import net.kingmc.plugin.kingmcdonate.payment.CardPaymentService
 import net.kingmc.plugin.kingmcdonate.util.Text
 import org.bukkit.Bukkit
@@ -10,6 +11,7 @@ import org.bukkit.command.CommandSender
 /** `/kingmcdonate fakecard <player> <amount>` — run the success path without a gateway. */
 class FakeCardSubCommand(
     private val service: CardPaymentService,
+    private val config: () -> PluginConfig,
     private val messages: () -> Messages,
 ) : SubCommand {
 
@@ -31,6 +33,10 @@ class FakeCardSubCommand(
             messages().send(sender, MessageKeys.FAKECARD_USAGE)
             return
         }
+        if (amount !in config().card.denominations) {
+            messages().send(sender, MessageKeys.CARD_INVALID_DENOMINATION)
+            return
+        }
         service.simulateSuccess(target.uniqueId, target.name, amount)
         messages().send(
             sender,
@@ -42,6 +48,7 @@ class FakeCardSubCommand(
 
     override fun tabComplete(sender: CommandSender, args: List<String>): List<String> = when (args.size) {
         1 -> Bukkit.getOnlinePlayers().map { it.name }.filter { it.startsWith(args[0], ignoreCase = true) }
+        2 -> config().card.denominations.keys.map { it.toString() }.filter { it.startsWith(args[1]) }
         else -> emptyList()
     }
 }
