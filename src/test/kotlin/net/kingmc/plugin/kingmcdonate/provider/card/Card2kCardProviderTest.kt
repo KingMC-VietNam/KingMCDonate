@@ -13,37 +13,43 @@ class Card2kCardProviderTest {
     private val request = CardRequest(UUID.randomUUID(), CardType.VIETTEL, 10_000, "seri", "pin", "REF1")
 
     private fun provider(response: String) =
-        Card2kCardProvider({ _, _ -> response }, "pid", "pkey", false, setOf(CardType.VIETTEL), logger)
+        Card2kCardProvider({ _, _ -> response }, "pid", "pkey", setOf(CardType.VIETTEL), logger)
 
     @Test
-    fun `pending status maps to WAITING`() {
+    fun `submit acknowledges intake as WAITING even when status is success`() {
+        val outcome = provider("""{"status":1,"value":"10000","message":"ok"}""").submit(request)
+        assertEquals(PaymentStatus.WAITING, outcome.status)
+    }
+
+    @Test
+    fun `submit pending maps to WAITING`() {
         val outcome = provider("""{"status":99,"message":"pending"}""").submit(request)
         assertEquals(PaymentStatus.WAITING, outcome.status)
     }
 
     @Test
-    fun `success status surfaces recognized value`() {
-        val outcome = provider("""{"status":1,"value":"10000","message":"ok"}""").submit(request)
+    fun `poll success surfaces recognized value`() {
+        val outcome = provider("""{"status":1,"value":"10000","message":"ok"}""").check("REF1", request)
         assertEquals(PaymentStatus.SUCCESS, outcome.status)
         assertEquals(10_000L, outcome.recognizedAmount)
     }
 
     @Test
-    fun `success with mismatched value is surfaced for the payment layer to reject`() {
-        val outcome = provider("""{"status":1,"value":"5000","message":"ok"}""").submit(request)
-        assertEquals(PaymentStatus.SUCCESS, outcome.status)
+    fun `wrong-denomination status maps to FAILED and surfaces the recognized value`() {
+        val outcome = provider("""{"status":2,"value":"5000","message":"sai menh gia"}""").check("REF1", request)
+        assertEquals(PaymentStatus.FAILED, outcome.status)
         assertEquals(5_000L, outcome.recognizedAmount)
     }
 
     @Test
     fun `failed status maps to FAILED`() {
-        val outcome = provider("""{"status":3,"message":"that bai"}""").submit(request)
+        val outcome = provider("""{"status":3,"message":"that bai"}""").check("REF1", request)
         assertEquals(PaymentStatus.FAILED, outcome.status)
     }
 
     @Test
-    fun `maintenance status maps to FAILED`() {
-        val outcome = provider("""{"status":4,"message":"bao tri"}""").check("REF1", request)
+    fun `unknown or used-card status maps to FAILED`() {
+        val outcome = provider("""{"status":100,"message":"used"}""").check("REF1", request)
         assertEquals(PaymentStatus.FAILED, outcome.status)
     }
 }

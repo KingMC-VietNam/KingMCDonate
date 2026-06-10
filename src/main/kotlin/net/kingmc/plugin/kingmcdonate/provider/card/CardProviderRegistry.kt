@@ -59,9 +59,8 @@ class CardProviderRegistry(
                 Card2kCardProvider.NAME -> {
                     val partnerId = yml.getString("partner-id").orEmpty()
                     val partnerKey = yml.getString("partner-key").orEmpty()
-                    val sandbox = yml.getBoolean("sandbox", false)
                     if (partnerId.isBlank() || partnerKey.isBlank()) null
-                    else Card2kCardProvider(http::postForm, partnerId, partnerKey, sandbox, enabledTypes(), logger)
+                    else Card2kCardProvider(http::postForm, partnerId, partnerKey, enabledTypes(), logger)
                 }
                 else -> null
             }
