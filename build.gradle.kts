@@ -29,16 +29,16 @@ dependencies {
 
     // --- Shaded + relocated (not on Maven Central, so the libraries: loader can't fetch them) ---
     implementation("com.tcoded:FoliaLib:0.5.1")                 // Folia-safe scheduler
-    implementation("net.wesjd:anvilgui:1.9.6-SNAPSHOT")         // anvil text input
+    implementation("net.wesjd:anvilgui:1.10.11-SNAPSHOT")         // anvil text input
 
     // --- Downloaded at runtime via plugin.yml `libraries:` (Maven Central). compileOnly = compile, not bundled. ---
-    compileOnly("org.jetbrains.kotlin:kotlin-stdlib:2.4.0-Beta2")
-    compileOnly("com.github.cryptomorin:XSeries:11.3.0")
-    compileOnly("com.google.code.gson:gson:2.10.1")
-    compileOnly("com.google.zxing:core:3.5.1")
-    compileOnly("com.zaxxer:HikariCP:5.1.0")
-    compileOnly("org.xerial:sqlite-jdbc:3.45.1.0")
-    compileOnly("com.mysql:mysql-connector-j:8.0.33")
+    compileOnly("org.jetbrains.kotlin:kotlin-stdlib:2.4.0")
+    compileOnly("com.github.cryptomorin:XSeries:13.7.0")
+    compileOnly("com.google.code.gson:gson:2.14.0")
+    compileOnly("com.google.zxing:core:3.5.4")
+    compileOnly("com.zaxxer:HikariCP:7.0.2")
+    compileOnly("org.xerial:sqlite-jdbc:3.53.2.0")
+    compileOnly("com.mysql:mysql-connector-j:9.7.0")
 
     // --- Unit tests: JUnit 5 + a real SQLite-backed pool for the migration runner ---
     // stdlib is provided at runtime via libraries: for the plugin, but tests run in a plain JVM.
