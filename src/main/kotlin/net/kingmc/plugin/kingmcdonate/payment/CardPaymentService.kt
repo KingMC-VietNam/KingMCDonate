@@ -30,6 +30,7 @@ class CardPaymentService(
     private val playerDao: PlayerDao,
     private val currency: CurrencyRegistry,
     private val providers: CardProviderRegistry,
+    private val rewardDelivery: RewardDeliveryService,
     private val scheduler: Scheduler,
     private val logger: PluginLogger,
     private val config: () -> PluginConfig,
@@ -175,17 +176,13 @@ class CardPaymentService(
         }
         grantReward(referenceCode, uuid, name, declaredAmount, point)
         logger.debug { "Card SUCCESS ref=$referenceCode uuid=$uuid +${point}pt amount=$declaredAmount" }
-        message(
-            uuid,
-            MessageKeys.CARD_SUCCESS,
-            "amount" to Text.formatMoney(declaredAmount),
-            "point" to point.toString(),
-        )
     }
 
     /**
-     * Credit points and run reward commands on the main thread: economy providers
-     * (Vault/PlayerPoints) are not thread-safe and Folia rejects off-region access.
+     * Credit points immediately by uuid (economy providers are not thread-safe, so on
+     * the main/region thread), then enqueue the player-present reward (success message
+     * and reward commands) to the outbox so it reaches the player on whichever node
+     * they are online and survives a rejoin.
      */
     private fun grantReward(referenceCode: String, uuid: UUID, name: String?, declaredAmount: Long, point: Long) {
         scheduler.runNextTick {
@@ -194,23 +191,24 @@ class CardPaymentService(
             } catch (e: Exception) {
                 logger.error("Card $referenceCode: reward credit failed uuid=$uuid point=$point; reconcile manually.", e)
             }
-            val commands = config().rewards.commandsFor(declaredAmount)
-            if (commands.isEmpty()) return@runNextTick
-            val playerName = name ?: Bukkit.getOfflinePlayer(uuid).name ?: uuid.toString()
-            RewardCommands.run(
-                commands,
-                uuid,
-                playerName,
-                mapOf(
-                    "player" to playerName,
-                    "amount" to declaredAmount.toString(),
-                    "point" to point.toString(),
-                    "ref" to referenceCode,
-                ),
-                scheduler,
-                logger,
-            )
         }
+        val playerName = name ?: Bukkit.getOfflinePlayer(uuid).name ?: uuid.toString()
+        val vars = mapOf(
+            "player" to playerName,
+            "amount" to declaredAmount.toString(),
+            "point" to point.toString(),
+            "ref" to referenceCode,
+        )
+        val commands = config().rewards.commandsFor(declaredAmount).map { RewardCommands.format(it, vars) }
+        rewardDelivery.enqueue(
+            uuid,
+            referenceCode,
+            RewardPayload(
+                messageKey = MessageKeys.CARD_SUCCESS,
+                messageVars = mapOf("amount" to Text.formatMoney(declaredAmount), "point" to point.toString()),
+                commands = commands,
+            ),
+        )
     }
 
     private fun message(uuid: UUID, key: String, vararg vars: Pair<String, String>) {

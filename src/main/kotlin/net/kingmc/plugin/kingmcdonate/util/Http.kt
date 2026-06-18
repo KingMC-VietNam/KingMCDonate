@@ -12,7 +12,8 @@ import java.time.Duration
 /**
  * Shared outbound HTTP client for gateway calls. Built on [java.net.http.HttpClient]
  * with a bounded connect timeout and per-request timeout; transient failures (IO
- * errors and 5xx responses) are retried a bounded number of times with backoff.
+ * errors and 5xx responses) are retried a bounded number of times with backoff,
+ * and HTTP 429 is retried honoring the `Retry-After` header.
  *
  * Calls block and MUST run on a virtual thread (via `Scheduler.runIo`), never on
  * the main server thread.
@@ -29,15 +30,27 @@ class Http(
         .build()
 
     fun get(url: String): String =
-        send(baseRequest(url).GET().build())
+        execute(baseRequest(url).GET().build(), HttpResponse.BodyHandlers.ofString())
+
+    /** GET with extra request headers (e.g. a Bearer token); body decoded as text. */
+    fun get(url: String, headers: Map<String, String>): String {
+        val builder = baseRequest(url).GET()
+        for ((k, v) in headers) builder.header(k, v)
+        return execute(builder.build(), HttpResponse.BodyHandlers.ofString())
+    }
+
+    /** GET returning the raw response bytes — used for binary payloads such as a QR PNG. */
+    fun getBytes(url: String): ByteArray =
+        execute(baseRequest(url).GET().build(), HttpResponse.BodyHandlers.ofByteArray())
 
     fun postForm(url: String, params: Map<String, String>): String =
-        send(
+        execute(
             baseRequest(url)
                 .header("Content-Type", "application/x-www-form-urlencoded")
                 .header("Accept", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(encodeForm(params)))
                 .build(),
+            HttpResponse.BodyHandlers.ofString(),
         )
 
     private fun baseRequest(url: String): HttpRequest.Builder =
@@ -45,12 +58,16 @@ class Http(
             .uri(URI.create(url))
             .timeout(Duration.ofSeconds(requestTimeoutSeconds))
 
-    /** Send with retry/backoff; returns the body on 2xx, retries IO/5xx, propagates 4xx immediately. */
-    private fun send(request: HttpRequest): String {
+    /**
+     * Send with retry/backoff: returns the body on 2xx, retries IO errors and 5xx
+     * with linear backoff, retries 429 honoring `Retry-After`, and surfaces other
+     * 4xx immediately.
+     */
+    private fun <T> execute(request: HttpRequest, handler: HttpResponse.BodyHandler<T>): T {
         var lastError: Exception? = null
         for (attempt in 1..maxRetries) {
             val response = try {
-                client.send(request, HttpResponse.BodyHandlers.ofString())
+                client.send(request, handler)
             } catch (e: IOException) {
                 lastError = e
                 logger.debug { "HTTP error (attempt $attempt/$maxRetries) for ${request.uri()}: ${e.message}" }
@@ -63,7 +80,13 @@ class Http(
 
             val code = response.statusCode()
             if (code in 200..299) return response.body()
-            // Client errors are not retryable — surface them immediately.
+            if (code == TOO_MANY_REQUESTS) {
+                lastError = IOException("HTTP 429 from ${request.uri()}")
+                logger.debug { "HTTP 429 rate-limited (attempt $attempt/$maxRetries) for ${request.uri()}" }
+                if (attempt < maxRetries) sleepMillis(retryAfterMillis(response) ?: (BACKOFF_BASE_MILLIS * attempt))
+                continue
+            }
+            // Other client errors are not retryable — surface them immediately.
             if (code < 500) throw IOException("HTTP $code from ${request.uri()}")
 
             lastError = IOException("HTTP $code from ${request.uri()}")
@@ -73,22 +96,27 @@ class Http(
         throw IOException("HTTP request to ${request.uri()} failed after $maxRetries attempts", lastError)
     }
 
-    private fun backoff(attempt: Int) {
+    private fun retryAfterMillis(response: HttpResponse<*>): Long? =
+        response.headers().firstValue("Retry-After").orElse(null)?.toLongOrNull()?.let { it * 1000 }
+
+    private fun backoff(attempt: Int) = sleepMillis(BACKOFF_BASE_MILLIS * attempt)
+
+    private fun sleepMillis(millis: Long) {
         try {
-            Thread.sleep(BACKOFF_BASE_MILLIS * attempt)
+            Thread.sleep(millis.coerceAtMost(MAX_BACKOFF_MILLIS))
         } catch (e: InterruptedException) {
             Thread.currentThread().interrupt()
         }
     }
 
     private fun encodeForm(params: Map<String, String>): String =
-        params.entries.joinToString("&") { (k, v) ->
-            "${enc(k)}=${enc(v)}"
-        }
+        params.entries.joinToString("&") { (k, v) -> "${enc(k)}=${enc(v)}" }
 
     private fun enc(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8)
 
     companion object {
         private const val BACKOFF_BASE_MILLIS = 500L
+        private const val MAX_BACKOFF_MILLIS = 10_000L
+        private const val TOO_MANY_REQUESTS = 429
     }
 }

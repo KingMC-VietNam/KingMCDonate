@@ -25,6 +25,7 @@ class ConfigManager(private val plugin: JavaPlugin, private val logger: PluginLo
         saveDefault("messages.yml")
         saveDefault("providers/thesieutoc.yml")
         saveDefault("providers/card2k.yml")
+        saveDefault("providers/sepay.yml")
         val (cfg, msg) = parse()
         applyAndLog(cfg, msg)
     }

@@ -15,8 +15,15 @@ class PluginConfig(root: ConfigurationSection) {
     val database: DatabaseConfig = DatabaseConfig(root.getConfigurationSection("database"))
     val currency: CurrencyConfig = CurrencyConfig(root.getConfigurationSection("currency"))
     val card: CardConfig = CardConfig(root.getConfigurationSection("card"))
+    val bank: BankConfig = BankConfig(root.getConfigurationSection("bank"))
     val rewards: RewardsConfig = RewardsConfig(root.getConfigurationSection("rewards"))
     val http: HttpConfig = HttpConfig(root.getConfigurationSection("http"))
+
+    /** How often the reward outbox is drained, in ticks. */
+    val rewardDeliveryIntervalTicks: Long = root.getLong("reward-delivery-interval", 40L)
+
+    /** A claimed-but-undelivered outbox row older than this many minutes is requeued. */
+    val staleClaimMinutes: Long = root.getLong("stale-claim-minutes", 5L)
 
     class DatabaseConfig(section: ConfigurationSection?) {
         /** `sqlite` (default) or `mysql`. */
@@ -59,6 +66,25 @@ class PluginConfig(root: ConfigurationSection) {
             val sub = section?.getConfigurationSection(key) ?: return emptyMap()
             return sub.getKeys(false).mapNotNull { k -> k.toLongOrNull()?.let { it to sub.getLong(k) } }.toMap()
         }
+    }
+
+    class BankConfig(section: ConfigurationSection?) {
+        /** Active bank gateway: `sepay`. Credentials live in `providers/<name>.yml`. */
+        val provider: String = section?.getString("provider", "sepay")?.lowercase() ?: "sepay"
+        /** Prefix đầu mã giao dịch; làm sạch về [A-Z0-9] hoa, cắt vừa cột (prefix + 10 ≤ 32). */
+        val prefix: String = (section?.getString("prefix", "KMD") ?: "KMD")
+            .uppercase().replace(Regex("[^A-Z0-9]"), "").take(22)
+        /** Points granted per 1000đ transferred; bank points are computed `amount/1000 × point-rate`. */
+        val pointRate: Double = section?.getDouble("point-rate", 1.0) ?: 1.0
+        /** Minimum / maximum accepted transfer amount (VNĐ). */
+        val min: Long = section?.getLong("min", 10_000L) ?: 10_000L
+        val max: Long = section?.getLong("max", 50_000_000L) ?: 50_000_000L
+        /** When true, new bank intake is blocked; PENDING orders still settle. */
+        val maintenance: Boolean = section?.getBoolean("maintenance", false) ?: false
+        /** How often PENDING orders are polled, in seconds. */
+        val pollIntervalSeconds: Long = section?.getLong("poll-interval", 20L) ?: 20L
+        /** A PENDING order older than this many minutes is marked FAILED. */
+        val timeoutMinutes: Long = section?.getLong("timeout", 30L) ?: 30L
     }
 
     /**

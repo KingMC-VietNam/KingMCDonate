@@ -90,6 +90,44 @@ card:
   use-anvil: true
 
 # ============================================================
+#  Nạp ngân hàng (QR qua SePay)
+# ============================================================
+bank:
+  # Cổng ngân hàng đang dùng: "sepay". Credential đặt trong providers/sepay.yml.
+  provider: "sepay"
+
+  # Prefix đứng đầu MÃ GIAO DỊCH chuyển khoản (chỉ A-Z 0-9, viết HOA, không dấu/cách).
+  # PHẢI trùng với "mã thanh toán" (prefix) cấu hình trong dashboard SePay để SePay tự nhận
+  # diện giao dịch. Mã đầy đủ = prefix + 10 ký tự ngẫu nhiên (vd "KMD" -> "KMDK8V2PK2WD9").
+  prefix: "KMD"
+
+  # Số point trao thưởng cho mỗi 1000đ chuyển khoản (point bank = số tiền/1000 × point-rate, làm tròn).
+  # Thường cao hơn thẻ cùng số tiền (thẻ có chiết khấu cổng, bank thì không).
+  point-rate: 1.2
+
+  # Giới hạn số tiền mỗi đơn nạp bank (VNĐ).
+  min: 10000
+  max: 50000000
+
+  # Tạm khoá nhận đơn bank mới + báo người chơi đang bảo trì. Đơn PENDING vẫn được poll tới khi xong.
+  maintenance: false
+
+  # Chu kỳ poll SePay để xác nhận giao dịch (giây). SePay giới hạn 3 request/giây.
+  poll-interval: 20
+
+  # Đơn chưa chuyển khoản quá thời gian này sẽ bị huỷ (phút). Đặt rộng để hiếm khi tiền về sau khi đã huỷ.
+  timeout: 30
+
+# ============================================================
+#  Trao thưởng đa server (outbox)
+# ============================================================
+# Chu kỳ quét hàng đợi trao thưởng cần người chơi hiện diện (ticks; 20 ticks = 1 giây).
+reward-delivery-interval: 40
+# Bản ghi đã được một node giành nhưng chưa trao quá số phút này sẽ được trả lại cho node khác.
+# Đặt LỚN hơn nhiều thời gian trao thưởng thực tế (trao thưởng ~1 tick) để tránh trao trùng.
+stale-claim-minutes: 5
+
+# ============================================================
 #  Lệnh thưởng theo mốc (dùng chung thẻ + bank)
 # ============================================================
 # Lệnh thưởng THÊM (ngoài point) chạy theo MỐC số tiền nạp. Khác currency.commands ở trên

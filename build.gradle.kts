@@ -35,7 +35,6 @@ dependencies {
     compileOnly("org.jetbrains.kotlin:kotlin-stdlib:2.4.0")
     compileOnly("com.github.cryptomorin:XSeries:13.7.0")
     compileOnly("com.google.code.gson:gson:2.14.0")
-    compileOnly("com.google.zxing:core:3.5.4")
     compileOnly("com.zaxxer:HikariCP:7.0.2")
     compileOnly("org.xerial:sqlite-jdbc:3.53.2.0")
     compileOnly("com.mysql:mysql-connector-j:9.7.0")

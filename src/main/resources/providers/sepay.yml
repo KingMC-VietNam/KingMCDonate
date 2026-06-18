@@ -1,0 +1,17 @@
+# ============================================================
+#  SePay — cổng QR ngân hàng (tài khoản cá nhân OK)
+# ============================================================
+# Xác nhận giao dịch bằng cách poll SePay API v2 (outbound, KHÔNG cần webhook / IP public).
+# Tạo API Token tại my.sepay.vn -> Cấu hình Công ty -> API Access.
+
+# Số tài khoản ngân hàng nhận tiền.
+account-number: "YOUR_BANK_ACCOUNT_NUMBER"
+
+# Mã / tên viết tắt ngân hàng theo SePay (vd: ACB, Vietcombank, MBBank, TPBank...).
+bank: "ACB"
+
+# API Token (Bearer) để gọi SePay API v2. KHÔNG commit token thật lên source code.
+api-token: "YOUR_API_TOKEN"
+
+# Bật để dùng môi trường thử nghiệm (userapi-sandbox.sepay.vn). Token sandbox và production KHÔNG dùng chung.
+sandbox: false

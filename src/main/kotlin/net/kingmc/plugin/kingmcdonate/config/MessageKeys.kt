@@ -23,6 +23,13 @@ object MessageKeys {
     const val CARD_INPUT_PIN = "card-input-pin"
     const val CARD_INPUT_CANCELLED = "card-input-cancelled"
 
+    const val BANK_CREATED = "bank-created"
+    const val BANK_SUCCESS = "bank-success"
+    const val BANK_EXPIRED = "bank-expired"
+    const val BANK_MAINTENANCE = "bank-maintenance"
+    const val BANK_UNAVAILABLE = "bank-unavailable"
+    const val BANK_AMOUNT_RANGE = "bank-amount-range"
+
     const val HISTORY_HEADER = "history-header"
     const val HISTORY_ENTRY = "history-entry"
     const val HISTORY_EMPTY = "history-empty"
@@ -30,4 +37,8 @@ object MessageKeys {
     const val FAKECARD_USAGE = "fakecard-usage"
     const val FAKECARD_DONE = "fakecard-done"
     const val FAKECARD_PLAYER_NOT_FOUND = "fakecard-player-not-found"
+
+    const val BANK_USAGE = "bank-usage"
+    const val FAKEBANK_USAGE = "fakebank-usage"
+    const val FAKEBANK_DONE = "fakebank-done"
 }

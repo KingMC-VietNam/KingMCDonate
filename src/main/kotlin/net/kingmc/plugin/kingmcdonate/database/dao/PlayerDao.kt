@@ -18,4 +18,12 @@ class PlayerDao(database: Database) : Dao(database) {
             ps.executeUpdate()
         }
     }
+
+    /** Last-seen name for [playerUuid], or null if unknown. */
+    fun findName(playerUuid: UUID): String? = withConnection { conn ->
+        conn.prepareStatement("SELECT name FROM players WHERE uuid = ?").use { ps ->
+            ps.setString(1, playerUuid.toString())
+            ps.executeQuery().use { rs -> if (rs.next()) rs.getString("name") else null }
+        }
+    }
 }

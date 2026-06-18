@@ -4,6 +4,7 @@ import net.kingmc.plugin.kingmcdonate.database.Database
 import net.kingmc.plugin.kingmcdonate.database.Dialect
 import net.kingmc.plugin.kingmcdonate.util.Period
 import net.kingmc.plugin.kingmcdonate.util.Periods
+import java.sql.Connection
 import java.util.UUID
 
 /**
@@ -13,8 +14,17 @@ import java.util.UUID
  */
 class PlayerTotalsDao(database: Database) : Dao(database) {
 
-    /** Add [amountVnd] and [point] to all period buckets for [method] at [now]. */
+    /** Add [amountVnd] and [point] to all period buckets for [method] in its own transaction. */
     fun add(playerUuid: UUID, method: String, amountVnd: Long, point: Long, now: Long) = transaction { conn ->
+        add(conn, playerUuid, method, amountVnd, point, now)
+    }
+
+    /**
+     * Add to all period buckets using the supplied [conn] so totals can join an
+     * outer transaction (the bank confirmation flips status and adds totals
+     * atomically). Does not commit; the caller's transaction owns that.
+     */
+    fun add(conn: Connection, playerUuid: UUID, method: String, amountVnd: Long, point: Long, now: Long) {
         val sql = upsertSql(database.dialect)
         conn.prepareStatement(sql).use { ps ->
             for (period in Period.entries) {
