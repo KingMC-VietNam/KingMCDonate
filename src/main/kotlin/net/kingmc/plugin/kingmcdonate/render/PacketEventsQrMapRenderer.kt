@@ -30,6 +30,13 @@ class PacketEventsQrMapRenderer(private val logger: PluginLogger) : QrMapRendere
 
     private val active = ConcurrentHashMap<UUID, ActiveQr>()
 
+    init {
+        PacketEventsCreativeSlotGuard(
+            { uuid -> active[uuid]?.let { PLAYER_INV_HOTBAR_START + it.hotbarSlot } },
+            logger,
+        ).register()
+    }
+
     override fun show(player: Player, mapBytes: ByteArray) {
         val hotbarSlot = player.inventory.heldItemSlot
         active[player.uniqueId] = ActiveQr(mapBytes, hotbarSlot)

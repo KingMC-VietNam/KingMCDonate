@@ -145,11 +145,10 @@ class KingMCDonate : JavaPlugin() {
         )
         val chatInput = ChatInputListener(scheduler) { configManager.messages }
         val menu = CardTopupMenu(service, providers, CardInput(this, chatInput)) { configManager.config }
-        val historyMenu = HistoryMenu(cardPaymentDao, scheduler)
         val pollService = CardPollService(cardPaymentDao, service, providers, scheduler, pluginLogger) {
             configManager.config
         }
-        return CardSubsystem(providers, cardPaymentDao, service, chatInput, menu, historyMenu, pollService)
+        return CardSubsystem(providers, cardPaymentDao, service, chatInput, menu, pollService)
     }
 
     private fun enabledCardTypes(configManager: ConfigManager): Set<CardType> =
@@ -191,7 +190,7 @@ class KingMCDonate : JavaPlugin() {
             bankPaymentDao, providers, confirmService, qrRenderer, scheduler, pluginLogger,
             { configManager.config }, { configManager.messages },
         )
-        return BankSubsystem(providers, service, pollService, qrRenderer)
+        return BankSubsystem(providers, bankPaymentDao, service, pollService, qrRenderer)
     }
 
     private fun registerCommands(
@@ -217,7 +216,8 @@ class KingMCDonate : JavaPlugin() {
             tabCompleter = napThe
         }
 
-        val lichSu = LichSuNapCommand(card.cardPaymentDao, card.historyMenu, scheduler) { configManager.messages }
+        val historyMenu = HistoryMenu(card.cardPaymentDao, bank.bankPaymentDao, scheduler)
+        val lichSu = LichSuNapCommand(card.cardPaymentDao, historyMenu, scheduler) { configManager.messages }
         getCommand("lichsunap")?.setExecutor(lichSu)
 
         getCommand("bank")?.setExecutor(BankCommand(bank.service) { configManager.messages })
@@ -237,13 +237,13 @@ class KingMCDonate : JavaPlugin() {
         val service: CardPaymentService,
         val chatInput: ChatInputListener,
         val menu: CardTopupMenu,
-        val historyMenu: HistoryMenu,
         val pollService: CardPollService,
     )
 
     /** Bundle of bank-subsystem components shared between bootstrap and command registration. */
     private class BankSubsystem(
         val providers: BankProviderRegistry,
+        val bankPaymentDao: BankPaymentDao,
         val service: BankPaymentService,
         val pollService: BankPollService,
         val qrRenderer: QrMapRenderer,

@@ -80,6 +80,17 @@ class BankPaymentDao(database: Database) : Dao(database) {
         }
     }
 
+    /** Most recent [limit] orders for a player, newest first (history). */
+    fun findByPlayer(playerUuid: UUID, limit: Int): List<BankPayment> = withConnection { conn ->
+        conn.prepareStatement(
+            "SELECT * FROM bank_payments WHERE player_uuid = ? ORDER BY created_at DESC LIMIT ?",
+        ).use { ps ->
+            ps.setString(1, playerUuid.toString())
+            ps.setInt(2, limit)
+            ps.executeQuery().use { rs -> rs.collect() }
+        }
+    }
+
     /** SUCCESS orders owned by [serverId] whose external credit has not been applied yet (reconcile). */
     fun findSuccessUnrewardedByServer(serverId: String): List<BankPayment> = withConnection { conn ->
         conn.prepareStatement(
