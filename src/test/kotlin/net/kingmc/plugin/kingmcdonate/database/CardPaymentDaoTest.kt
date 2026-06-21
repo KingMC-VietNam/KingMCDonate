@@ -2,7 +2,7 @@ package net.kingmc.plugin.kingmcdonate.database
 
 import net.kingmc.plugin.kingmcdonate.config.PluginConfig
 import net.kingmc.plugin.kingmcdonate.database.dao.CardPaymentDao
-import net.kingmc.plugin.kingmcdonate.payment.PaymentStatus
+import net.kingmc.plugin.kingmcdonate.payment.model.PaymentStatus
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals

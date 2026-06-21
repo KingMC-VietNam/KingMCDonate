@@ -3,7 +3,7 @@ package net.kingmc.plugin.kingmcdonate.command
 import net.kingmc.plugin.kingmcdonate.config.MessageKeys
 import net.kingmc.plugin.kingmcdonate.config.Messages
 import net.kingmc.plugin.kingmcdonate.database.dao.CardPaymentDao
-import net.kingmc.plugin.kingmcdonate.gui.HistoryMenu
+import net.kingmc.plugin.kingmcdonate.gui.screen.HistoryMenu
 import net.kingmc.plugin.kingmcdonate.util.Scheduler
 import org.bukkit.command.Command
 import org.bukkit.command.CommandExecutor

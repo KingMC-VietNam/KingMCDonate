@@ -1,7 +1,7 @@
 package net.kingmc.plugin.kingmcdonate.provider.card
 
 import com.google.gson.JsonParser
-import net.kingmc.plugin.kingmcdonate.payment.PaymentStatus
+import net.kingmc.plugin.kingmcdonate.payment.model.PaymentStatus
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger
 
 /**
@@ -42,7 +42,7 @@ class ThesieutocCardProvider(
         return if (status == STATUS_OK && !transactionId.isNullOrBlank()) {
             CardOutcome(PaymentStatus.WAITING, transactionId, null, message)
         } else {
-            CardOutcome(PaymentStatus.FAILED, null, null, message.ifBlank { "Cổng từ chối giao dịch" })
+            CardOutcome(PaymentStatus.FAILED, null, null, message)
         }
     }
 
@@ -59,9 +59,9 @@ class ThesieutocCardProvider(
             status == STATUS_OK && message.contains(SUCCESS_MARKER, ignoreCase = true) ->
                 CardOutcome(PaymentStatus.SUCCESS, transactionId, null, message)
             status == STATUS_WRONG_DENOMINATION ->
-                CardOutcome(PaymentStatus.FAILED, transactionId, null, message.ifBlank { "Sai mệnh giá" })
+                CardOutcome(PaymentStatus.FAILED, transactionId, null, message)
             status == STATUS_FAILED ->
-                CardOutcome(PaymentStatus.FAILED, transactionId, null, message.ifBlank { "Thẻ không hợp lệ" })
+                CardOutcome(PaymentStatus.FAILED, transactionId, null, message)
             else -> CardOutcome(PaymentStatus.WAITING, transactionId, null, message)
         }
     }
@@ -81,6 +81,8 @@ class ThesieutocCardProvider(
         private const val STATUS_PENDING = "-9"
         private const val STATUS_FAILED = "-10"
         private const val STATUS_WRONG_DENOMINATION = "10"
+
+        // Matches the gateway's own success text in the `msg` field; not display text, do not translate.
         private const val SUCCESS_MARKER = "nạp thành công"
 
         private val TELCO = mapOf(

@@ -2,13 +2,13 @@ package net.kingmc.plugin.kingmcdonate.command
 
 import net.kingmc.plugin.kingmcdonate.config.MessageKeys
 import net.kingmc.plugin.kingmcdonate.config.Messages
-import net.kingmc.plugin.kingmcdonate.payment.BankPaymentService
+import net.kingmc.plugin.kingmcdonate.payment.bank.BankPaymentService
 import org.bukkit.command.Command
 import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 
-/** `/bank <số tiền>` — open a bank QR order for the given amount. */
+/** `/bank <amount>` — open a bank QR order for the given amount. */
 class BankCommand(
     private val service: BankPaymentService,
     private val messages: () -> Messages,

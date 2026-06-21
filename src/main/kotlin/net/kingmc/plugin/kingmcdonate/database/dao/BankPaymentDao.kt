@@ -1,12 +1,11 @@
 package net.kingmc.plugin.kingmcdonate.database.dao
 
 import net.kingmc.plugin.kingmcdonate.database.Database
-import net.kingmc.plugin.kingmcdonate.payment.BankPayment
-import net.kingmc.plugin.kingmcdonate.payment.PaymentStatus
+import net.kingmc.plugin.kingmcdonate.payment.model.BankPayment
+import net.kingmc.plugin.kingmcdonate.payment.model.PaymentStatus
 import net.kingmc.plugin.kingmcdonate.payment.ReferenceCode
 import java.sql.Connection
 import java.sql.ResultSet
-import java.sql.SQLException
 import java.util.UUID
 
 /**
@@ -28,30 +27,25 @@ class BankPaymentDao(database: Database) : Dao(database) {
         prefix: String = "",
     ): String =
         withConnection { conn ->
-            repeat(REFERENCE_RETRIES) {
+            retryOnCollision(REFERENCE_RETRIES) {
                 val code = prefix + ReferenceCode.generate()
-                try {
-                    conn.prepareStatement(
-                        "INSERT INTO bank_payments " +
-                            "(player_uuid, amount, reference_code, status, provider, owner_server, " +
-                            "reward_applied, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)",
-                    ).use { ps ->
-                        ps.setString(1, playerUuid.toString())
-                        ps.setLong(2, amount)
-                        ps.setString(3, code)
-                        ps.setString(4, PaymentStatus.PENDING.storageValue)
-                        ps.setString(5, provider)
-                        ps.setString(6, ownerServer)
-                        ps.setLong(7, now)
-                        ps.setLong(8, now)
-                        ps.executeUpdate()
-                    }
-                    return@withConnection code
-                } catch (e: SQLException) {
-                    if (!isUniqueViolation(e)) throw e
+                conn.prepareStatement(
+                    "INSERT INTO bank_payments " +
+                        "(player_uuid, amount, reference_code, status, provider, owner_server, " +
+                        "reward_applied, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)",
+                ).use { ps ->
+                    ps.setString(1, playerUuid.toString())
+                    ps.setLong(2, amount)
+                    ps.setString(3, code)
+                    ps.setString(4, PaymentStatus.PENDING.storageValue)
+                    ps.setString(5, provider)
+                    ps.setString(6, ownerServer)
+                    ps.setLong(7, now)
+                    ps.setLong(8, now)
+                    ps.executeUpdate()
                 }
+                code
             }
-            throw IllegalStateException("Could not generate a unique reference code after $REFERENCE_RETRIES attempts")
         }
 
     /** Load an order by reference, whatever its status (the confirmation path branches on it). */
@@ -76,7 +70,7 @@ class BankPaymentDao(database: Database) : Dao(database) {
             ps.setString(2, PaymentStatus.FAILED.storageValue)
             ps.setLong(3, since)
             ps.setInt(4, MAX_BATCH)
-            ps.executeQuery().use { rs -> rs.collect() }
+            ps.executeQuery().use { rs -> rs.mapAll { toBankPayment() } }
         }
     }
 
@@ -87,7 +81,7 @@ class BankPaymentDao(database: Database) : Dao(database) {
         ).use { ps ->
             ps.setString(1, playerUuid.toString())
             ps.setInt(2, limit)
-            ps.executeQuery().use { rs -> rs.collect() }
+            ps.executeQuery().use { rs -> rs.mapAll { toBankPayment() } }
         }
     }
 
@@ -100,7 +94,7 @@ class BankPaymentDao(database: Database) : Dao(database) {
             ps.setString(1, serverId)
             ps.setString(2, PaymentStatus.SUCCESS.storageValue)
             ps.setInt(3, MAX_BATCH)
-            ps.executeQuery().use { rs -> rs.collect() }
+            ps.executeQuery().use { rs -> rs.mapAll { toBankPayment() } }
         }
     }
 
@@ -156,15 +150,9 @@ class BankPaymentDao(database: Database) : Dao(database) {
                 ps.setString(1, serverId)
                 ps.setString(2, status.storageValue)
                 ps.setInt(3, MAX_BATCH)
-                ps.executeQuery().use { rs -> rs.collect() }
+                ps.executeQuery().use { rs -> rs.mapAll { toBankPayment() } }
             }
         }
-
-    private fun ResultSet.collect(): List<BankPayment> {
-        val out = ArrayList<BankPayment>()
-        while (next()) out.add(toBankPayment())
-        return out
-    }
 
     private fun ResultSet.toBankPayment() = BankPayment(
         id = getLong("id"),

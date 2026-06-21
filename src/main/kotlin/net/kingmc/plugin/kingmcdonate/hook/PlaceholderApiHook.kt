@@ -27,7 +27,7 @@ object PlaceholderApiHook {
             val method = api.getMethod("setPlaceholders", Player::class.java, String::class.java)
             resolver = { player, text -> method.invoke(null, player, text) as String }
             logger.debug { "PlaceholderAPI hook installed." }
-        }.onFailure { logger.warn("Không gắn được PlaceholderAPI: ${it.message}") }
+        }.onFailure { logger.warn("Could not hook PlaceholderAPI: ${it.message}") }
     }
 
     /** Expand `%placeholder%` tokens for [player]; returns [text] unchanged when unavailable or no player. */

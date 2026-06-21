@@ -4,7 +4,7 @@ import net.kingmc.plugin.kingmcdonate.database.Dialect
 import java.sql.Connection
 
 /**
- * Initial schema. Money is stored in VNĐ as BIGINT; timestamps as epoch-millis
+ * Initial schema. Money is stored in VND as BIGINT; timestamps as epoch-millis
  * BIGINT; booleans as INT (0/1) for portability. All statements are
  * `CREATE TABLE IF NOT EXISTS` so a partial pre-existing schema is tolerated.
  */

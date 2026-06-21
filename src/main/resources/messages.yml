@@ -10,10 +10,18 @@ reload-failed: "&cTải lại thất bại: &e{error}&c. Giữ nguyên cấu hì
 # Trả thưởng / provider
 currency-unavailable: "&cHệ thống trả thưởng đang không khả dụng, vui lòng liên hệ quản trị."
 
+# Trạng thái giao dịch (hiển thị trong lịch sử)
+status-success: "&aThành công"
+status-failed: "&cThất bại"
+status-waiting: "&eĐang xử lý"
+status-pending: "&7Đang chờ"
+
 # Nạp thẻ
 card-charging: "&7Đang xử lý thẻ của bạn, vui lòng đợi giây lát..."
 card-success: "&aNạp thẻ thành công! &f+{amount} &a(&e{point} point&a)."
 card-failed: "&cNạp thẻ thất bại: &e{reason}&c."
+card-reason-generic: "giao dịch không thành công"
+card-reason-timeout: "hết hạn xử lý"
 card-wrong-denomination: "&cSai mệnh giá — thẻ không được cộng thưởng. Liên hệ quản trị để đối soát."
 card-invalid-type: "&cLoại thẻ không hợp lệ hoặc chưa được mở."
 card-invalid-denomination: "&cMệnh giá không hợp lệ."
@@ -24,6 +32,8 @@ card-maintenance: "&eCổng nạp thẻ đang bảo trì, vui lòng quay lại s
 card-input-serial: "&eNhập &fseri&e thẻ vào chat &7(gõ &chuy&7 để hủy)&e:"
 card-input-pin: "&eNhập &fmã thẻ (PIN)&e vào chat &7(gõ &chuy&7 để hủy)&e:"
 card-input-cancelled: "&7Đã hủy nạp thẻ."
+anvil-serial-title: "&8Nhập seri thẻ"
+anvil-pin-title: "&8Nhập mã thẻ (PIN)"
 
 # Nạp ngân hàng (QR)
 bank-created: "&aĐã tạo mã QR nạp &f{amount}&a. Mã giao dịch: &e{ref}&a. Quét QR và chuyển đúng số tiền, hệ thống sẽ tự xác nhận."
@@ -38,6 +48,7 @@ bank-usage: "&cDùng: &e/bank <số tiền>"
 history-header: "&#55FFFF===== Lịch sử nạp ====="
 history-entry: "&7- &f{type} &7| &e{amount} &7| {status} &7| &8{time}"
 history-empty: "&7Chưa có giao dịch nào."
+history-bank-label: "Ngân hàng"
 
 # Test (admin)
 fakecard-usage: "&cDùng: &e/kingmcdonate fakecard <player> <số tiền>"

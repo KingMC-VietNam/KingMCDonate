@@ -1,7 +1,7 @@
 package net.kingmc.plugin.kingmcdonate.database.dao
 
 import net.kingmc.plugin.kingmcdonate.database.Database
-import net.kingmc.plugin.kingmcdonate.payment.PendingReward
+import net.kingmc.plugin.kingmcdonate.payment.reward.PendingReward
 import java.util.UUID
 
 /**
@@ -32,7 +32,7 @@ class PendingRewardDao(database: Database) : Dao(database) {
                 "WHERE delivered = 0 AND claimed_by IS NULL ORDER BY created_at LIMIT ?",
         ).use { ps ->
             ps.setInt(1, limit)
-            ps.executeQuery().use { rs -> rs.toRewards() }
+            ps.executeQuery().use { rs -> rs.mapAll { toPendingReward() } }
         }
     }
 
@@ -46,25 +46,17 @@ class PendingRewardDao(database: Database) : Dao(database) {
                     "WHERE delivered = 0 AND claimed_by IS NULL AND player_uuid IN ($placeholders)",
             ).use { ps ->
                 playerUuids.forEachIndexed { i, uuid -> ps.setString(i + 1, uuid.toString()) }
-                ps.executeQuery().use { rs -> rs.toRewards() }
+                ps.executeQuery().use { rs -> rs.mapAll { toPendingReward() } }
             }
         }
     }
 
-    private fun java.sql.ResultSet.toRewards(): List<PendingReward> {
-        val out = ArrayList<PendingReward>()
-        while (next()) {
-            out.add(
-                PendingReward(
-                    id = getLong("id"),
-                    playerUuid = UUID.fromString(getString("player_uuid")),
-                    referenceCode = getString("reference_code"),
-                    payload = getString("payload"),
-                ),
-            )
-        }
-        return out
-    }
+    private fun java.sql.ResultSet.toPendingReward() = PendingReward(
+        id = getLong("id"),
+        playerUuid = UUID.fromString(getString("player_uuid")),
+        referenceCode = getString("reference_code"),
+        payload = getString("payload"),
+    )
 
     /** Atomically claim row [id] for [node]; returns 1 for the single winner, 0 otherwise. */
     fun claim(id: Long, node: String, now: Long): Int = withConnection { conn ->

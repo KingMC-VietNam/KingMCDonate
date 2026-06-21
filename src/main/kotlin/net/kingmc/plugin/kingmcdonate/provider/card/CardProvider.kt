@@ -1,6 +1,6 @@
 package net.kingmc.plugin.kingmcdonate.provider.card
 
-import net.kingmc.plugin.kingmcdonate.payment.PaymentStatus
+import net.kingmc.plugin.kingmcdonate.payment.model.PaymentStatus
 import java.util.UUID
 
 /** Telcos/brands a card can belong to; each gateway maps these to its own wire string. */

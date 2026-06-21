@@ -1,7 +1,8 @@
 package net.kingmc.plugin.kingmcdonate.payment
 
-import net.kingmc.plugin.kingmcdonate.payment.RewardCommands.Context
-import net.kingmc.plugin.kingmcdonate.payment.RewardCommands.Parsed
+import net.kingmc.plugin.kingmcdonate.payment.reward.RewardCommands
+import net.kingmc.plugin.kingmcdonate.payment.reward.RewardCommands.Context
+import net.kingmc.plugin.kingmcdonate.payment.reward.RewardCommands.Parsed
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 

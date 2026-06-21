@@ -21,30 +21,23 @@ class Messages(
 
     /** Colorized message for [key]; logs a warning and returns the key if missing. */
     fun get(key: String, vararg vars: Pair<String, String>): String {
-        val raw = messages[key]
-        if (raw == null) {
-            logger.warn("Missing message key: $key")
-            return key
-        }
+        val raw = getOrWarn(key) ?: return key
         return Text.colorize(applyVars(raw, vars))
     }
 
     /** Send a prefixed message to [sender]; blank messages are skipped. */
     fun send(sender: CommandSender, key: String, vararg vars: Pair<String, String>) {
-        val raw = messages[key]
-        if (raw == null) {
-            logger.warn("Missing message key: $key")
-            sender.sendMessage(key)
-            return
-        }
+        val raw = getOrWarn(key) ?: run { sender.sendMessage(key); return }
         if (raw.isBlank()) return
         sender.sendMessage(Text.colorize(prefix + applyVars(raw, vars)))
     }
 
-    private fun applyVars(raw: String, vars: Array<out Pair<String, String>>): String {
-        if (vars.isEmpty()) return raw
-        var result = raw
-        for ((token, value) in vars) result = result.replace("{$token}", value)
-        return result
+    /** Raw message for [key], or null (after logging) when missing. */
+    private fun getOrWarn(key: String): String? = messages[key] ?: run {
+        logger.warn("Missing message key: $key")
+        null
     }
+
+    private fun applyVars(raw: String, vars: Array<out Pair<String, String>>): String =
+        vars.fold(raw) { result, (token, value) -> result.replace("{$token}", value) }
 }

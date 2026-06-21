@@ -5,7 +5,7 @@ import java.text.DecimalFormatSymbols
 import java.util.Locale
 
 /**
- * Text helpers: color translation and VNĐ money formatting.
+ * Text helpers: color translation and VND money formatting.
  *
  * Color is deliberately legacy-first so it works on every 1.16.5+ client
  * (Spigot included, where Adventure is not bundled):
@@ -27,7 +27,7 @@ object Text {
     /** Valid characters after `&` for a legacy color/format code. */
     private const val LEGACY_CODES = "0123456789abcdefklmnorABCDEFKLMNOR"
 
-    /** Fixed VNĐ grouping: `.` thousands separator, no decimals. */
+    /** Fixed VND grouping: `.` thousands separator, no decimals. */
     private val moneyFormat = ThreadLocal.withInitial {
         DecimalFormat("#,###", DecimalFormatSymbols(Locale.ROOT).apply { groupingSeparator = '.' })
     }
@@ -63,6 +63,6 @@ object Text {
         return String(chars)
     }
 
-    /** Format a VNĐ amount as e.g. `100.000đ`, independent of the host locale. */
+    /** Format a VND amount as e.g. `100.000đ` (đ = the dong currency symbol), independent of the host locale. */
     fun formatMoney(amount: Long): String = moneyFormat.get().format(amount) + "đ"
 }

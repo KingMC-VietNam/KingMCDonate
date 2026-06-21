@@ -1,6 +1,6 @@
 package net.kingmc.plugin.kingmcdonate.provider.card
 
-import net.kingmc.plugin.kingmcdonate.payment.PaymentStatus
+import net.kingmc.plugin.kingmcdonate.payment.model.PaymentStatus
 import net.kingmc.plugin.kingmcdonate.util.Http
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger
 import org.bukkit.configuration.file.YamlConfiguration

@@ -1,0 +1,161 @@
+package net.kingmc.plugin.kingmcdonate.payment.bank
+
+import net.kingmc.plugin.kingmcdonate.config.MessageKeys
+import net.kingmc.plugin.kingmcdonate.config.PluginConfig
+import net.kingmc.plugin.kingmcdonate.currency.CurrencyRegistry
+import net.kingmc.plugin.kingmcdonate.database.Database
+import net.kingmc.plugin.kingmcdonate.database.dao.BankPaymentDao
+import net.kingmc.plugin.kingmcdonate.database.dao.PlayerDao
+import net.kingmc.plugin.kingmcdonate.database.dao.PlayerTotalsDao
+import net.kingmc.plugin.kingmcdonate.database.dao.ProcessedBankTxDao
+import net.kingmc.plugin.kingmcdonate.database.dao.isUniqueViolation
+import net.kingmc.plugin.kingmcdonate.payment.model.BankPayment
+import net.kingmc.plugin.kingmcdonate.payment.model.PaymentStatus
+import net.kingmc.plugin.kingmcdonate.payment.reward.RewardCommands
+import net.kingmc.plugin.kingmcdonate.payment.reward.RewardPayload
+import net.kingmc.plugin.kingmcdonate.payment.reward.RewardSink
+import net.kingmc.plugin.kingmcdonate.provider.bank.BankConfirmation
+import net.kingmc.plugin.kingmcdonate.util.PluginLogger
+import net.kingmc.plugin.kingmcdonate.util.Text
+import org.bukkit.Bukkit
+import java.sql.SQLException
+import java.util.UUID
+
+/**
+ * The single convergence point for every bank confirmation. It loads the order by
+ * reference regardless of status; a PENDING order is resolved by one transaction
+ * that records the gateway transaction, flips the status and accumulates totals
+ * (all exactly-once), after which the external point credit is applied under a
+ * conditional `reward_applied` gate (at most once). Amount mismatches are not
+ * rewarded; transfers for an already-failed order are recorded and surfaced once.
+ */
+class BankConfirmService(
+    private val database: Database,
+    private val bankPaymentDao: BankPaymentDao,
+    private val processedBankTxDao: ProcessedBankTxDao,
+    private val playerTotalsDao: PlayerTotalsDao,
+    private val playerDao: PlayerDao,
+    private val currency: CurrencyRegistry,
+    private val rewardSink: RewardSink,
+    private val clearQr: (UUID) -> Unit,
+    private val logger: PluginLogger,
+    private val config: () -> PluginConfig,
+) {
+
+    private class NotPendingException : RuntimeException()
+
+    /** Route a confirmed transfer: branch on the order's current status. */
+    fun confirm(confirmation: BankConfirmation) {
+        val order = bankPaymentDao.findByReference(confirmation.referenceCode)
+        if (order == null) {
+            logger.debug { "Confirm: no order for ref=${confirmation.referenceCode}; skipping." }
+            return
+        }
+        when (order.status) {
+            PaymentStatus.PENDING -> resolvePending(order, confirmation)
+            PaymentStatus.FAILED -> lateTransfer(order, confirmation)
+            PaymentStatus.SUCCESS -> logger.debug { "Confirm: ref=${order.referenceCode} already SUCCESS; skipping." }
+            PaymentStatus.WAITING -> logger.debug { "Confirm: ref=${order.referenceCode} WAITING (unused for bank)." }
+        }
+    }
+
+    /** Re-apply the gated external credit for a SUCCESS order whose credit was not applied (reconcile). */
+    fun reapplyReward(order: BankPayment) {
+        if (order.status != PaymentStatus.SUCCESS) return
+        applyReward(order)
+    }
+
+    private fun resolvePending(order: BankPayment, confirmation: BankConfirmation) {
+        if (confirmation.amount != order.amount) {
+            logger.warn(
+                "Bank ${order.referenceCode} amount mismatch: order=${order.amount} paid=${confirmation.amount}; " +
+                    "kept PENDING for manual reconciliation.",
+            )
+            return
+        }
+        if (!currency.active.isAvailable()) {
+            logger.warn("Bank ${order.referenceCode}: currency provider unavailable; left PENDING for a later pass.")
+            return
+        }
+
+        val point = pointFor(order.amount)
+        val now = System.currentTimeMillis()
+        val committed = try {
+            database.transaction { conn ->
+                processedBankTxDao.insertWithinTxn(conn, confirmation.transactionId, order.referenceCode, now)
+                val rows = bankPaymentDao.resolveSuccessWithinTxn(conn, order.referenceCode, now)
+                if (rows != 1) throw NotPendingException()
+                playerTotalsDao.add(conn, order.playerUuid, METHOD_BANK, order.amount, point, now)
+            }
+            true
+        } catch (e: NotPendingException) {
+            logger.debug { "Bank ${order.referenceCode} no longer PENDING at flip; skipping." }
+            false
+        } catch (e: SQLException) {
+            if (isUniqueViolation(e)) {
+                logger.debug { "Bank tx ${confirmation.transactionId} already processed; skipping." }
+            } else {
+                logger.error("Bank ${order.referenceCode}: confirm transaction failed.", e)
+            }
+            false
+        }
+        if (!committed) return
+
+        logger.debug { "Bank SUCCESS ref=${order.referenceCode} uuid=${order.playerUuid} amount=${order.amount} +${point}pt" }
+        applyReward(order)
+        clearQr(order.playerUuid)
+    }
+
+    /** Gate the external reward so confirm and any reconcile pass together apply it at most once. */
+    private fun applyReward(order: BankPayment) {
+        val point = pointFor(order.amount)
+        if (bankPaymentDao.claimRewardApplied(order.referenceCode, System.currentTimeMillis()) != 1) {
+            logger.debug { "Bank ${order.referenceCode}: reward already applied; skipping credit." }
+            return
+        }
+        try {
+            currency.active.give(order.playerUuid, point)
+        } catch (e: Exception) {
+            logger.error("Bank ${order.referenceCode}: point credit failed uuid=${order.playerUuid}; reconcile manually.", e)
+        }
+        enqueueReward(order, point)
+    }
+
+    private fun enqueueReward(order: BankPayment, point: Long) {
+        val name = playerDao.findName(order.playerUuid)
+            ?: Bukkit.getOfflinePlayer(order.playerUuid).name
+            ?: order.playerUuid.toString()
+        val vars = mapOf(
+            "player" to name,
+            "amount" to order.amount.toString(),
+            "point" to point.toString(),
+            "ref" to order.referenceCode,
+        )
+        val commands = config().rewards.commandsFor(order.amount).map { RewardCommands.format(it, vars) }
+        val payload = RewardPayload(
+            messageKey = MessageKeys.BANK_SUCCESS,
+            messageVars = mapOf("amount" to Text.formatMoney(order.amount), "point" to point.toString()),
+            commands = commands,
+        )
+        rewardSink.enqueue(order.playerUuid, order.referenceCode, payload)
+    }
+
+    private fun lateTransfer(order: BankPayment, confirmation: BankConfirmation) {
+        val first = processedBankTxDao.insertIfAbsent(
+            confirmation.transactionId, order.referenceCode, System.currentTimeMillis(),
+        )
+        if (first) {
+            logger.warn(
+                "Bank ${order.referenceCode}: transfer (tx=${confirmation.transactionId}, ${confirmation.amount}) " +
+                    "arrived after the order FAILED; recorded for manual reconciliation.",
+            )
+        }
+    }
+
+    /** points = amount / 1000 * bank.point-rate, rounded half-up. */
+    fun pointFor(amountVnd: Long): Long = Math.round(amountVnd / 1000.0 * config().bank.pointRate)
+
+    companion object {
+        const val METHOD_BANK = "bank"
+    }
+}

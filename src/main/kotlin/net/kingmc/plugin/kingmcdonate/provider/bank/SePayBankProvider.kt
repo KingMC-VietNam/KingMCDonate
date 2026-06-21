@@ -2,7 +2,7 @@ package net.kingmc.plugin.kingmcdonate.provider.bank
 
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
-import net.kingmc.plugin.kingmcdonate.payment.BankPayment
+import net.kingmc.plugin.kingmcdonate.payment.model.BankPayment
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets

@@ -1,12 +1,11 @@
 package net.kingmc.plugin.kingmcdonate.database.dao
 
 import net.kingmc.plugin.kingmcdonate.database.Database
-import net.kingmc.plugin.kingmcdonate.payment.CardPayment
-import net.kingmc.plugin.kingmcdonate.payment.PaymentStatus
+import net.kingmc.plugin.kingmcdonate.payment.model.CardPayment
+import net.kingmc.plugin.kingmcdonate.payment.model.PaymentStatus
 import net.kingmc.plugin.kingmcdonate.payment.ReferenceCode
 import java.sql.Connection
 import java.sql.ResultSet
-import java.sql.SQLException
 import java.util.UUID
 
 /**
@@ -31,36 +30,30 @@ class CardPaymentDao(database: Database) : Dao(database) {
         ownerServer: String,
         now: Long,
     ): String = withConnection { conn ->
-        repeat(REFERENCE_RETRIES) {
+        retryOnCollision(REFERENCE_RETRIES) {
             val code = ReferenceCode.generate()
-            try {
-                conn.prepareStatement(
-                    "INSERT INTO card_payments " +
-                        "(player_uuid, player_name, card_type, amount, serial, pin, status, " +
-                        "reference_code, card_provider, owner_server, point, created_at, updated_at) " +
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)",
-                ).use { ps ->
-                    ps.setString(1, playerUuid.toString())
-                    ps.setString(2, playerName)
-                    ps.setString(3, cardType)
-                    ps.setLong(4, amount)
-                    ps.setString(5, serial)
-                    ps.setString(6, pin)
-                    ps.setString(7, PaymentStatus.PENDING.storageValue)
-                    ps.setString(8, code)
-                    ps.setString(9, provider)
-                    ps.setString(10, ownerServer)
-                    ps.setLong(11, now)
-                    ps.setLong(12, now)
-                    ps.executeUpdate()
-                }
-                return@withConnection code
-            } catch (e: SQLException) {
-                // Retry only on a reference-code collision; rethrow anything else.
-                if (!isUniqueViolation(e)) throw e
+            conn.prepareStatement(
+                "INSERT INTO card_payments " +
+                    "(player_uuid, player_name, card_type, amount, serial, pin, status, " +
+                    "reference_code, card_provider, owner_server, point, created_at, updated_at) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)",
+            ).use { ps ->
+                ps.setString(1, playerUuid.toString())
+                ps.setString(2, playerName)
+                ps.setString(3, cardType)
+                ps.setLong(4, amount)
+                ps.setString(5, serial)
+                ps.setString(6, pin)
+                ps.setString(7, PaymentStatus.PENDING.storageValue)
+                ps.setString(8, code)
+                ps.setString(9, provider)
+                ps.setString(10, ownerServer)
+                ps.setLong(11, now)
+                ps.setLong(12, now)
+                ps.executeUpdate()
             }
+            code
         }
-        throw IllegalStateException("Could not generate a unique reference code after $REFERENCE_RETRIES attempts")
     }
 
     /** Move PENDING -> WAITING and store the gateway transaction handle. */
@@ -105,7 +98,7 @@ class CardPaymentDao(database: Database) : Dao(database) {
             ps.setString(1, serverId)
             ps.setString(2, PaymentStatus.WAITING.storageValue)
             ps.setInt(3, MAX_POLL_BATCH)
-            ps.executeQuery().use { rs -> rs.collect() }
+            ps.executeQuery().use { rs -> rs.mapAll { toCardPayment() } }
         }
     }
 
@@ -116,14 +109,8 @@ class CardPaymentDao(database: Database) : Dao(database) {
         ).use { ps ->
             ps.setString(1, playerUuid.toString())
             ps.setInt(2, limit)
-            ps.executeQuery().use { rs -> rs.collect() }
+            ps.executeQuery().use { rs -> rs.mapAll { toCardPayment() } }
         }
-    }
-
-    private fun ResultSet.collect(): List<CardPayment> {
-        val out = ArrayList<CardPayment>()
-        while (next()) out.add(toCardPayment())
-        return out
     }
 
     private fun ResultSet.toCardPayment() = CardPayment(
@@ -143,13 +130,6 @@ class CardPaymentDao(database: Database) : Dao(database) {
         createdAt = getLong("created_at"),
         updatedAt = getLong("updated_at"),
     )
-
-    private fun isUniqueViolation(e: SQLException): Boolean {
-        // SQL integrity-constraint violations use SQLState class 23; SQLite reports it in the message.
-        if (e.sqlState?.startsWith("23") == true) return true
-        val message = e.message ?: return false
-        return message.contains("unique", ignoreCase = true) || message.contains("constraint", ignoreCase = true)
-    }
 
     companion object {
         private const val REFERENCE_RETRIES = 5

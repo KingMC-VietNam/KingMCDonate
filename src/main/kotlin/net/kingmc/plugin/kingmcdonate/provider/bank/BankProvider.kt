@@ -1,6 +1,6 @@
 package net.kingmc.plugin.kingmcdonate.provider.bank
 
-import net.kingmc.plugin.kingmcdonate.payment.BankPayment
+import net.kingmc.plugin.kingmcdonate.payment.model.BankPayment
 
 /** The QR a gateway produces for an order: an image URL the client fetches and renders. */
 data class BankQr(val imageUrl: String)

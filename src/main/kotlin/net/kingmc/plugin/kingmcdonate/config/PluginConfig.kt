@@ -51,7 +51,7 @@ class PluginConfig(root: ConfigurationSection) {
         val provider: String = section?.getString("provider", "thesieutoc")?.lowercase() ?: "thesieutoc"
         /** Card type names enabled for top-up (resolved to `CardType` by the registry). */
         val cardTypes: List<String> = section?.getStringList("card-types") ?: emptyList()
-        /** Denomination (VNĐ) -> points granted; the single source of card points. */
+        /** Denomination (VND) -> points granted; the single source of card points. */
         val denominations: Map<Long, Long> = readLongMap(section, "denominations")
         /** When true, new card intake is blocked with a maintenance notice; in-flight orders still settle. */
         val maintenance: Boolean = section?.getBoolean("maintenance", false) ?: false
@@ -71,12 +71,11 @@ class PluginConfig(root: ConfigurationSection) {
     class BankConfig(section: ConfigurationSection?) {
         /** Active bank gateway: `sepay`. Credentials live in `providers/<name>.yml`. */
         val provider: String = section?.getString("provider", "sepay")?.lowercase() ?: "sepay"
-        /** Prefix đầu mã giao dịch; làm sạch về [A-Z0-9] hoa, cắt vừa cột (prefix + 10 ≤ 32). */
-        val prefix: String = (section?.getString("prefix", "KMD") ?: "KMD")
-            .uppercase().replace(Regex("[^A-Z0-9]"), "").take(22)
-        /** Points granted per 1000đ transferred; bank points are computed `amount/1000 × point-rate`. */
+        /** Reference-code prefix; sanitized to uppercase [A-Z0-9] and trimmed to fit the column (prefix + 10 <= 32). */
+        val prefix: String = sanitizePrefix(section?.getString("prefix", "KMD") ?: "KMD")
+        /** Points granted per 1000 VND transferred; bank points are computed `amount / 1000 * point-rate`. */
         val pointRate: Double = section?.getDouble("point-rate", 1.0) ?: 1.0
-        /** Minimum / maximum accepted transfer amount (VNĐ). */
+        /** Minimum / maximum accepted transfer amount (VND). */
         val min: Long = section?.getLong("min", 10_000L) ?: 10_000L
         val max: Long = section?.getLong("max", 50_000_000L) ?: 50_000_000L
         /** When true, new bank intake is blocked; PENDING orders still settle. */
@@ -85,10 +84,18 @@ class PluginConfig(root: ConfigurationSection) {
         val pollIntervalSeconds: Long = section?.getLong("poll-interval", 20L) ?: 20L
         /** A PENDING order older than this many minutes is marked FAILED. */
         val timeoutMinutes: Long = section?.getLong("timeout", 30L) ?: 30L
+
+        companion object {
+            private const val MAX_PREFIX_LENGTH = 22
+            private val NON_ALPHANUMERIC = Regex("[^A-Z0-9]")
+
+            private fun sanitizePrefix(raw: String): String =
+                raw.uppercase().replace(NON_ALPHANUMERIC, "").take(MAX_PREFIX_LENGTH)
+        }
     }
 
     /**
-     * Reward commands shared by every donation method (card and bank), keyed by a VNĐ
+     * Reward commands shared by every donation method (card and bank), keyed by a VND
      * threshold. A successful top-up runs the single highest tier whose threshold is
      * `<=` the amount paid; `{player}`/`{amount}`/`{point}`/`{ref}` are substituted and
      * each line may carry a `console:`/`player:`/`op:` context prefix.

@@ -3,7 +3,7 @@ package net.kingmc.plugin.kingmcdonate.command
 import net.kingmc.plugin.kingmcdonate.config.MessageKeys
 import net.kingmc.plugin.kingmcdonate.config.Messages
 import net.kingmc.plugin.kingmcdonate.database.dao.CardPaymentDao
-import net.kingmc.plugin.kingmcdonate.payment.CardDisplay
+import net.kingmc.plugin.kingmcdonate.payment.card.CardDisplay
 import net.kingmc.plugin.kingmcdonate.util.Scheduler
 import net.kingmc.plugin.kingmcdonate.util.Text
 import org.bukkit.Bukkit
@@ -55,7 +55,7 @@ object CardHistoryChat {
                     MessageKeys.HISTORY_ENTRY,
                     "type" to payment.cardType,
                     "amount" to Text.formatMoney(payment.amount),
-                    "status" to CardDisplay.statusText(payment.status),
+                    "status" to CardDisplay.statusText(payment.status, messages),
                     "time" to CardDisplay.time(payment.createdAt),
                 )
             }

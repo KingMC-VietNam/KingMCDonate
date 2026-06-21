@@ -4,7 +4,7 @@ import org.bukkit.entity.Player
 
 /**
  * Renders a payment QR onto a virtual map for a single player. `mapBytes` is a
- * 128×128 Minecraft map colour array. Implementations send the map purely by
+ * 128x128 Minecraft map colour array. Implementations send the map purely by
  * packet (no real inventory write), so a fork can swap in an NMS renderer without
  * touching the payment core. Closing an inventory re-syncs the real slot, so the
  * payment flow calls [resend] to keep the QR visible.

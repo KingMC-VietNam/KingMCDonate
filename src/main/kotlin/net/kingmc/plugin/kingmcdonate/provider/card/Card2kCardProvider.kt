@@ -1,7 +1,7 @@
 package net.kingmc.plugin.kingmcdonate.provider.card
 
 import com.google.gson.JsonParser
-import net.kingmc.plugin.kingmcdonate.payment.PaymentStatus
+import net.kingmc.plugin.kingmcdonate.payment.model.PaymentStatus
 import net.kingmc.plugin.kingmcdonate.util.Hashing
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger
 
@@ -59,8 +59,9 @@ class Card2kCardProvider(
                 if (isCheck) CardOutcome(PaymentStatus.SUCCESS, ref, recognized, message)
                 else CardOutcome(PaymentStatus.WAITING, ref, recognized, message)
             STATUS_PENDING -> CardOutcome(PaymentStatus.WAITING, ref, recognized, message)
-            STATUS_WRONG_PRICE -> CardOutcome(PaymentStatus.FAILED, ref, recognized, message.ifBlank { "Sai mệnh giá" })
-            else -> CardOutcome(PaymentStatus.FAILED, ref, recognized, message.ifBlank { "Thẻ không hợp lệ" })
+            // Surface the gateway's own (Vietnamese) message; the payment layer localizes when it is blank.
+            STATUS_WRONG_PRICE -> CardOutcome(PaymentStatus.FAILED, ref, recognized, message)
+            else -> CardOutcome(PaymentStatus.FAILED, ref, recognized, message)
         }
     }
 

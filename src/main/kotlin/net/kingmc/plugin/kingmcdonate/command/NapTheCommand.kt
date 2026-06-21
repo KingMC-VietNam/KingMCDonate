@@ -3,8 +3,8 @@ package net.kingmc.plugin.kingmcdonate.command
 import net.kingmc.plugin.kingmcdonate.config.MessageKeys
 import net.kingmc.plugin.kingmcdonate.config.Messages
 import net.kingmc.plugin.kingmcdonate.config.PluginConfig
-import net.kingmc.plugin.kingmcdonate.gui.CardTopupMenu
-import net.kingmc.plugin.kingmcdonate.payment.CardPaymentService
+import net.kingmc.plugin.kingmcdonate.gui.screen.CardTopupMenu
+import net.kingmc.plugin.kingmcdonate.payment.card.CardPaymentService
 import net.kingmc.plugin.kingmcdonate.provider.card.CardType
 import org.bukkit.command.Command
 import org.bukkit.command.CommandExecutor

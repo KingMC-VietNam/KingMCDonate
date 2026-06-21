@@ -2,12 +2,12 @@ package net.kingmc.plugin.kingmcdonate.command
 
 import net.kingmc.plugin.kingmcdonate.config.MessageKeys
 import net.kingmc.plugin.kingmcdonate.config.Messages
-import net.kingmc.plugin.kingmcdonate.payment.BankPaymentService
+import net.kingmc.plugin.kingmcdonate.payment.bank.BankPaymentService
 import net.kingmc.plugin.kingmcdonate.util.Text
 import org.bukkit.Bukkit
 import org.bukkit.command.CommandSender
 
-/** `/kingmcdonate fakebank <player> <số tiền>` — run the bank confirm/reward path without a gateway. */
+/** `/kingmcdonate fakebank <player> <amount>` — run the bank confirm/reward path without a gateway. */
 class FakeBankSubCommand(
     private val service: BankPaymentService,
     private val messages: () -> Messages,

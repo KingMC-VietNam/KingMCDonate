@@ -9,9 +9,16 @@ object MessageKeys {
     const val RELOAD_FAILED = "reload-failed"
     const val CURRENCY_UNAVAILABLE = "currency-unavailable"
 
+    const val STATUS_SUCCESS = "status-success"
+    const val STATUS_FAILED = "status-failed"
+    const val STATUS_WAITING = "status-waiting"
+    const val STATUS_PENDING = "status-pending"
+
     const val CARD_CHARGING = "card-charging"
     const val CARD_SUCCESS = "card-success"
     const val CARD_FAILED = "card-failed"
+    const val CARD_REASON_GENERIC = "card-reason-generic"
+    const val CARD_REASON_TIMEOUT = "card-reason-timeout"
     const val CARD_WRONG_DENOMINATION = "card-wrong-denomination"
     const val CARD_INVALID_TYPE = "card-invalid-type"
     const val CARD_INVALID_DENOMINATION = "card-invalid-denomination"
@@ -22,6 +29,8 @@ object MessageKeys {
     const val CARD_INPUT_SERIAL = "card-input-serial"
     const val CARD_INPUT_PIN = "card-input-pin"
     const val CARD_INPUT_CANCELLED = "card-input-cancelled"
+    const val ANVIL_SERIAL_TITLE = "anvil-serial-title"
+    const val ANVIL_PIN_TITLE = "anvil-pin-title"
 
     const val BANK_CREATED = "bank-created"
     const val BANK_SUCCESS = "bank-success"
@@ -33,6 +42,7 @@ object MessageKeys {
     const val HISTORY_HEADER = "history-header"
     const val HISTORY_ENTRY = "history-entry"
     const val HISTORY_EMPTY = "history-empty"
+    const val HISTORY_BANK_LABEL = "history-bank-label"
 
     const val FAKECARD_USAGE = "fakecard-usage"
     const val FAKECARD_DONE = "fakecard-done"

@@ -3,7 +3,7 @@ package net.kingmc.plugin.kingmcdonate.command
 import net.kingmc.plugin.kingmcdonate.config.MessageKeys
 import net.kingmc.plugin.kingmcdonate.config.Messages
 import net.kingmc.plugin.kingmcdonate.config.PluginConfig
-import net.kingmc.plugin.kingmcdonate.payment.CardPaymentService
+import net.kingmc.plugin.kingmcdonate.payment.card.CardPaymentService
 import net.kingmc.plugin.kingmcdonate.util.Text
 import org.bukkit.Bukkit
 import org.bukkit.command.CommandSender

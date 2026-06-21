@@ -4,7 +4,7 @@ import net.kingmc.plugin.kingmcdonate.config.ConfigManager
 import net.kingmc.plugin.kingmcdonate.config.MessageKeys
 import net.kingmc.plugin.kingmcdonate.currency.CurrencyRegistry
 import net.kingmc.plugin.kingmcdonate.gui.GuiManager
-import net.kingmc.plugin.kingmcdonate.gui.MenuRegistry
+import net.kingmc.plugin.kingmcdonate.gui.menu.MenuRegistry
 import net.kingmc.plugin.kingmcdonate.provider.bank.BankProviderRegistry
 import net.kingmc.plugin.kingmcdonate.provider.card.CardProviderRegistry
 import org.bukkit.command.CommandSender

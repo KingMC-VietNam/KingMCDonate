@@ -17,7 +17,7 @@ object QrImage {
 
     const val MAP_SIZE = 128
 
-    /** Download the QR PNG and convert it to 128×128 map bytes, or null on any failure. */
+    /** Download the QR PNG and convert it to 128x128 map bytes, or null on any failure. */
     fun fetchMapBytes(http: Http, url: String, logger: PluginLogger): ByteArray? = try {
         val bytes = http.getBytes(url)
         val image = ImageIO.read(ByteArrayInputStream(bytes))
@@ -32,7 +32,7 @@ object QrImage {
         null
     }
 
-    /** Scale [image] to 128×128 and map each pixel to a map colour (transparent → white). */
+    /** Scale [image] to 128x128 and map each pixel to a map colour (transparent -> white). */
     @Suppress("DEPRECATION")
     fun toMapBytes(image: BufferedImage): ByteArray {
         val scaled = if (image.width == MAP_SIZE && image.height == MAP_SIZE) {

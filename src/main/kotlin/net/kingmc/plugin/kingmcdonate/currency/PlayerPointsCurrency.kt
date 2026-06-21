@@ -6,7 +6,7 @@ import java.util.UUID
 /**
  * PlayerPoints adapter. Only instantiated when the PlayerPoints plugin is
  * enabled (so the PlayerPoints classes are guaranteed on the classpath).
- * PlayerPoints stores points as `int`, so VNĐ-scale amounts are truncated to int.
+ * PlayerPoints stores points as `int`, so VND-scale amounts are truncated to int.
  */
 class PlayerPointsCurrency : CurrencyProvider {
 

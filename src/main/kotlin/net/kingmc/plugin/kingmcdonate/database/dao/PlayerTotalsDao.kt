@@ -8,7 +8,7 @@ import java.sql.Connection
 import java.util.UUID
 
 /**
- * Accumulates per-player donation totals. Each successful payment adds its VNĐ
+ * Accumulates per-player donation totals. Each successful payment adds its VND
  * amount and granted points to every period bucket (ALL/DAY/WEEK/MONTH) for the
  * given method, via a dialect-specific upsert that increments existing rows.
  */
