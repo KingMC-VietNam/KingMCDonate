@@ -47,6 +47,9 @@ currency:
 # ============================================================
 #  Nạp thẻ
 # ============================================================
+# Giao diện (GUI) các menu nằm ở thư mục "menus/" (card-type.yml, card-price.yml,
+# history.yml). Sửa tiêu đề/màu/biểu tượng/bố cục ở đó rồi /kingmcdonate reload —
+# không cần khởi động lại. Danh sách loại thẻ & mệnh giá vẫn lấy từ mục "card" dưới đây.
 card:
   # Cổng gạch thẻ đang dùng: "thesieutoc" | "card2k".
   # Credential đặt trong providers/<tên>.yml.

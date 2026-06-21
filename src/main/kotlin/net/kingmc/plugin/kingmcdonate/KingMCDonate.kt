@@ -21,8 +21,11 @@ import net.kingmc.plugin.kingmcdonate.database.dao.ProcessedBankTxDao
 import net.kingmc.plugin.kingmcdonate.gui.CardInput
 import net.kingmc.plugin.kingmcdonate.gui.CardTopupMenu
 import net.kingmc.plugin.kingmcdonate.gui.ChatInputListener
-import net.kingmc.plugin.kingmcdonate.gui.GuiListener
+import net.kingmc.plugin.kingmcdonate.gui.GuiManager
 import net.kingmc.plugin.kingmcdonate.gui.HistoryMenu
+import net.kingmc.plugin.kingmcdonate.gui.MenuRegistry
+import net.kingmc.plugin.kingmcdonate.gui.MenuService
+import net.kingmc.plugin.kingmcdonate.hook.PlaceholderApiHook
 import net.kingmc.plugin.kingmcdonate.payment.BankConfirmService
 import net.kingmc.plugin.kingmcdonate.payment.BankPaymentService
 import net.kingmc.plugin.kingmcdonate.payment.BankPollService
@@ -48,6 +51,8 @@ class KingMCDonate : JavaPlugin() {
     private lateinit var foliaLib: FoliaLib
     private lateinit var scheduler: Scheduler
     private var database: Database? = null
+    private var menuRegistry: MenuRegistry? = null
+    private var guiManager: GuiManager? = null
 
     override fun onEnable() {
         pluginLogger = PluginLogger(logger)
@@ -100,11 +105,18 @@ class KingMCDonate : JavaPlugin() {
             { configManager.config }, { configManager.messages },
         )
 
-        val card = setupCard(http, configManager, database, currency, rewardDelivery)
+        PlaceholderApiHook.install(pluginLogger)
+        val guiManager = GuiManager(scheduler)
+        val menuRegistry = MenuRegistry(this, pluginLogger).apply { load() }
+        val menus = MenuService(menuRegistry, guiManager, pluginLogger)
+        this.menuRegistry = menuRegistry
+        this.guiManager = guiManager
+
+        val card = setupCard(http, configManager, database, currency, rewardDelivery, menus)
         val bank = setupBank(http, configManager, database, currency, rewardDelivery)
 
-        registerCommands(configManager, currency, card, bank)
-        server.pluginManager.registerEvents(GuiListener(), this)
+        registerCommands(configManager, currency, card, bank, menus)
+        server.pluginManager.registerEvents(guiManager, this)
         server.pluginManager.registerEvents(card.chatInput, this)
         server.pluginManager.registerEvents(RewardDeliveryListener(rewardDelivery), this)
         server.pluginManager.registerEvents(QrListener(bank.qrRenderer, scheduler), this)
@@ -124,6 +136,7 @@ class KingMCDonate : JavaPlugin() {
         database: Database,
         currency: CurrencyRegistry,
         rewardDelivery: RewardDeliveryService,
+        menus: MenuService,
     ): CardSubsystem {
         val providers = CardProviderRegistry(
             pluginLogger,
@@ -144,7 +157,7 @@ class KingMCDonate : JavaPlugin() {
             { configManager.messages },
         )
         val chatInput = ChatInputListener(scheduler) { configManager.messages }
-        val menu = CardTopupMenu(service, providers, CardInput(this, chatInput)) { configManager.config }
+        val menu = CardTopupMenu(service, providers, CardInput(this, chatInput), menus) { configManager.config }
         val pollService = CardPollService(cardPaymentDao, service, providers, scheduler, pluginLogger) {
             configManager.config
         }
@@ -198,9 +211,10 @@ class KingMCDonate : JavaPlugin() {
         currency: CurrencyRegistry,
         card: CardSubsystem,
         bank: BankSubsystem,
+        menus: MenuService,
     ) {
         val router = CommandRouter { configManager.messages }.apply {
-            register(ReloadCommand(configManager, currency, card.providers, bank.providers))
+            register(ReloadCommand(configManager, currency, card.providers, bank.providers, menus.registry, guiManager))
             register(LichSuSubCommand(card.cardPaymentDao, scheduler) { configManager.messages })
             register(FakeCardSubCommand(card.service, { configManager.config }) { configManager.messages })
             register(FakeBankSubCommand(bank.service) { configManager.messages })
@@ -216,7 +230,7 @@ class KingMCDonate : JavaPlugin() {
             tabCompleter = napThe
         }
 
-        val historyMenu = HistoryMenu(card.cardPaymentDao, bank.bankPaymentDao, scheduler)
+        val historyMenu = HistoryMenu(card.cardPaymentDao, bank.bankPaymentDao, menus, scheduler)
         val lichSu = LichSuNapCommand(card.cardPaymentDao, historyMenu, scheduler) { configManager.messages }
         getCommand("lichsunap")?.setExecutor(lichSu)
 

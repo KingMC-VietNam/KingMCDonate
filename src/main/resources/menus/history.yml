@@ -1,0 +1,56 @@
+# ============================================================
+#  Menu lịch sử nạp (mở bằng /lichsunap) — gồm cả thẻ và ngân hàng
+# ============================================================
+#   X = vùng các giao dịch (phân trang)
+#   P = trang trước, N = trang sau, C = đóng
+# "entry-item" là mẫu cho mỗi dòng lịch sử; biến: {material} {label} {amount} {status} {time}.
+title: "&8» &b&lLỊCH SỬ NẠP &8«"
+rows: 6
+
+layout:
+  - "#########"
+  - "#XXXXXXX#"
+  - "#XXXXXXX#"
+  - "#XXXXXXX#"
+  - "#XXXXXXX#"
+  - "P###C###N"
+
+items:
+  X:
+    content: true
+  P:
+    material: ARROW
+    name: "&e&lTrang trước"
+    sound: "BLOCK_NOTE_BLOCK_HAT"
+    actions:
+      - "page:prev"
+  N:
+    material: ARROW
+    name: "&e&lTrang sau"
+    sound: "BLOCK_NOTE_BLOCK_HAT"
+    actions:
+      - "page:next"
+  C:
+    material: BARRIER
+    name: "&c&lĐóng"
+    sound: "BLOCK_NOTE_BLOCK_BASS"
+    actions:
+      - "close"
+
+# Mẫu cho mỗi dòng lịch sử. {material} do hệ thống quyết định (thẻ vs ngân hàng).
+entry-item:
+  material: "{material}"
+  name: "&f{label} &7- &e{amount}"
+  lore:
+    - "&7Trạng thái: {status}"
+    - "&8{time}"
+
+# Hiển thị trong lúc đang tải dữ liệu từ CSDL.
+loading-item:
+  material: CLOCK
+  name: "&7Đang tải lịch sử..."
+
+filler:
+  enabled: true
+  material: GRAY_STAINED_GLASS_PANE
+  name: " "

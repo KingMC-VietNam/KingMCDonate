@@ -1,0 +1,62 @@
+# ============================================================
+#  Menu chọn nhà mạng (mở bằng /napthe)
+# ============================================================
+# layout: lưới ký tự, mỗi dòng 9 ô. Ô trống / ký tự không khai báo -> nhận "filler".
+#   X = vùng nội dung động (các nhà mạng được đổ vào đây)
+#   C = nút đóng
+# Biểu tượng từng nhà mạng nằm ở "card-items" (key = tên loại thẻ).
+title: "&8» &b&lCHỌN NHÀ MẠNG &8«"
+rows: 3
+
+layout:
+  - "#########"
+  - "#XXXXXXX#"
+  - "####C####"
+
+items:
+  X:
+    content: true
+  C:
+    material: BARRIER
+    name: "&c&lĐóng"
+    lore:
+      - "&7Nhấn để đóng menu"
+    sound: "BLOCK_NOTE_BLOCK_BASS"
+    actions:
+      - "close"
+
+# Biểu tượng cho từng nhà mạng (đổ vào vùng X theo thứ tự bật trong config.yml).
+card-items:
+  VIETTEL:
+    material: GREEN_WOOL
+    name: "&a&lViettel"
+    lore: ["&7Nhấn để nạp thẻ &aViettel"]
+  MOBIFONE:
+    material: RED_WOOL
+    name: "&c&lMobifone"
+    lore: ["&7Nhấn để nạp thẻ &cMobifone"]
+  VINAPHONE:
+    material: LIGHT_BLUE_WOOL
+    name: "&b&lVinaphone"
+    lore: ["&7Nhấn để nạp thẻ &bVinaphone"]
+  GARENA:
+    material: ORANGE_WOOL
+    name: "&6&lGarena"
+    lore: ["&7Nhấn để nạp thẻ &6Garena"]
+  VCOIN:
+    material: CYAN_WOOL
+    name: "&3&lVcoin"
+    lore: ["&7Nhấn để nạp thẻ &3Vcoin"]
+  ZING:
+    material: PURPLE_WOOL
+    name: "&5&lZing"
+    lore: ["&7Nhấn để nạp thẻ &5Zing"]
+  GATE:
+    material: YELLOW_WOOL
+    name: "&e&lGate"
+    lore: ["&7Nhấn để nạp thẻ &eGate"]
+
+filler:
+  enabled: true
+  material: GRAY_STAINED_GLASS_PANE
+  name: " "

@@ -8,54 +8,73 @@ import net.kingmc.plugin.kingmcdonate.util.ItemBuilder
 import net.kingmc.plugin.kingmcdonate.util.Scheduler
 import net.kingmc.plugin.kingmcdonate.util.Text
 import org.bukkit.entity.Player
+import java.util.UUID
 
 /**
- * Read-only chest view of a player's recent top-ups (card + bank, merged newest
- * first). Rows are loaded off the main thread and the inventory is opened back on
- * the player's region thread.
+ * Read-only paginated view of a player's recent top-ups (card + bank, merged newest
+ * first), rendered from `history.yml`. The frame and controls come from config; each
+ * row is built from the `entry-item` template with the row's material/label/amount/
+ * status/time. Rows are loaded off the main thread via the pagination async loader and
+ * filled back on the player's region thread only while the menu is still open.
  */
 class HistoryMenu(
     private val cardPaymentDao: CardPaymentDao,
     private val bankPaymentDao: BankPaymentDao,
+    private val menus: MenuService,
     private val scheduler: Scheduler,
 ) {
 
     private data class Entry(
         val createdAt: Long,
         val material: String,
-        val title: String,
+        val label: String,
+        val amount: Long,
         val status: PaymentStatus,
     )
 
+    init {
+        menus.registerOpener("history") { open(it) }
+    }
+
     fun open(player: Player) {
-        scheduler.runIo {
-            val cards = cardPaymentDao.findByPlayer(player.uniqueId, MAX_ENTRIES).map {
-                Entry(it.createdAt, "PAPER", "&e${it.cardType} &7- &f${Text.formatMoney(it.amount)}", it.status)
+        val definition = menus.registry.get("history") ?: return
+        val gui = menus.create(definition, player, menus.baseTokens(player))
+        val entryItem = definition.root.getConfigurationSection("entry-item")
+        val loading = definition.root.getConfigurationSection("loading-item")
+            ?.let { ItemTemplate.fromConfig(it).build(emptyMap(), player) }
+            ?: ItemBuilder.of("CLOCK").name("&7Đang tải...").build()
+
+        val pagination = Pagination(gui, definition.contentSlots) { entry: Entry ->
+            val tokens = mapOf(
+                "material" to entry.material,
+                "label" to entry.label,
+                "amount" to Text.formatMoney(entry.amount),
+                "status" to CardDisplay.statusText(entry.status),
+                "time" to CardDisplay.time(entry.createdAt),
+            )
+            val item = if (entryItem != null) {
+                ItemTemplate.fromConfig(entryItem).build(tokens, player)
+            } else {
+                ItemBuilder.of(entry.material).name("&f${entry.label}").build()
             }
-            val banks = bankPaymentDao.findByPlayer(player.uniqueId, MAX_ENTRIES).map {
-                Entry(it.createdAt, "GOLD_INGOT", "&6Ngân hàng &7- &f${Text.formatMoney(it.amount)}", it.status)
-            }
-            val entries = (cards + banks).sortedByDescending { it.createdAt }.take(MAX_ENTRIES)
-            scheduler.runAtEntity(player) {
-                val gui = Gui(TITLE, ROWS)
-                entries.forEachIndexed { index, entry ->
-                    val icon = ItemBuilder.of(entry.material)
-                        .name(entry.title)
-                        .lore(
-                            "&7Trạng thái: ${CardDisplay.statusText(entry.status)}",
-                            "&8${CardDisplay.time(entry.createdAt)}",
-                        )
-                        .build()
-                    gui.setItem(index, icon)
-                }
-                gui.open(player)
-            }
+            MenuItem(item)
         }
+        menus.attachPagination(gui, pagination)
+        gui.open(player)
+        pagination.loadAsync(scheduler, player, loading) { loadEntries(player.uniqueId) }
+    }
+
+    private fun loadEntries(uuid: UUID): List<Entry> {
+        val cards = cardPaymentDao.findByPlayer(uuid, MAX_ENTRIES).map {
+            Entry(it.createdAt, "PAPER", it.cardType, it.amount, it.status)
+        }
+        val banks = bankPaymentDao.findByPlayer(uuid, MAX_ENTRIES).map {
+            Entry(it.createdAt, "GOLD_INGOT", "Ngân hàng", it.amount, it.status)
+        }
+        return (cards + banks).sortedByDescending { it.createdAt }.take(MAX_ENTRIES)
     }
 
     companion object {
-        private const val TITLE = "&8Lịch sử nạp"
-        private const val ROWS = 6
         private const val MAX_ENTRIES = 54
     }
 }

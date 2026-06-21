@@ -1,0 +1,41 @@
+# ============================================================
+#  Menu chọn mệnh giá (mở sau khi chọn nhà mạng)
+# ============================================================
+#   X = vùng mệnh giá động (đổ từ card.denominations trong config.yml)
+#   B = nút quay lại menu chọn nhà mạng
+# "price-item" là mẫu dùng chung cho mọi mệnh giá; biến: {amount} {point}.
+title: "&8» &b&lCHỌN MỆNH GIÁ &8«"
+rows: 4
+
+layout:
+  - "#########"
+  - "#XXXXXXX#"
+  - "#XXXXXXX#"
+  - "####B####"
+
+items:
+  X:
+    content: true
+  B:
+    material: ARROW
+    name: "&e&lQuay lại"
+    lore:
+      - "&7Về menu chọn nhà mạng"
+    sound: "BLOCK_NOTE_BLOCK_HAT"
+    actions:
+      - "open:card-type"
+
+# Mẫu hiển thị cho mỗi mệnh giá.
+price-item:
+  material: SUNFLOWER
+  name: "&e&l{amount}"
+  lore:
+    - "&7Nhận: &a{point} point"
+    - ""
+    - "&8Nhấn để chọn mệnh giá này"
+  glow: true
+
+filler:
+  enabled: true
+  material: GRAY_STAINED_GLASS_PANE
+  name: " "
