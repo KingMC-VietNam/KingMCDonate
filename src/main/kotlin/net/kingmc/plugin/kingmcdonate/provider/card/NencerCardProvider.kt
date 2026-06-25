@@ -58,11 +58,20 @@ class NencerCardProvider(
         // A charge POST must not be retried (a lost response could double-charge); the poll
         // reconciles a failed charge. A status check is idempotent, so it may retry.
         val body = httpPostForm(endpoint, params, isCheck)
-        val json = JsonParser.parseString(body).asJsonObject
-        val status = json.get("status")?.asInt
+        val ref = request.referenceCode
+
+        // A non-JSON body (a maintenance/rate-limit HTML page) or a missing/non-numeric status is
+        // ambiguous, never a confirmed result: keep the order WAITING so the poll service retries
+        // rather than failing a possibly-charged card or throwing out of the poll sweep.
+        val json = runCatching { JsonParser.parseString(body) }.getOrNull()
+            ?.takeIf { it.isJsonObject }?.asJsonObject
+        if (json == null) {
+            logger.warn("$name $label ref=$ref: unparseable gateway response, keeping WAITING.")
+            return CardOutcome(PaymentStatus.WAITING, ref, null, "")
+        }
+        val status = json.get("status")?.takeUnless { it.isJsonNull }?.let { runCatching { it.asInt }.getOrNull() }
         val message = json.get("message")?.takeUnless { it.isJsonNull }?.asString ?: ""
         val recognized = json.get("value")?.takeUnless { it.isJsonNull }?.asString?.toLongOrNull()
-        val ref = request.referenceCode
 
         logger.debug { "$name $label ref=$ref status=$status value=$recognized" }
         return when (status) {
@@ -88,6 +97,9 @@ class NencerCardProvider(
 
         /** card2k uses a fixed domain; thesieure's domain is partner-specific and read from config. */
         const val CARD2K_BASE_URL = "https://card2k.com"
+
+        /** card2k's test gateway: resolves a card by the last 3 digits of its PIN (001/002/other). */
+        const val CARD2K_SANDBOX_BASE_URL = "https://sandbox.card2k.com"
 
         private const val COMMAND_CHARGE = "charging"
         private const val COMMAND_CHECK = "check"

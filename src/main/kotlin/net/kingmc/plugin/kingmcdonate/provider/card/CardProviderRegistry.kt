@@ -60,7 +60,16 @@ class CardProviderRegistry(
             }
 
             when (name) {
-                NencerCardProvider.CARD2K -> nencer(NencerCardProvider.CARD2K_BASE_URL)
+                NencerCardProvider.CARD2K -> {
+                    val sandbox = yml.getBoolean("sandbox", false)
+                    if (sandbox) {
+                        logger.warn(
+                            "card2k SANDBOX mode active — charges go to " +
+                                "${NencerCardProvider.CARD2K_SANDBOX_BASE_URL}, not real cards. Set sandbox: false for production.",
+                        )
+                    }
+                    nencer(if (sandbox) NencerCardProvider.CARD2K_SANDBOX_BASE_URL else NencerCardProvider.CARD2K_BASE_URL)
+                }
                 NencerCardProvider.THESIEURE -> nencer(yml.getString("base-url").orEmpty())
                 else -> null
             }

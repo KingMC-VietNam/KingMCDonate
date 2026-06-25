@@ -12,6 +12,18 @@ partner-id: ""
 # KHÔNG commit key thật lên source code.
 partner-key: ""
 
+# ----- Sandbox (môi trường test) -----
+# false (mặc định): gạch thẻ thật tại https://card2k.com.
+# true: gửi thẻ tới cổng test https://sandbox.card2k.com — KHÔNG tốn tiền, dùng để chạy thử
+#       toàn bộ luồng nạp thẻ + trả thưởng trước khi go-live.
+#
+# Quy ước kết quả của sandbox dựa trên 3 ký tự CUỐI của mã thẻ (code):
+#   • kết thúc bằng 001  -> thẻ ĐÚNG mệnh giá (status 1, thành công).
+#   • kết thúc bằng 002  -> thẻ SAI mệnh giá (status 2, thất bại).
+#   • 3 ký tự khác       -> thẻ LỖI (thất bại).
+# Serial nhập tuỳ ý. NHỚ đặt lại sandbox: false trước khi chạy production.
+sandbox: false
+
 # ----- Callback (chỉ dùng khi card.confirmation = "webhook" hoặc "both") -----
 # card2k gọi callback về <public-base-url><base-path>/card2k (cấu hình ở dashboard card2k).
 # Callback được xác thực bằng chính partner-key ở trên nên KHÔNG cần khai báo thêm secret.

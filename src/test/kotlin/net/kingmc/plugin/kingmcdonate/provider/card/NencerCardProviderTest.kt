@@ -79,6 +79,48 @@ class NencerCardProviderTest {
     }
 
     @Test
+    fun `sandbox base url targets the card2k sandbox host`() {
+        var calledUrl = ""
+        val provider = NencerCardProvider(
+            "card2k", NencerCardProvider.CARD2K_SANDBOX_BASE_URL,
+            { url, _, _ -> calledUrl = url; """{"status":99,"message":"pending"}""" },
+            "pid", "pkey", setOf(CardType.VIETTEL), logger,
+        )
+        provider.check("REF1", request)
+        assertEquals("https://sandbox.card2k.com/chargingws/v2", calledUrl)
+    }
+
+    @Test
+    fun `production base url targets the card2k production host`() {
+        var calledUrl = ""
+        val provider = NencerCardProvider(
+            "card2k", NencerCardProvider.CARD2K_BASE_URL,
+            { url, _, _ -> calledUrl = url; """{"status":99,"message":"pending"}""" },
+            "pid", "pkey", setOf(CardType.VIETTEL), logger,
+        )
+        provider.check("REF1", request)
+        assertEquals("https://card2k.com/chargingws/v2", calledUrl)
+    }
+
+    @Test
+    fun `non-json body maps to WAITING without throwing`() {
+        val outcome = provider("<html>maintenance</html>").check("REF1", request)
+        assertEquals(PaymentStatus.WAITING, outcome.status)
+    }
+
+    @Test
+    fun `non-numeric status maps to WAITING without throwing`() {
+        val outcome = provider("""{"status":"PENDING","message":"???"}""").check("REF1", request)
+        assertEquals(PaymentStatus.WAITING, outcome.status)
+    }
+
+    @Test
+    fun `maintenance status maps to WAITING so the poll service retries`() {
+        val outcome = provider("""{"status":4,"message":"bao tri"}""").check("REF1", request)
+        assertEquals(PaymentStatus.WAITING, outcome.status)
+    }
+
+    @Test
     fun `charge is not retried but a status check is`() {
         var chargeRetry: Boolean? = null
         var checkRetry: Boolean? = null
