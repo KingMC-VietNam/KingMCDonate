@@ -103,6 +103,24 @@ class NencerCallbackHandlerTest {
     }
 
     @Test
+    fun `used-card status maps to FAILED`() {
+        handler().handle(request("100"))
+        assertEquals(PaymentStatus.FAILED, applied?.outcome?.status)
+    }
+
+    @Test
+    fun `unknown status stays WAITING so a charged card is not terminally failed`() {
+        handler().handle(request("7"))
+        assertEquals(PaymentStatus.WAITING, applied?.outcome?.status)
+    }
+
+    @Test
+    fun `missing or non-numeric status stays WAITING`() {
+        handler().handle(request("notanumber"))
+        assertEquals(PaymentStatus.WAITING, applied?.outcome?.status)
+    }
+
+    @Test
     fun `unknown reference is acknowledged without applying`() {
         val response = handler(found = null).handle(request("1"))
         assertEquals(200, response.status)

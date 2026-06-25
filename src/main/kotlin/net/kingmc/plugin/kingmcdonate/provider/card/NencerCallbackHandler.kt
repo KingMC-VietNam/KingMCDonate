@@ -54,16 +54,26 @@ class NencerCallbackHandler(
         return WebhookResponse.ok()
     }
 
-    /** Nencer callback status codes; `2` (wrong denomination) is a strict-match FAILED. */
+    /**
+     * Nencer callback status codes, mapped exactly like the poll adapter so a callback can never
+     * terminally FAIL a possibly-charged card on an ambiguous status: `1` success; `2` (wrong
+     * denomination, card lost), `3` and `100` are FAILED; `4` (maintenance) and `99` (pending) stay
+     * WAITING; any unknown or missing status stays WAITING so the poll service reconciles instead of
+     * failing a card that may have been charged.
+     */
     private fun mapStatus(status: Int?): PaymentStatus = when (status) {
         STATUS_SUCCESS -> PaymentStatus.SUCCESS
+        STATUS_WRONG_PRICE, STATUS_ERROR, STATUS_USED -> PaymentStatus.FAILED
         STATUS_MAINTENANCE, STATUS_PENDING -> PaymentStatus.WAITING
-        else -> PaymentStatus.FAILED
+        else -> PaymentStatus.WAITING
     }
 
     companion object {
         private const val STATUS_SUCCESS = 1
+        private const val STATUS_WRONG_PRICE = 2
+        private const val STATUS_ERROR = 3
         private const val STATUS_MAINTENANCE = 4
         private const val STATUS_PENDING = 99
+        private const val STATUS_USED = 100
     }
 }
