@@ -53,6 +53,7 @@ class CardPollService(
 
     private fun pollOnce() {
         val serverId = config().serverId
+        reconcileUnrewarded(serverId)
         val waiting = cardPaymentDao.findWaitingByServer(serverId)
         if (waiting.isEmpty()) {
             backoff.clear()
@@ -98,6 +99,20 @@ class CardPollService(
             } catch (e: Exception) {
                 val delay = registerBackoff(payment.referenceCode)
                 logger.warn("Failed to poll card order ${payment.referenceCode}: ${e.message}; backing off ${delay}ms")
+            }
+        }
+    }
+
+    /** Re-credit SUCCESS orders whose external credit never landed (e.g. a crash before the credit). */
+    private fun reconcileUnrewarded(serverId: String) {
+        val unrewarded = cardPaymentDao.findSuccessUnrewardedByServer(serverId)
+        if (unrewarded.isEmpty()) return
+        logger.debug { "Reconciling ${unrewarded.size} SUCCESS card order(s) with unapplied credit on '$serverId'" }
+        for (order in unrewarded) {
+            try {
+                service.reapplyReward(order)
+            } catch (e: Exception) {
+                logger.error("Failed to reconcile card order ${order.referenceCode}: ${e.message}", e)
             }
         }
     }

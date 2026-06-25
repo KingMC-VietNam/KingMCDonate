@@ -45,6 +45,7 @@ class Migration0001 : Migration {
                 transaction_id VARCHAR(128),
                 owner_server   VARCHAR(64) NOT NULL DEFAULT '',
                 point          BIGINT NOT NULL DEFAULT 0,
+                reward_applied INT NOT NULL DEFAULT 0,
                 created_at     BIGINT NOT NULL,
                 updated_at     BIGINT NOT NULL
             )

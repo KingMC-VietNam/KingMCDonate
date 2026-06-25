@@ -4,12 +4,14 @@ import net.kingmc.plugin.kingmcdonate.config.MessageKeys
 import net.kingmc.plugin.kingmcdonate.config.Messages
 import net.kingmc.plugin.kingmcdonate.config.PluginConfig
 import net.kingmc.plugin.kingmcdonate.currency.CurrencyRegistry
+import net.kingmc.plugin.kingmcdonate.database.Database
 import net.kingmc.plugin.kingmcdonate.database.dao.CardPaymentDao
 import net.kingmc.plugin.kingmcdonate.database.dao.PlayerDao
 import net.kingmc.plugin.kingmcdonate.database.dao.PlayerTotalsDao
+import net.kingmc.plugin.kingmcdonate.payment.model.CardPayment
 import net.kingmc.plugin.kingmcdonate.payment.model.PaymentStatus
 import net.kingmc.plugin.kingmcdonate.payment.reward.RewardCommands
-import net.kingmc.plugin.kingmcdonate.payment.reward.RewardDeliveryService
+import net.kingmc.plugin.kingmcdonate.payment.reward.RewardSink
 import net.kingmc.plugin.kingmcdonate.payment.reward.RewardPayload
 import net.kingmc.plugin.kingmcdonate.provider.card.CardOutcome
 import net.kingmc.plugin.kingmcdonate.provider.card.CardProviderRegistry
@@ -29,17 +31,20 @@ import java.util.UUID
  * gateway-recognised amount matches the declared denomination.
  */
 class CardPaymentService(
+    private val database: Database,
     private val cardPaymentDao: CardPaymentDao,
     private val playerTotalsDao: PlayerTotalsDao,
     private val playerDao: PlayerDao,
     private val currency: CurrencyRegistry,
     private val providers: CardProviderRegistry,
-    private val rewardDelivery: RewardDeliveryService,
+    private val rewardSink: RewardSink,
     private val scheduler: Scheduler,
     private val logger: PluginLogger,
     private val config: () -> PluginConfig,
     private val messages: () -> Messages,
 ) {
+
+    private class NotResolvableException : RuntimeException()
 
     /** Validate and start a card top-up for an online [player]. */
     fun submit(player: Player, type: CardType, declaredAmount: Long, serial: String, pin: String) {
@@ -167,29 +172,47 @@ class CardPaymentService(
             return
         }
 
+        // Flip status and accumulate totals in one transaction so they commit together (exactly once);
+        // the external point credit is then applied under a separate gate so a reconcile pass can
+        // re-credit a SUCCESS order whose credit never landed (e.g. a crash before grantReward).
         val now = System.currentTimeMillis()
-        val rows = cardPaymentDao.resolve(referenceCode, PaymentStatus.SUCCESS, point, now)
-        if (rows != 1) {
-            logger.debug { "Card $referenceCode already resolved (rows=$rows); skipping reward." }
-            return
-        }
-
-        try {
-            playerTotalsDao.add(uuid, METHOD_CARD, declaredAmount, point, now)
+        val committed = try {
+            database.transaction { conn ->
+                val rows = cardPaymentDao.resolveSuccessWithinTxn(conn, referenceCode, point, now)
+                if (rows != 1) throw NotResolvableException()
+                playerTotalsDao.add(conn, uuid, METHOD_CARD, declaredAmount, point, now)
+            }
+            true
+        } catch (e: NotResolvableException) {
+            logger.debug { "Card $referenceCode already resolved; skipping reward." }
+            false
         } catch (e: Exception) {
-            logger.error("Card $referenceCode: totals update failed after SUCCESS; reconcile manually.", e)
+            logger.error("Card $referenceCode: confirm transaction failed.", e)
+            false
         }
-        grantReward(referenceCode, uuid, name, declaredAmount, point)
+        if (!committed) return
+
         logger.debug { "Card SUCCESS ref=$referenceCode uuid=$uuid +${point}pt amount=$declaredAmount" }
+        applyReward(referenceCode, uuid, name, declaredAmount, point)
+    }
+
+    /** Re-apply the gated external credit for a SUCCESS order whose credit was not applied (reconcile). */
+    fun reapplyReward(order: CardPayment) {
+        if (order.status != PaymentStatus.SUCCESS) return
+        applyReward(order.referenceCode, order.playerUuid, order.playerName, order.amount, order.point)
     }
 
     /**
-     * Credit points by uuid (the currency provider dispatches the credit to the region
-     * thread itself), then enqueue the player-present reward (success message and reward
-     * commands) to the outbox so it reaches the player on whichever node they are online
-     * and survives a rejoin.
+     * Gate the external reward so the resolving caller and any reconcile pass credit at most once:
+     * credit points by uuid (the currency provider dispatches the credit to the region thread
+     * itself), then enqueue the player-present reward (success message and reward commands) to the
+     * outbox so it reaches the player on whichever node they are online and survives a rejoin.
      */
-    private fun grantReward(referenceCode: String, uuid: UUID, name: String?, declaredAmount: Long, point: Long) {
+    private fun applyReward(referenceCode: String, uuid: UUID, name: String?, declaredAmount: Long, point: Long) {
+        if (cardPaymentDao.claimRewardApplied(referenceCode, System.currentTimeMillis()) != 1) {
+            logger.debug { "Card $referenceCode: reward already applied; skipping credit." }
+            return
+        }
         try {
             currency.active.give(uuid, point)
         } catch (e: Exception) {
@@ -203,7 +226,7 @@ class CardPaymentService(
             "ref" to referenceCode,
         )
         val commands = config().rewards.commandsFor(declaredAmount).map { RewardCommands.format(it, vars) }
-        rewardDelivery.enqueue(
+        rewardSink.enqueue(
             uuid,
             referenceCode,
             RewardPayload(

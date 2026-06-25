@@ -68,6 +68,49 @@ class CardPaymentDaoTest {
     }
 
     @Test
+    fun `resolveSuccessWithinTxn flips a non-terminal order once`() {
+        val ref = insert()
+        val first = database.transaction { conn -> dao.resolveSuccessWithinTxn(conn, ref, 100, 2_000) }
+        assertEquals(1, first)
+        assertEquals(PaymentStatus.SUCCESS, dao.findByReference(ref)!!.status)
+        assertEquals(100, dao.findByReference(ref)!!.point)
+        // A second flip finds no non-terminal row.
+        val second = database.transaction { conn -> dao.resolveSuccessWithinTxn(conn, ref, 100, 3_000) }
+        assertEquals(0, second)
+    }
+
+    @Test
+    fun `claimRewardApplied wins exactly once`() {
+        val ref = insert()
+        database.transaction { conn -> dao.resolveSuccessWithinTxn(conn, ref, 100, 2_000) }
+        assertEquals(1, dao.claimRewardApplied(ref, 2_500))
+        // Every later claim loses, so the external credit runs at most once.
+        assertEquals(0, dao.claimRewardApplied(ref, 3_000))
+        assertEquals(0, dao.claimRewardApplied(ref, 3_500))
+    }
+
+    @Test
+    fun `findSuccessUnrewardedByServer returns only SUCCESS orders with credit unapplied`() {
+        val unrewarded = insert()
+        database.transaction { conn -> dao.resolveSuccessWithinTxn(conn, unrewarded, 100, 2_000) }
+
+        val rewarded = insert()
+        database.transaction { conn -> dao.resolveSuccessWithinTxn(conn, rewarded, 100, 2_000) }
+        dao.claimRewardApplied(rewarded, 2_500)
+
+        val stillWaiting = insert()
+        dao.markWaiting(stillWaiting, "T", 2_000)
+
+        val found = dao.findSuccessUnrewardedByServer("node-a")
+        assertEquals(1, found.size)
+        assertEquals(unrewarded, found.first().referenceCode)
+
+        // Once claimed, it drops out of the reconcile set.
+        dao.claimRewardApplied(unrewarded, 2_600)
+        assertEquals(0, dao.findSuccessUnrewardedByServer("node-a").size)
+    }
+
+    @Test
     fun `history returns a player's payments newest first`() {
         val uuid = UUID.randomUUID()
         dao.insertPending(uuid, "Bob", "VIETTEL", 10_000, "s1", "p1", "card2k", "node-a", 1_000)

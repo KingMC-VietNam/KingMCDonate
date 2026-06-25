@@ -160,6 +160,7 @@ class KingMCDonate : JavaPlugin() {
 
         val cardPaymentDao = CardPaymentDao(database)
         val service = CardPaymentService(
+            database,
             cardPaymentDao,
             PlayerTotalsDao(database),
             PlayerDao(database),

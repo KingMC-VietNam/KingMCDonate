@@ -90,6 +90,53 @@ class CardPaymentDao(database: Database) : Dao(database) {
         }
     }
 
+    /**
+     * Flip a non-terminal order to SUCCESS with its granted [point] using the supplied
+     * [conn] so it runs inside the confirmation transaction (shared with the totals
+     * upsert). Returns the affected row count; callers proceed only on 1.
+     */
+    fun resolveSuccessWithinTxn(conn: Connection, referenceCode: String, point: Long, now: Long): Int =
+        conn.prepareStatement(
+            "UPDATE card_payments SET status = ?, point = ?, updated_at = ? " +
+                "WHERE reference_code = ? AND status IN (?, ?)",
+        ).use { ps ->
+            ps.setString(1, PaymentStatus.SUCCESS.storageValue)
+            ps.setLong(2, point)
+            ps.setLong(3, now)
+            ps.setString(4, referenceCode)
+            ps.setString(5, PaymentStatus.PENDING.storageValue)
+            ps.setString(6, PaymentStatus.WAITING.storageValue)
+            ps.executeUpdate()
+        }
+
+    /**
+     * Conditionally claim the external-reward right: flip `reward_applied` 0 -> 1.
+     * Returns 1 for the single winner, 0 otherwise, so the point credit runs at most
+     * once across the resolving caller and any reconcile pass.
+     */
+    fun claimRewardApplied(referenceCode: String, now: Long): Int = withConnection { conn ->
+        conn.prepareStatement(
+            "UPDATE card_payments SET reward_applied = 1, updated_at = ? WHERE reference_code = ? AND reward_applied = 0",
+        ).use { ps ->
+            ps.setLong(1, now)
+            ps.setString(2, referenceCode)
+            ps.executeUpdate()
+        }
+    }
+
+    /** SUCCESS orders owned by [serverId] whose external credit has not been applied yet (reconcile). */
+    fun findSuccessUnrewardedByServer(serverId: String): List<CardPayment> = withConnection { conn ->
+        conn.prepareStatement(
+            "SELECT * FROM card_payments WHERE owner_server = ? AND status = ? AND reward_applied = 0 " +
+                "ORDER BY created_at LIMIT ?",
+        ).use { ps ->
+            ps.setString(1, serverId)
+            ps.setString(2, PaymentStatus.SUCCESS.storageValue)
+            ps.setInt(3, MAX_POLL_BATCH)
+            ps.executeQuery().use { rs -> rs.mapAll { toCardPayment() } }
+        }
+    }
+
     /** Oldest WAITING orders owned by [serverId], capped per pass, for poll/resume. */
     fun findWaitingByServer(serverId: String): List<CardPayment> = withConnection { conn ->
         conn.prepareStatement(
