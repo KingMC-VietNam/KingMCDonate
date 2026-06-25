@@ -184,18 +184,16 @@ class CardPaymentService(
     }
 
     /**
-     * Credit points immediately by uuid (economy providers are not thread-safe, so on
-     * the main/region thread), then enqueue the player-present reward (success message
-     * and reward commands) to the outbox so it reaches the player on whichever node
-     * they are online and survives a rejoin.
+     * Credit points by uuid (the currency provider dispatches the credit to the region
+     * thread itself), then enqueue the player-present reward (success message and reward
+     * commands) to the outbox so it reaches the player on whichever node they are online
+     * and survives a rejoin.
      */
     private fun grantReward(referenceCode: String, uuid: UUID, name: String?, declaredAmount: Long, point: Long) {
-        scheduler.runNextTick {
-            try {
-                currency.active.give(uuid, point)
-            } catch (e: Exception) {
-                logger.error("Card $referenceCode: reward credit failed uuid=$uuid point=$point; reconcile manually.", e)
-            }
+        try {
+            currency.active.give(uuid, point)
+        } catch (e: Exception) {
+            logger.error("Card $referenceCode: reward credit failed uuid=$uuid point=$point; reconcile manually.", e)
         }
         val playerName = name ?: Bukkit.getOfflinePlayer(uuid).name ?: uuid.toString()
         val vars = mapOf(

@@ -26,6 +26,7 @@ class QrListener(
 
     @EventHandler
     fun onQuit(event: PlayerQuitEvent) {
-        renderer.clear(event.player)
+        val player = event.player
+        scheduler.runAtEntity(player) { renderer.clear(player) }
     }
 }

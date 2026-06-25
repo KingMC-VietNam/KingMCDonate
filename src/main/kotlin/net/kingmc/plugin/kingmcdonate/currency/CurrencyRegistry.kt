@@ -58,9 +58,9 @@ class CurrencyRegistry(
         ): (String) -> CurrencyProvider? = factory@{ name ->
             when (name) {
                 "playerpoints" ->
-                    if (Bukkit.getPluginManager().isPluginEnabled("PlayerPoints")) PlayerPointsCurrency() else null
+                    if (Bukkit.getPluginManager().isPluginEnabled("PlayerPoints")) PlayerPointsCurrency(scheduler) else null
                 "vault" ->
-                    if (Bukkit.getPluginManager().isPluginEnabled("Vault")) VaultCurrency.create() else null
+                    if (Bukkit.getPluginManager().isPluginEnabled("Vault")) VaultCurrency.create(scheduler) else null
                 "command" ->
                     CommandCurrency(currencyConfig.commands, scheduler, logger)
                 else -> null
