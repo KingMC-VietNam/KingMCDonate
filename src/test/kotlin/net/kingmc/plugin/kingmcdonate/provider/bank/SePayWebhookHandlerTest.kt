@@ -37,10 +37,12 @@ class SePayWebhookHandlerTest {
         amount: Long = 50_000,
         content: String = "CK KMD7X9A2QP NAP",
         code: String? = null,
+        account: String? = null,
     ): String {
         val codeJson = if (code == null) "null" else "\"$code\""
+        val accountPart = if (account == null) "" else ""","accountNumber":"$account""""
         return """{"id":$id,"transferType":"$transferType","transferAmount":$amount,""" +
-            """"content":"$content","code":$codeJson}"""
+            """"content":"$content","code":$codeJson$accountPart}"""
     }
 
     private fun hmacRequest(rawBody: String, ts: Long = System.currentTimeMillis() / 1000, sig: String? = null): WebhookRequest {
@@ -54,8 +56,8 @@ class SePayWebhookHandlerTest {
         )
     }
 
-    private fun handler(auth: String, apiKey: String = "") =
-        SePayWebhookHandler(auth, secret, apiKey, deps())
+    private fun handler(auth: String, apiKey: String = "", account: String = "") =
+        SePayWebhookHandler(auth, secret, apiKey, account, deps())
 
     @Test
     fun `valid hmac matching transfer confirms once with success body`() {
@@ -92,7 +94,7 @@ class SePayWebhookHandlerTest {
         )
         // The stale token appears first in the content, but only the second matches the amount.
         val raw = body(amount = 50_000, content = "CK KMDSTALE01 KMD7X9A2QP NAP")
-        SePayWebhookHandler("hmac", secret, "", deps).handle(hmacRequest(raw))
+        SePayWebhookHandler("hmac", secret, "", "", deps).handle(hmacRequest(raw))
         assertEquals("KMD7X9A2QP", confirmed?.referenceCode)
     }
 
@@ -115,13 +117,13 @@ class SePayWebhookHandlerTest {
     @Test
     fun `apikey scheme accepts the configured key and rejects others`() {
         val raw = body()
-        val ok = SePayWebhookHandler("apikey", secret, "K", deps()).handle(
+        val ok = SePayWebhookHandler("apikey", secret, "K", "", deps()).handle(
             WebhookRequest("POST", "/kmd/sepay", emptyMap(), mapOf("Authorization" to "Apikey K"), raw.toByteArray()),
         )
         assertEquals(200, ok.status)
 
         confirmed = null
-        val bad = SePayWebhookHandler("apikey", secret, "K", deps()).handle(
+        val bad = SePayWebhookHandler("apikey", secret, "K", "", deps()).handle(
             WebhookRequest("POST", "/kmd/sepay", emptyMap(), mapOf("Authorization" to "Apikey WRONG"), raw.toByteArray()),
         )
         assertEquals(401, bad.status)
@@ -130,7 +132,7 @@ class SePayWebhookHandlerTest {
 
     @Test
     fun `authentic but unmatched transfer is acknowledged without confirming`() {
-        val handler = SePayWebhookHandler("hmac", secret, "", deps(found = null))
+        val handler = SePayWebhookHandler("hmac", secret, "", "", deps(found = null))
         val response = handler.handle(hmacRequest(body()))
         assertEquals(200, response.status)
         assertEquals("""{"success":true}""", response.body)
@@ -146,10 +148,23 @@ class SePayWebhookHandlerTest {
 
     @Test
     fun `none scheme accepts without verification`() {
-        val response = SePayWebhookHandler("none", "", "", deps()).handle(
+        val response = SePayWebhookHandler("none", "", "", "", deps()).handle(
             WebhookRequest("POST", "/kmd/sepay", emptyMap(), emptyMap(), body().toByteArray()),
         )
         assertEquals(200, response.status)
         assertTrue(confirmed != null)
+    }
+
+    @Test
+    fun `transfer to a different account is acknowledged but not confirmed`() {
+        val response = handler("hmac", account = "0123456789").handle(hmacRequest(body(account = "9999999999")))
+        assertEquals(200, response.status)
+        assertNull(confirmed)
+    }
+
+    @Test
+    fun `transfer to the configured account confirms`() {
+        handler("hmac", account = "0123456789").handle(hmacRequest(body(account = "0123456789")))
+        assertEquals("KMD7X9A2QP", confirmed?.referenceCode)
     }
 }

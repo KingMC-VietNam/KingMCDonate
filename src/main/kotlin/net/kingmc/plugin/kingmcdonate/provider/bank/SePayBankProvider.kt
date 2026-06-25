@@ -37,7 +37,7 @@ class SePayBankProvider(
     override val name = NAME
 
     override fun webhookHandler(deps: BankWebhookDeps): WebhookHandler =
-        SePayWebhookHandler(webhookAuth, webhookSecret, webhookApiKey, deps)
+        SePayWebhookHandler(webhookAuth, webhookSecret, webhookApiKey, accountNumber, deps)
 
     override fun createQr(amountVnd: Long, referenceCode: String): BankQr {
         val url = buildString {

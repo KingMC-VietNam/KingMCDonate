@@ -20,6 +20,7 @@ class SePayWebhookHandler(
     private val auth: String,
     private val secret: String,
     private val apiKey: String,
+    private val accountNumber: String,
     private val deps: BankWebhookDeps,
 ) : WebhookHandler {
 
@@ -38,6 +39,17 @@ class SePayWebhookHandler(
         }
         if (!payload.transferType.equals("in", ignoreCase = true)) {
             deps.logger.debug { "SePay webhook tx=${payload.id} is not incoming; acknowledged." }
+            return ACK
+        }
+        // Validate the transfer landed on our configured receiving account. With a non-HMAC scheme the
+        // payload isn't integrity-protected, so a transfer to a different account must never confirm an
+        // order here. Skip only when the payload omits the field (can't validate) or no account is set.
+        val payloadAccount = payload.accountNumber?.trim()
+        if (!payloadAccount.isNullOrEmpty() && accountNumber.isNotBlank() && payloadAccount != accountNumber) {
+            deps.logger.warn(
+                "SePay webhook tx=${payload.id} for account $payloadAccount != configured $accountNumber; " +
+                    "acknowledged, no change.",
+            )
             return ACK
         }
 
@@ -87,6 +99,7 @@ class SePayWebhookHandler(
         @SerializedName("id") val id: Long? = null,
         @SerializedName("transferType") val transferType: String? = null,
         @SerializedName("transferAmount") val transferAmount: Long = 0,
+        @SerializedName("accountNumber") val accountNumber: String? = null,
         @SerializedName("content") val content: String? = null,
         @SerializedName("code") val code: String? = null,
     )
