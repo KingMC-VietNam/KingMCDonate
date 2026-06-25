@@ -9,6 +9,9 @@ import net.kingmc.plugin.kingmcdonate.webhook.BankWebhookDeps
 import net.kingmc.plugin.kingmcdonate.webhook.WebhookHandler
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 /**
  * SePay gateway. The QR is a SePay-hosted VietQR image (`qr.sepay.vn/img`) pointing
@@ -51,13 +54,22 @@ class SePayBankProvider(
     override fun poll(orders: List<BankPayment>): List<BankConfirmation> {
         if (orders.isEmpty()) return emptyList()
         val base = if (sandbox) SANDBOX_BASE else PRODUCTION_BASE
-        val url = "$base/transactions?account_number=${enc(accountNumber)}&limit=$PAGE_SIZE"
+        // Bound the page to transactions since the oldest live order (minus a generous buffer that
+        // absorbs any clock/timezone skew) so a busy account can't push a pending transfer off the
+        // newest page; `per_page` is the documented SePay parameter (an unfiltered `limit` is ignored).
+        val dateFrom = formatDate(orders.minOf { it.createdAt } - LOOKBACK_BUFFER_MILLIS)
+        val url = "$base/transactions?account_number=${enc(accountNumber)}" +
+            "&transaction_date_from=${enc(dateFrom)}&per_page=$PER_PAGE"
         val body = httpGet(url, mapOf("Authorization" to "Bearer $apiToken"))
         val envelope = gson.fromJson(body, SePayEnvelope::class.java)
         val transactions = envelope?.data.orEmpty()
-        logger.debug { "SePay poll: ${transactions.size} tx(s) returned, matching ${orders.size} order(s)" }
+        logger.debug { "SePay poll: ${transactions.size} tx(s) since $dateFrom, matching ${orders.size} order(s)" }
         return match(orders, transactions)
     }
+
+    /** SePay expects `yyyy-MM-dd HH:mm:ss` in the account's local time; format in the JVM default zone. */
+    private fun formatDate(epochMillis: Long): String =
+        DATE_FORMAT.format(Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()))
 
     /** Pure matching: each incoming transfer maps to at most one order by code/token + exact amount. */
     fun match(orders: List<BankPayment>, transactions: List<SePayTransaction>): List<BankConfirmation> {
@@ -102,7 +114,9 @@ class SePayBankProvider(
         const val NAME = "sepay"
         private const val PRODUCTION_BASE = "https://userapi.sepay.vn/v2"
         private const val SANDBOX_BASE = "https://userapi-sandbox.sepay.vn/v2"
-        private const val PAGE_SIZE = 50
+        private const val PER_PAGE = 100 // SePay caps per_page at 100
+        private const val LOOKBACK_BUFFER_MILLIS = 2L * 24 * 60 * 60 * 1000 // 2 days, absorbs clock/timezone skew
+        private val DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
         private val gson = Gson()
     }
 }

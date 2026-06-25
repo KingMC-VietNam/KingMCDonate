@@ -108,6 +108,19 @@ class SePayBankProviderTest {
     }
 
     @Test
+    fun `poll requests a date-bounded page with the documented parameters`() {
+        var calledUrl = ""
+        val provider = SePayBankProvider(
+            httpGet = { url, _ -> calledUrl = url; "" },
+            accountNumber = "0123456789", bank = "ACB", apiToken = "token", sandbox = false, logger = logger,
+        )
+        provider.poll(listOf(order("KMD7X9A2QP", 50_000)))
+        assertTrue(calledUrl.contains("account_number=0123456789"))
+        assertTrue(calledUrl.contains("per_page=100"))
+        assertTrue(calledUrl.contains("transaction_date_from="))
+    }
+
+    @Test
     fun `poll parses the v2 envelope and matches`() {
         val json = """
             {
