@@ -43,8 +43,11 @@ class SePayWebhookHandler(
 
         val txId = payload.id.toString()
         val candidates = SePayReference.candidates(payload.code, payload.content)
-        for (reference in candidates) {
-            val order = deps.findByReference(reference) ?: continue
+        val orders = candidates.mapNotNull { deps.findByReference(it) }
+        // Prefer the order whose amount matches the transfer (mirrors the polling match rule) so a
+        // stray second token in the content can't lock onto the wrong order; fall back to the first.
+        val order = orders.firstOrNull { it.amount == payload.transferAmount } ?: orders.firstOrNull()
+        if (order != null) {
             deps.logger.debug { "SePay webhook tx=$txId matched ref=${order.referenceCode}; confirming." }
             deps.confirm(BankConfirmation(order.referenceCode, txId, payload.transferAmount))
             return ACK

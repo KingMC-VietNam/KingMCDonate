@@ -76,6 +76,27 @@ class SePayWebhookHandlerTest {
     }
 
     @Test
+    fun `prefers the candidate whose order amount matches the transfer`() {
+        val stale = order.copy(referenceCode = "KMDSTALE01", amount = 99_000)
+        val correct = order.copy(referenceCode = "KMD7X9A2QP", amount = 50_000)
+        val deps = BankWebhookDeps(
+            findByReference = { ref ->
+                when (ref) {
+                    "KMDSTALE01" -> stale
+                    "KMD7X9A2QP" -> correct
+                    else -> null
+                }
+            },
+            confirm = { confirmed = it },
+            logger = logger,
+        )
+        // The stale token appears first in the content, but only the second matches the amount.
+        val raw = body(amount = 50_000, content = "CK KMDSTALE01 KMD7X9A2QP NAP")
+        SePayWebhookHandler("hmac", secret, "", deps).handle(hmacRequest(raw))
+        assertEquals("KMD7X9A2QP", confirmed?.referenceCode)
+    }
+
+    @Test
     fun `stale timestamp is rejected`() {
         val raw = body()
         val staleTs = System.currentTimeMillis() / 1000 - 1000

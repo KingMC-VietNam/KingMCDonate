@@ -115,6 +115,27 @@ class BankConfirmServiceTest {
         assertEquals(0L, fakeCurrency.balance(uuid))
     }
 
+    private fun processedTxCount(ref: String): Int = database.withConnection { conn ->
+        conn.prepareStatement("SELECT COUNT(*) FROM processed_bank_tx WHERE reference_code = ?").use { ps ->
+            ps.setString(1, ref)
+            ps.executeQuery().use { rs -> if (rs.next()) rs.getInt(1) else 0 }
+        }
+    }
+
+    @Test
+    fun `a second transfer with a new tx for a success order is recorded and not re-credited`() {
+        val (uuid, ref) = newOrder()
+        service.confirm(BankConfirmation(ref, "TX1", 50_000))
+        assertEquals(50L, fakeCurrency.balance(uuid))
+        // A genuine second transfer (different tx id) for the same already-SUCCESS order.
+        service.confirm(BankConfirmation(ref, "TX2", 50_000))
+        assertEquals(50L, fakeCurrency.balance(uuid)) // not re-credited
+        assertEquals(2, processedTxCount(ref)) // both tx ids recorded for manual reconciliation
+        // Replaying the original tx records nothing new.
+        service.confirm(BankConfirmation(ref, "TX1", 50_000))
+        assertEquals(2, processedTxCount(ref))
+    }
+
     @Test
     fun `reconcile after a credit gap applies the credit once without re-adding totals`() {
         val (uuid, ref) = newOrder()

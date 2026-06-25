@@ -54,7 +54,7 @@ class BankConfirmService(
         when (order.status) {
             PaymentStatus.PENDING -> resolvePending(order, confirmation)
             PaymentStatus.FAILED -> lateTransfer(order, confirmation)
-            PaymentStatus.SUCCESS -> logger.debug { "Confirm: ref=${order.referenceCode} already SUCCESS; skipping." }
+            PaymentStatus.SUCCESS -> extraTransfer(order, confirmation)
             PaymentStatus.WAITING -> logger.debug { "Confirm: ref=${order.referenceCode} WAITING (unused for bank)." }
         }
     }
@@ -149,6 +149,25 @@ class BankConfirmService(
                 "Bank ${order.referenceCode}: transfer (tx=${confirmation.transactionId}, ${confirmation.amount}) " +
                     "arrived after the order FAILED; recorded for manual reconciliation.",
             )
+        }
+    }
+
+    /**
+     * A confirmation for an already-SUCCESS order. The original transfer's tx id was recorded inside
+     * the confirm transaction, so a replay of the same tx is a no-op; a *new* tx id means a second
+     * real transfer for the same reference (player double-paid) — record and surface it once.
+     */
+    private fun extraTransfer(order: BankPayment, confirmation: BankConfirmation) {
+        val first = processedBankTxDao.insertIfAbsent(
+            confirmation.transactionId, order.referenceCode, System.currentTimeMillis(),
+        )
+        if (first) {
+            logger.warn(
+                "Bank ${order.referenceCode}: extra transfer (tx=${confirmation.transactionId}, ${confirmation.amount}) " +
+                    "for an already-SUCCESS order; recorded for manual reconciliation.",
+            )
+        } else {
+            logger.debug { "Confirm: ref=${order.referenceCode} already SUCCESS, tx already recorded; skipping." }
         }
     }
 
