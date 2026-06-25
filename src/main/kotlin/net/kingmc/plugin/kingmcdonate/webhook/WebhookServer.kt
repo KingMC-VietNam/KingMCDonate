@@ -17,6 +17,9 @@ class WebhookServer(private val logger: PluginLogger) {
 
     private var server: HttpServer? = null
 
+    /** The actually-bound port (useful when started on port 0), or null when not running. */
+    val boundPort: Int? get() = server?.address?.port
+
     /** Bind [host]:[port] and serve [router]. Throws if the port cannot be bound. */
     fun start(host: String, port: Int, router: WebhookRouter) {
         val httpServer = HttpServer.create(InetSocketAddress(host, port), BACKLOG)
@@ -29,7 +32,20 @@ class WebhookServer(private val logger: PluginLogger) {
 
     private fun dispatch(exchange: HttpExchange, router: WebhookRouter) {
         try {
-            val rawBody = exchange.requestBody.use { it.readBytes() }
+            // Webhook payloads are tiny (a JSON object or a query-string GET); cap the body so the
+            // exposed port can't be used to exhaust heap with a huge upload. Read at most one byte over
+            // the cap to detect (and reject) an oversized body even when Content-Length is absent/lies.
+            val declared = exchange.requestHeaders.getFirst("Content-Length")?.toLongOrNull()
+            if (declared != null && declared > MAX_BODY_BYTES) {
+                write(exchange, WebhookResponse(413, "text/plain", "payload too large"))
+                return
+            }
+            val rawBody = exchange.requestBody.use { it.readNBytes(MAX_BODY_BYTES + 1) }
+            if (rawBody.size > MAX_BODY_BYTES) {
+                logger.warn("Webhook body exceeded $MAX_BODY_BYTES bytes; rejected.")
+                write(exchange, WebhookResponse(413, "text/plain", "payload too large"))
+                return
+            }
             val headers = exchange.requestHeaders.entries.associate { (k, v) -> k to (v.firstOrNull() ?: "") }
             val request = WebhookRequest(
                 method = exchange.requestMethod,
@@ -68,5 +84,6 @@ class WebhookServer(private val logger: PluginLogger) {
 
     companion object {
         private const val BACKLOG = 0
+        private const val MAX_BODY_BYTES = 64 * 1024 // 64 KB; webhook payloads are far smaller
     }
 }
