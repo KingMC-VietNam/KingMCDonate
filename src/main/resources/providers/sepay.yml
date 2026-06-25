@@ -15,3 +15,11 @@ api-token: "YOUR_API_TOKEN"
 
 # Bật để dùng môi trường thử nghiệm (userapi-sandbox.sepay.vn). Token sandbox và production KHÔNG dùng chung.
 sandbox: false
+
+# ----- Webhook (chỉ dùng khi bank.confirmation = "webhook" hoặc "both") -----
+# Cách xác thực webhook SePay gửi tới: "hmac" (khuyến nghị) | "apikey" | "none" (chỉ test).
+webhook-auth: "hmac"
+# Secret Key của webhook (dùng cho hmac). Lấy ở dashboard SePay khi tạo webhook; chỉ hiện 1 lần.
+webhook-secret: ""
+# API Key (dùng cho apikey). SePay gửi header "Authorization: Apikey <key>".
+webhook-api-key: ""

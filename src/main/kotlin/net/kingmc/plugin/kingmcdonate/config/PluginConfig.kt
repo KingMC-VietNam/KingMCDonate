@@ -18,6 +18,7 @@ class PluginConfig(root: ConfigurationSection) {
     val bank: BankConfig = BankConfig(root.getConfigurationSection("bank"))
     val rewards: RewardsConfig = RewardsConfig(root.getConfigurationSection("rewards"))
     val http: HttpConfig = HttpConfig(root.getConfigurationSection("http"))
+    val webhook: WebhookConfig = WebhookConfig(root.getConfigurationSection("webhook"))
 
     /** How often the reward outbox is drained, in ticks. */
     val rewardDeliveryIntervalTicks: Long = root.getLong("reward-delivery-interval", 40L)
@@ -47,8 +48,10 @@ class PluginConfig(root: ConfigurationSection) {
     }
 
     class CardConfig(section: ConfigurationSection?) {
-        /** Active card gateway: `thesieutoc` | `card2k`. */
-        val provider: String = section?.getString("provider", "thesieutoc")?.lowercase() ?: "thesieutoc"
+        /** Active card gateway: `card2k`. */
+        val provider: String = section?.getString("provider", "card2k")?.lowercase() ?: "card2k"
+        /** How card orders are confirmed: `poll` | `webhook` | `both`. */
+        val confirmation: ConfirmationMode = ConfirmationMode.parse(section?.getString("confirmation", "poll"))
         /** Card type names enabled for top-up (resolved to `CardType` by the registry). */
         val cardTypes: List<String> = section?.getStringList("card-types") ?: emptyList()
         /** Denomination (VND) -> points granted; the single source of card points. */
@@ -57,6 +60,12 @@ class PluginConfig(root: ConfigurationSection) {
         val maintenance: Boolean = section?.getBoolean("maintenance", false) ?: false
         /** How often WAITING orders are re-polled, in seconds. */
         val pollIntervalSeconds: Long = section?.getLong("poll-interval", 15L) ?: 15L
+        /**
+         * Delay between consecutive gateway re-checks within one poll sweep, in milliseconds.
+         * Spreads the per-order `check` calls so a burst of WAITING orders does not hit the
+         * gateway all at once; 0 disables spacing.
+         */
+        val pollSpacingMillis: Long = (section?.getLong("poll-spacing-millis", 200L) ?: 200L).coerceAtLeast(0L)
         /** A WAITING order older than this many minutes is marked FAILED. */
         val timeoutMinutes: Long = section?.getLong("timeout", 30L) ?: 30L
         /** Use AnvilGUI for serial/PIN input; false = chat input. */
@@ -78,6 +87,8 @@ class PluginConfig(root: ConfigurationSection) {
         /** Minimum / maximum accepted transfer amount (VND). */
         val min: Long = section?.getLong("min", 10_000L) ?: 10_000L
         val max: Long = section?.getLong("max", 50_000_000L) ?: 50_000_000L
+        /** How bank orders are confirmed: `poll` | `webhook` | `both`. */
+        val confirmation: ConfirmationMode = ConfirmationMode.parse(section?.getString("confirmation", "poll"))
         /** When true, new bank intake is blocked; PENDING orders still settle. */
         val maintenance: Boolean = section?.getBoolean("maintenance", false) ?: false
         /** How often PENDING orders are polled, in seconds. */
@@ -117,5 +128,25 @@ class PluginConfig(root: ConfigurationSection) {
         val connectTimeoutSeconds: Long = section?.getLong("connect-timeout-seconds", 10L) ?: 10L
         val requestTimeoutSeconds: Long = section?.getLong("request-timeout-seconds", 30L) ?: 30L
         val maxRetries: Int = section?.getInt("max-retries", 3) ?: 3
+    }
+
+    /**
+     * The shared single-port webhook receiver. [enabled] is a master switch: when
+     * false, every subsystem behaves as if `confirmation: poll` and no port is bound.
+     * The server only actually starts when a subsystem's confirmation mode includes
+     * `webhook`. [publicBaseUrl] is informational — the operator pastes
+     * `<public-base-url><base-path>/<provider>` into each gateway's dashboard.
+     */
+    class WebhookConfig(section: ConfigurationSection?) {
+        val enabled: Boolean = section?.getBoolean("enabled", true) ?: true
+        val host: String = section?.getString("host", "0.0.0.0") ?: "0.0.0.0"
+        val port: Int = section?.getInt("port", 9123) ?: 9123
+        val basePath: String = normalizeBasePath(section?.getString("base-path", "/kmd") ?: "/kmd")
+        val publicBaseUrl: String = (section?.getString("public-base-url", "") ?: "").trimEnd('/')
+
+        private fun normalizeBasePath(raw: String): String {
+            val trimmed = raw.trim().trimEnd('/')
+            return if (trimmed.startsWith("/")) trimmed else "/$trimmed"
+        }
     }
 }

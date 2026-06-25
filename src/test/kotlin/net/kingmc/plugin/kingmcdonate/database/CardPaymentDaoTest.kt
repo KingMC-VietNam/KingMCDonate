@@ -38,7 +38,7 @@ class CardPaymentDaoTest {
     }
 
     private fun insert(uuid: UUID = UUID.randomUUID()): String =
-        dao.insertPending(uuid, "Alice", "VIETTEL", 10_000, "seri", "pin", "thesieutoc", "node-a", 1_000)
+        dao.insertPending(uuid, "Alice", "VIETTEL", 10_000, "seri", "pin", "card2k", "node-a", 1_000)
 
     @Test
     fun `resolve rewards exactly once`() {
@@ -70,8 +70,8 @@ class CardPaymentDaoTest {
     @Test
     fun `history returns a player's payments newest first`() {
         val uuid = UUID.randomUUID()
-        dao.insertPending(uuid, "Bob", "VIETTEL", 10_000, "s1", "p1", "thesieutoc", "node-a", 1_000)
-        dao.insertPending(uuid, "Bob", "MOBIFONE", 20_000, "s2", "p2", "thesieutoc", "node-a", 5_000)
+        dao.insertPending(uuid, "Bob", "VIETTEL", 10_000, "s1", "p1", "card2k", "node-a", 1_000)
+        dao.insertPending(uuid, "Bob", "MOBIFONE", 20_000, "s2", "p2", "card2k", "node-a", 5_000)
         val history = dao.findByPlayer(uuid, 10)
         assertEquals(2, history.size)
         assertEquals(5_000, history.first().createdAt)

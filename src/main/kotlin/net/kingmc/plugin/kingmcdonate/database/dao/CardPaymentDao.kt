@@ -102,6 +102,14 @@ class CardPaymentDao(database: Database) : Dao(database) {
         }
     }
 
+    /** Load a single order by its reference code, regardless of status (webhook lookup). */
+    fun findByReference(referenceCode: String): CardPayment? = withConnection { conn ->
+        conn.prepareStatement("SELECT * FROM card_payments WHERE reference_code = ?").use { ps ->
+            ps.setString(1, referenceCode)
+            ps.executeQuery().use { rs -> if (rs.next()) rs.toCardPayment() else null }
+        }
+    }
+
     /** Most recent [limit] orders for a player, newest first (history). */
     fun findByPlayer(playerUuid: UUID, limit: Int): List<CardPayment> = withConnection { conn ->
         conn.prepareStatement(

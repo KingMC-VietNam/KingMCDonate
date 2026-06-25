@@ -39,9 +39,17 @@ import net.kingmc.plugin.kingmcdonate.provider.card.CardType
 import net.kingmc.plugin.kingmcdonate.render.PacketEventsQrMapRenderer
 import net.kingmc.plugin.kingmcdonate.render.QrListener
 import net.kingmc.plugin.kingmcdonate.render.QrMapRenderer
+import net.kingmc.plugin.kingmcdonate.config.PluginConfig
 import net.kingmc.plugin.kingmcdonate.util.Http
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger
 import net.kingmc.plugin.kingmcdonate.util.Scheduler
+import net.kingmc.plugin.kingmcdonate.webhook.BankWebhookCapable
+import net.kingmc.plugin.kingmcdonate.webhook.BankWebhookDeps
+import net.kingmc.plugin.kingmcdonate.webhook.CardWebhookCapable
+import net.kingmc.plugin.kingmcdonate.webhook.CardWebhookDeps
+import net.kingmc.plugin.kingmcdonate.webhook.WebhookHandler
+import net.kingmc.plugin.kingmcdonate.webhook.WebhookRouter
+import net.kingmc.plugin.kingmcdonate.webhook.WebhookServer
 import org.bukkit.Bukkit
 import org.bukkit.plugin.java.JavaPlugin
 
@@ -54,6 +62,7 @@ class KingMCDonate : JavaPlugin() {
     private var database: Database? = null
     private var menuRegistry: MenuRegistry? = null
     private var guiManager: GuiManager? = null
+    private var webhookServer: WebhookServer? = null
 
     // Re-read on every access so services always see the latest reloaded config/messages.
     private val configRef = { configManager.config }
@@ -70,6 +79,8 @@ class KingMCDonate : JavaPlugin() {
     }
 
     override fun onDisable() {
+        // Stop accepting callbacks before tearing down the scheduler/database the handlers use.
+        webhookServer?.stop()
         if (this::scheduler.isInitialized) scheduler.shutdown()
         database?.close()
     }
@@ -118,6 +129,7 @@ class KingMCDonate : JavaPlugin() {
 
         val card = setupCard(http, database, currency, rewardDelivery, menus)
         val bank = setupBank(http, database, currency, rewardDelivery)
+        startWebhookServer(config, listOfNotNull(card.webhookHandler, bank.webhookHandler))
 
         registerCommands(currency, card, bank, menus)
         server.pluginManager.registerEvents(guiManager, this)
@@ -162,8 +174,28 @@ class KingMCDonate : JavaPlugin() {
         val chatInput = ChatInputListener(scheduler, messagesRef)
         val cardInput = CardInput(this, chatInput, messagesRef)
         val menu = CardTopupMenu(service, providers, cardInput, menus, configRef)
-        val pollService = CardPollService(cardPaymentDao, service, providers, scheduler, pluginLogger, configRef)
-        return CardSubsystem(providers, cardPaymentDao, service, chatInput, menu, pollService)
+
+        val mode = configRef().card.confirmation
+        val webhookHandler: WebhookHandler? = if (mode.usesWebhook && configRef().webhook.enabled) {
+            val active = providers.active
+            if (active is CardWebhookCapable) {
+                active.webhookHandler(CardWebhookDeps(cardPaymentDao::findByReference, service::applyOutcome, pluginLogger))
+            } else {
+                pluginLogger.warn(
+                    "card.confirmation='${mode.name.lowercase()}' but provider '${active.name}' has no webhook " +
+                        "support; falling back to polling for card.",
+                )
+                null
+            }
+        } else {
+            null
+        }
+        // Webhook resolves WAITING orders; fall back to gateway polling when no handler is active.
+        val queryGateway = mode.pollsGateway || webhookHandler == null
+        val pollService =
+            CardPollService(cardPaymentDao, service, providers, scheduler, pluginLogger, configRef, queryGateway)
+        pluginLogger.debug { "Card confirmation: mode=${mode.name.lowercase()} queryGateway=$queryGateway webhook=${webhookHandler != null}" }
+        return CardSubsystem(providers, cardPaymentDao, service, chatInput, menu, pollService, webhookHandler)
     }
 
     private fun enabledCardTypes(): Set<CardType> =
@@ -200,10 +232,41 @@ class KingMCDonate : JavaPlugin() {
             bankPaymentDao, PlayerDao(database), providers, currency, confirmService, qrRenderer, http,
             scheduler, pluginLogger, configRef, messagesRef,
         )
+        val mode = configRef().bank.confirmation
+        val webhookHandler: WebhookHandler? = if (mode.usesWebhook && configRef().webhook.enabled) {
+            val active = providers.active
+            if (active is BankWebhookCapable) {
+                active.webhookHandler(BankWebhookDeps(bankPaymentDao::findByReference, confirmService::confirm, pluginLogger))
+            } else {
+                pluginLogger.warn(
+                    "bank.confirmation='${mode.name.lowercase()}' but provider '${active.name}' has no webhook " +
+                        "support; falling back to polling for bank.",
+                )
+                null
+            }
+        } else {
+            null
+        }
+        val queryGateway = mode.pollsGateway || webhookHandler == null
         val pollService = BankPollService(
             bankPaymentDao, providers, confirmService, qrRenderer, scheduler, pluginLogger, configRef, messagesRef,
+            queryGateway,
         )
-        return BankSubsystem(providers, bankPaymentDao, service, pollService, qrRenderer)
+        pluginLogger.debug { "Bank confirmation: mode=${mode.name.lowercase()} queryGateway=$queryGateway webhook=${webhookHandler != null}" }
+        return BankSubsystem(providers, bankPaymentDao, service, pollService, qrRenderer, webhookHandler)
+    }
+
+    /** Start the single shared webhook server when any subsystem registered a handler. */
+    private fun startWebhookServer(config: PluginConfig, handlers: List<WebhookHandler>) {
+        if (handlers.isEmpty()) return
+        val router = WebhookRouter(config.webhook.basePath, handlers, pluginLogger)
+        try {
+            webhookServer = WebhookServer(pluginLogger).also { it.start(config.webhook.host, config.webhook.port, router) }
+            pluginLogger.debug { "Webhook handlers registered: ${handlers.map { it.providerKey }}" }
+        } catch (e: Exception) {
+            // Keep the plugin running (polling/other features still work); the operator fixes the port.
+            pluginLogger.error("Failed to bind webhook server on ${config.webhook.host}:${config.webhook.port}.", e)
+        }
     }
 
     private fun registerCommands(
@@ -251,6 +314,7 @@ class KingMCDonate : JavaPlugin() {
         val chatInput: ChatInputListener,
         val menu: CardTopupMenu,
         val pollService: CardPollService,
+        val webhookHandler: WebhookHandler?,
     )
 
     /** Bundle of bank-subsystem components shared between bootstrap and command registration. */
@@ -260,5 +324,6 @@ class KingMCDonate : JavaPlugin() {
         val service: BankPaymentService,
         val pollService: BankPollService,
         val qrRenderer: QrMapRenderer,
+        val webhookHandler: WebhookHandler?,
     )
 }

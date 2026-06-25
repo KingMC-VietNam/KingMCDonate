@@ -8,14 +8,23 @@ import net.kingmc.plugin.kingmcdonate.provider.card.CardRequest
 import net.kingmc.plugin.kingmcdonate.provider.card.CardType
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger
 import net.kingmc.plugin.kingmcdonate.util.Scheduler
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Re-polls WAITING card orders owned by this node: once on startup and then on a
- * recurring timer. Each pass re-checks every order against the active gateway and
- * resolves it through [CardPaymentService]; orders older than the configured timeout
- * are failed. Working from the database (not an online-player set) means a restart or
- * a player logging off mid-charge does not lose the resolution.
+ * recurring timer. Each pass fails orders older than the timeout (housekeeping, always
+ * run) and, when [queryGateway] is set, also re-checks each order against the active
+ * gateway and resolves it through [CardPaymentService]. In webhook-only confirmation
+ * [queryGateway] is false: the gateway is not polled, but the timeout sweep and startup
+ * resume still run so a missing callback never strands an order. Working from the
+ * database (not an online-player set) means a restart or a logout does not lose the
+ * resolution.
+ *
+ * To stay under gateway rate limits the gateway checks are spaced by `pollSpacingMillis`
+ * within a sweep, and an order whose check fails (e.g. the gateway is rate-limiting after
+ * the HTTP client's own retries) is skipped with an exponential per-order backoff so a
+ * sustained outage is not hammered every sweep.
  */
 class CardPollService(
     private val cardPaymentDao: CardPaymentDao,
@@ -24,9 +33,15 @@ class CardPollService(
     private val scheduler: Scheduler,
     private val logger: PluginLogger,
     private val config: () -> PluginConfig,
+    private val queryGateway: Boolean = true,
 ) {
 
     private val polling = AtomicBoolean(false)
+
+    /** Per-order gateway backoff, keyed by reference code; pruned each sweep to WAITING orders. */
+    private val backoff = ConcurrentHashMap<String, BackoffState>()
+
+    private class BackoffState(var failures: Int, var nextAttemptAt: Long)
 
     fun start() {
         scheduler.runIo(::poll)
@@ -39,36 +54,76 @@ class CardPollService(
     private fun pollOnce() {
         val serverId = config().serverId
         val waiting = cardPaymentDao.findWaitingByServer(serverId)
-        if (waiting.isEmpty()) return
+        if (waiting.isEmpty()) {
+            backoff.clear()
+            return
+        }
+        // Forget backoff for orders that are no longer WAITING (resolved or timed out elsewhere).
+        backoff.keys.retainAll(waiting.mapTo(HashSet()) { it.referenceCode })
 
         val provider = providers.active
         val timeoutMillis = config().card.timeoutMinutes.coerceAtLeast(1) * 60_000L
+        val spacingMillis = config().card.pollSpacingMillis
         val now = System.currentTimeMillis()
-        logger.debug { "Polling ${waiting.size} WAITING card order(s) on server '$serverId'" }
+        logger.debug {
+            "Sweeping ${waiting.size} WAITING card order(s) on '$serverId' (queryGateway=$queryGateway)"
+        }
 
+        var checkedAny = false
         for (payment in waiting) {
             try {
                 if (now - payment.createdAt > timeoutMillis) {
                     service.timeout(payment.referenceCode, payment.playerUuid)
                     continue
                 }
+                // Webhook-only: housekeeping (timeout above) runs, but the gateway is not polled.
+                if (!queryGateway) continue
                 if (payment.cardProvider != provider.name) {
                     logger.debug { "Skipping ${payment.referenceCode}: provider '${payment.cardProvider}' is not active." }
+                    continue
+                }
+                // Skip orders still inside their backoff window after a recent gateway failure.
+                if (backoff[payment.referenceCode]?.let { System.currentTimeMillis() < it.nextAttemptAt } == true) {
                     continue
                 }
                 val type = CardType.parse(payment.cardType) ?: continue
                 val request = CardRequest(
                     payment.playerUuid, type, payment.amount, payment.serial, payment.pin, payment.referenceCode,
                 )
+                if (checkedAny && spacingMillis > 0) sleepQuietly(spacingMillis)
+                checkedAny = true
                 val outcome = provider.check(payment.transactionId ?: payment.referenceCode, request)
+                backoff.remove(payment.referenceCode)
                 service.applyOutcome(payment.referenceCode, payment.playerUuid, payment.playerName, payment.amount, outcome)
             } catch (e: Exception) {
-                logger.warn("Failed to poll card order ${payment.referenceCode}: ${e.message}")
+                val delay = registerBackoff(payment.referenceCode)
+                logger.warn("Failed to poll card order ${payment.referenceCode}: ${e.message}; backing off ${delay}ms")
             }
+        }
+    }
+
+    /** Grow this order's backoff window after a failed check and return the applied delay. */
+    private fun registerBackoff(referenceCode: String): Long {
+        val state = backoff.computeIfAbsent(referenceCode) { BackoffState(0, 0L) }
+        state.failures++
+        val shift = (state.failures - 1).coerceAtMost(MAX_BACKOFF_SHIFT)
+        val delay = (BACKOFF_BASE_MILLIS shl shift).coerceAtMost(MAX_BACKOFF_MILLIS)
+        state.nextAttemptAt = System.currentTimeMillis() + delay
+        return delay
+    }
+
+    private fun sleepQuietly(millis: Long) {
+        try {
+            Thread.sleep(millis)
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
         }
     }
 
     companion object {
         private const val TICKS_PER_SECOND = 20L
+        private const val BACKOFF_BASE_MILLIS = 30_000L
+        private const val MAX_BACKOFF_MILLIS = 600_000L
+        private const val MAX_BACKOFF_SHIFT = 5
     }
 }

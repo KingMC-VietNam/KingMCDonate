@@ -51,9 +51,16 @@ currency:
 # history.yml). Sửa tiêu đề/màu/biểu tượng/bố cục ở đó rồi /kingmcdonate reload —
 # không cần khởi động lại. Danh sách loại thẻ & mệnh giá vẫn lấy từ mục "card" dưới đây.
 card:
-  # Cổng gạch thẻ đang dùng: "thesieutoc" | "card2k".
-  # Credential đặt trong providers/<tên>.yml.
-  provider: "thesieutoc"
+  # Cổng gạch thẻ đang dùng: "card2k" | "thesieure". Credential đặt trong providers/<tên>.yml.
+  # (Cả hai cùng giao thức Nencer; thesieure cần thêm "base-url" trong providers/thesieure.yml.)
+  provider: "card2k"
+
+  # Cách xác nhận đơn thẻ: "poll" | "webhook" | "both".
+  #   poll    = tự hỏi cổng theo chu kỳ (mặc định; chạy sau NAT, không cần IP public).
+  #   webhook = nhận callback GET của card2k (cần webhook.* bật + URL public cấu hình ở dashboard card2k).
+  #   both    = vừa poll vừa nhận callback (callback cho nhanh, poll làm lưới an toàn) — không trao trùng.
+  # Dù chọn mode nào, đơn quá hạn vẫn tự huỷ và đơn còn dở vẫn được resume khi khởi động lại.
+  confirmation: "poll"
 
   # Các loại thẻ được mở. Mọi loại dùng chung bộ mệnh giá ở "denominations" bên dưới.
   # Loại hợp lệ: VIETTEL, MOBIFONE, VINAPHONE, GARENA, VCOIN, ZING, GATE.
@@ -86,6 +93,10 @@ card:
   # Chu kỳ poll lại các đơn đang chờ cổng xử lý (giây).
   poll-interval: 15
 
+  # Giãn cách giữa mỗi request check trong một lượt poll (mili-giây), tránh bắn dồn
+  # khi nhiều đơn cùng chờ và giảm nguy cơ chạm rate limit của cổng. 0 = tắt.
+  poll-spacing-millis: 200
+
   # Đơn chờ quá thời gian này sẽ bị đánh dấu thất bại (phút).
   timeout: 30
 
@@ -98,6 +109,12 @@ card:
 bank:
   # Cổng ngân hàng đang dùng: "sepay". Credential đặt trong providers/sepay.yml.
   provider: "sepay"
+
+  # Cách xác nhận đơn bank: "poll" | "webhook" | "both".
+  #   poll    = poll SePay API v2 theo chu kỳ (mặc định; không cần IP public).
+  #   webhook = nhận webhook POST của SePay (cần webhook.* bật + URL public cấu hình ở dashboard SePay).
+  #   both    = vừa poll vừa nhận webhook (webhook cho nhanh, poll làm lưới an toàn) — không trao trùng.
+  confirmation: "poll"
 
   # Prefix đứng đầu MÃ GIAO DỊCH chuyển khoản (chỉ A-Z 0-9, viết HOA, không dấu/cách).
   # PHẢI trùng với "mã thanh toán" (prefix) cấu hình trong dashboard SePay để SePay tự nhận
@@ -153,3 +170,26 @@ http:
   request-timeout-seconds: 30
   # Số lần thử lại khi lỗi mạng / cổng trả 5xx.
   max-retries: 3
+
+# ============================================================
+#  Webhook / Callback (DÙNG CHUNG cho mọi cổng — chỉ MỘT cổng/port)
+# ============================================================
+# Bộ nhận callback nhúng sẵn: mở DUY NHẤT 1 port, định tuyến theo đường dẫn cho mọi cổng
+# (card2k, sepay, và các cổng thêm sau). Chỉ dùng khi card.confirmation / bank.confirmation
+# có chứa "webhook" hoặc "both"; mặc định cả hai là "poll" nên KHÔNG mở port nào.
+#
+# Webhook cần 1 node có địa chỉ public (hoặc reverse proxy lo HTTPS). Khác với poll vốn
+# chạy sau NAT không cần port. SePay production YÊU CẦU HTTPS hợp lệ — đặt nginx/Caddy phía
+# trước rồi forward về port dưới đây.
+webhook:
+  # Tắt = bỏ qua mọi cấu hình webhook (mọi subsystem coi như "poll", không mở port).
+  enabled: true
+  # Địa chỉ bind. 0.0.0.0 = mọi card mạng. Đổi nếu muốn chỉ nghe nội bộ (reverse proxy).
+  host: "0.0.0.0"
+  # Port lắng nghe. Mỗi node con phải dùng port KHÁC nhau nếu chạy chung 1 máy.
+  port: 9123
+  # Tiền tố đường dẫn. Endpoint từng cổng = <base-path>/<tên cổng> (vd /kmd/sepay, /kmd/card2k).
+  base-path: "/kmd"
+  # URL public của server (kèm domain/HTTPS). Chỉ để THAM KHẢO: dán
+  # <public-base-url><base-path>/<cổng> vào dashboard SePay/card2k. Vd "https://napthe.example.com".
+  public-base-url: ""
