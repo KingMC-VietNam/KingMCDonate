@@ -13,9 +13,11 @@ import java.io.File
  */
 class ConfigManager(private val plugin: JavaPlugin, private val logger: PluginLogger) {
 
+    @Volatile
     lateinit var config: PluginConfig
         private set
 
+    @Volatile
     lateinit var messages: Messages
         private set
 

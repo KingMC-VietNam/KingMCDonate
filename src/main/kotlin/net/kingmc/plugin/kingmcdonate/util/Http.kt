@@ -43,7 +43,12 @@ class Http(
     fun getBytes(url: String): ByteArray =
         execute(baseRequest(url).GET().build(), HttpResponse.BodyHandlers.ofByteArray())
 
-    fun postForm(url: String, params: Map<String, String>): String =
+    /**
+     * Form POST. [retry] defaults true (safe for idempotent calls such as a status check);
+     * pass false for a charge-creating POST so a lost response is never re-sent (which could
+     * double-charge) — the caller reconciles such a request by polling instead.
+     */
+    fun postForm(url: String, params: Map<String, String>, retry: Boolean = true): String =
         execute(
             baseRequest(url)
                 .header("Content-Type", "application/x-www-form-urlencoded")
@@ -51,6 +56,7 @@ class Http(
                 .POST(HttpRequest.BodyPublishers.ofString(encodeForm(params)))
                 .build(),
             HttpResponse.BodyHandlers.ofString(),
+            retryable = retry,
         )
 
     private fun baseRequest(url: String): HttpRequest.Builder =
@@ -63,15 +69,16 @@ class Http(
      * with linear backoff, retries 429 honoring `Retry-After`, and surfaces other
      * 4xx immediately.
      */
-    private fun <T> execute(request: HttpRequest, handler: HttpResponse.BodyHandler<T>): T {
+    private fun <T> execute(request: HttpRequest, handler: HttpResponse.BodyHandler<T>, retryable: Boolean = true): T {
+        val maxAttempts = if (retryable) maxRetries else 1
         var lastError: Exception? = null
-        for (attempt in 1..maxRetries) {
+        for (attempt in 1..maxAttempts) {
             val response = try {
                 client.send(request, handler)
             } catch (e: IOException) {
                 lastError = e
-                logger.debug { "HTTP error (attempt $attempt/$maxRetries) for ${request.uri()}: ${e.message}" }
-                if (attempt < maxRetries) backoff(attempt)
+                logger.debug { "HTTP error (attempt $attempt/$maxAttempts) for ${request.uri()}: ${e.message}" }
+                if (attempt < maxAttempts) backoff(attempt)
                 continue
             } catch (e: InterruptedException) {
                 Thread.currentThread().interrupt()
@@ -82,18 +89,18 @@ class Http(
             if (code in 200..299) return response.body()
             if (code == TOO_MANY_REQUESTS) {
                 lastError = IOException("HTTP 429 from ${request.uri()}")
-                logger.debug { "HTTP 429 rate-limited (attempt $attempt/$maxRetries) for ${request.uri()}" }
-                if (attempt < maxRetries) sleepMillis(retryAfterMillis(response) ?: (BACKOFF_BASE_MILLIS * attempt))
+                logger.debug { "HTTP 429 rate-limited (attempt $attempt/$maxAttempts) for ${request.uri()}" }
+                if (attempt < maxAttempts) sleepMillis(retryAfterMillis(response) ?: (BACKOFF_BASE_MILLIS * attempt))
                 continue
             }
             // Other client errors are not retryable — surface them immediately.
             if (code < 500) throw IOException("HTTP $code from ${request.uri()}")
 
             lastError = IOException("HTTP $code from ${request.uri()}")
-            logger.debug { "HTTP $code (attempt $attempt/$maxRetries) for ${request.uri()}" }
-            if (attempt < maxRetries) backoff(attempt)
+            logger.debug { "HTTP $code (attempt $attempt/$maxAttempts) for ${request.uri()}" }
+            if (attempt < maxAttempts) backoff(attempt)
         }
-        throw IOException("HTTP request to ${request.uri()} failed after $maxRetries attempts", lastError)
+        throw IOException("HTTP request to ${request.uri()} failed after $maxAttempts attempts", lastError)
     }
 
     private fun retryAfterMillis(response: HttpResponse<*>): Long? =

@@ -18,6 +18,7 @@ class CurrencyRegistry(
     private val factory: (String) -> CurrencyProvider?,
 ) {
 
+    @Volatile
     lateinit var active: CurrencyProvider
         private set
 

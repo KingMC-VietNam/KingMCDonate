@@ -17,6 +17,7 @@ class BankProviderRegistry(
     private val factory: (String) -> BankProvider?,
 ) {
 
+    @Volatile
     lateinit var active: BankProvider
         private set
 

@@ -2,7 +2,9 @@ package net.kingmc.plugin.kingmcdonate.payment.card
 
 import net.kingmc.plugin.kingmcdonate.config.PluginConfig
 import net.kingmc.plugin.kingmcdonate.database.dao.CardPaymentDao
+import net.kingmc.plugin.kingmcdonate.payment.model.CardPayment
 import net.kingmc.plugin.kingmcdonate.payment.runExclusively
+import net.kingmc.plugin.kingmcdonate.provider.card.CardProvider
 import net.kingmc.plugin.kingmcdonate.provider.card.CardProviderRegistry
 import net.kingmc.plugin.kingmcdonate.provider.card.CardRequest
 import net.kingmc.plugin.kingmcdonate.provider.card.CardType
@@ -74,6 +76,9 @@ class CardPollService(
         for (payment in waiting) {
             try {
                 if (now - payment.createdAt > timeoutMillis) {
+                    // Force one final check (ignoring backoff) before failing so a charged-but-slow card
+                    // that the backoff starved isn't failed unchecked; timeout() no-ops if it resolved.
+                    if (queryGateway && payment.cardProvider == provider.name) forceFinalCheck(payment, provider)
                     service.timeout(payment.referenceCode, payment.playerUuid)
                     continue
                 }
@@ -100,6 +105,20 @@ class CardPollService(
                 val delay = registerBackoff(payment.referenceCode)
                 logger.warn("Failed to poll card order ${payment.referenceCode}: ${e.message}; backing off ${delay}ms")
             }
+        }
+    }
+
+    /** Final pre-timeout gateway check; resolves the order through the shared path so timeout() then no-ops. */
+    private fun forceFinalCheck(payment: CardPayment, provider: CardProvider) {
+        val type = CardType.parse(payment.cardType) ?: return
+        val request = CardRequest(
+            payment.playerUuid, type, payment.amount, payment.serial, payment.pin, payment.referenceCode,
+        )
+        try {
+            val outcome = provider.check(payment.transactionId ?: payment.referenceCode, request)
+            service.applyOutcome(payment.referenceCode, payment.playerUuid, payment.playerName, payment.amount, outcome)
+        } catch (e: Exception) {
+            logger.warn("Final pre-timeout check failed for ${payment.referenceCode}: ${e.message}")
         }
     }
 

@@ -24,7 +24,7 @@ import net.kingmc.plugin.kingmcdonate.webhook.WebhookHandler
 class NencerCardProvider(
     override val name: String,
     baseUrl: String,
-    private val httpPostForm: (String, Map<String, String>) -> String,
+    private val httpPostForm: (String, Map<String, String>, Boolean) -> String,
     private val partnerId: String,
     private val partnerKey: String,
     private val enabledTypes: Set<CardType>,
@@ -55,7 +55,9 @@ class NencerCardProvider(
             "sign" to Hashing.md5Hex(partnerKey + request.pin + request.serial),
         )
 
-        val body = httpPostForm(endpoint, params)
+        // A charge POST must not be retried (a lost response could double-charge); the poll
+        // reconciles a failed charge. A status check is idempotent, so it may retry.
+        val body = httpPostForm(endpoint, params, isCheck)
         val json = JsonParser.parseString(body).asJsonObject
         val status = json.get("status")?.asInt
         val message = json.get("message")?.takeUnless { it.isJsonNull }?.asString ?: ""

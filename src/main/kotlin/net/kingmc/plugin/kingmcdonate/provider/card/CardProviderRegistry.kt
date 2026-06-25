@@ -18,6 +18,7 @@ class CardProviderRegistry(
     private val factory: (String) -> CardProvider?,
 ) {
 
+    @Volatile
     lateinit var active: CardProvider
         private set
 
