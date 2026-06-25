@@ -1,3 +1,17 @@
-# Cổng gạch thẻ card2k — lấy partner-id/partner-key tại bảng điều khiển card2k.com.
+# ============================================================
+#  card2k — cổng gạch thẻ cào (giao thức Nencer)
+# ============================================================
+# Lấy partner-id / partner-key tại bảng điều khiển card2k.com.
+# Cùng giao thức với thesieure; base-url của card2k cố định nên không cần khai báo ở đây.
+
+# ID đối tác (partner id) do card2k cấp.
 partner-id: ""
+
+# Khoá đối tác (partner key) do card2k cấp.
+# Dùng để KÝ request gửi thẻ VÀ verify callback: md5(partner_key + code + serial).
+# KHÔNG commit key thật lên source code.
 partner-key: ""
+
+# ----- Callback (chỉ dùng khi card.confirmation = "webhook" hoặc "both") -----
+# card2k gọi callback về <public-base-url><base-path>/card2k (cấu hình ở dashboard card2k).
+# Callback được xác thực bằng chính partner-key ở trên nên KHÔNG cần khai báo thêm secret.

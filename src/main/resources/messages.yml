@@ -1,3 +1,10 @@
+# ============================================================
+#  KingMCDonate — tin nhắn gửi người chơi
+# ============================================================
+# Hỗ trợ mã màu & và mã hex &#RRGGBB. Mọi tin nhắn được ghép thêm "prefix" ở config.yml.
+# {biến} trong ngoặc nhọn được thay tự động (vd {amount}, {point}, {reason}) — giữ nguyên tên biến.
+# Sau khi sửa, chạy /kingmcdonate reload (không cần khởi động lại server).
+
 # Chung
 no-permission: "&cBạn không có quyền dùng lệnh này."
 player-only: "&cLệnh này chỉ dùng được trong game."
