@@ -6,3 +6,9 @@ partner-key: ""
 # Tên miền cổng bạn truy cập, vd "https://thesieure.com" (KHÔNG kèm /chargingws/v2).
 # Để trống = cổng không khả dụng (chặn nhận đơn).
 base-url: ""
+
+# ----- Callback (chỉ dùng khi card.confirmation = "webhook" hoặc "both") -----
+# thesieure gọi callback về <public-base-url><base-path>/thesieure, xác thực bằng partner-key.
+# Plugin nhận callback dạng GET. thesieure cho chọn POST-JSON hoặc GET tùy cấu hình ở dashboard
+# -> hãy chọn GET. Hoặc dùng card.confirmation = "poll"/"both" thì poll tự đối soát kể cả khi
+# không có callback, nên không cần lo kiểu callback.
