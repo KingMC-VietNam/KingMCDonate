@@ -4,6 +4,9 @@ import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 import net.kingmc.plugin.kingmcdonate.payment.model.BankPayment
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger
+import net.kingmc.plugin.kingmcdonate.webhook.BankWebhookCapable
+import net.kingmc.plugin.kingmcdonate.webhook.BankWebhookDeps
+import net.kingmc.plugin.kingmcdonate.webhook.WebhookHandler
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
@@ -23,9 +26,15 @@ class SePayBankProvider(
     private val apiToken: String,
     private val sandbox: Boolean,
     private val logger: PluginLogger,
-) : BankProvider {
+    private val webhookAuth: String = "none",
+    private val webhookSecret: String = "",
+    private val webhookApiKey: String = "",
+) : BankProvider, BankWebhookCapable {
 
     override val name = NAME
+
+    override fun webhookHandler(deps: BankWebhookDeps): WebhookHandler =
+        SePayWebhookHandler(webhookAuth, webhookSecret, webhookApiKey, deps)
 
     override fun createQr(amountVnd: Long, referenceCode: String): BankQr {
         val url = buildString {
@@ -67,12 +76,8 @@ class SePayBankProvider(
     }
 
     /** Reference candidates from a transfer: the extracted code when present, else exact content tokens. */
-    private fun referenceCandidates(tx: SePayTransaction): Set<String> {
-        val code = tx.code?.trim()?.uppercase()
-        if (!code.isNullOrEmpty()) return setOf(code)
-        val content = tx.content ?: return emptySet()
-        return content.uppercase().split(NON_ALNUM).filter { it.isNotEmpty() }.toSet()
-    }
+    private fun referenceCandidates(tx: SePayTransaction): List<String> =
+        SePayReference.candidates(tx.code, tx.content)
 
     private fun enc(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8)
 
@@ -98,7 +103,6 @@ class SePayBankProvider(
         private const val PRODUCTION_BASE = "https://userapi.sepay.vn/v2"
         private const val SANDBOX_BASE = "https://userapi-sandbox.sepay.vn/v2"
         private const val PAGE_SIZE = 50
-        private val NON_ALNUM = Regex("[^A-Z0-9]+")
         private val gson = Gson()
     }
 }

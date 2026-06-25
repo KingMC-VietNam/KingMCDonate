@@ -1,0 +1,8 @@
+# Cổng gạch thẻ thesieure (CARD PARTNER API) — giao thức giống Nencer/card2k.
+# Lấy partner-id/partner-key tại bảng điều khiển cổng thesieure.
+partner-id: ""
+# Dùng để KÝ request gửi thẻ VÀ verify callback: md5(partner_key + code + serial).
+partner-key: ""
+# Tên miền cổng bạn truy cập, vd "https://thesieure.com" (KHÔNG kèm /chargingws/v2).
+# Để trống = cổng không khả dụng (chặn nhận đơn).
+base-url: ""

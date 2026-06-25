@@ -49,19 +49,18 @@ class CardProviderRegistry(
             logger: PluginLogger,
         ): (String) -> CardProvider? = factory@{ name ->
             val yml = providerConfig(dataFolder, name) ?: return@factory null
+
+            // Nencer-style gateways share one adapter; they differ only by base URL.
+            fun nencer(baseUrl: String): CardProvider? {
+                val partnerId = yml.getString("partner-id").orEmpty()
+                val partnerKey = yml.getString("partner-key").orEmpty()
+                if (partnerId.isBlank() || partnerKey.isBlank() || baseUrl.isBlank()) return null
+                return NencerCardProvider(name, baseUrl, http::postForm, partnerId, partnerKey, enabledTypes(), logger)
+            }
+
             when (name) {
-                ThesieutocCardProvider.NAME -> {
-                    val key = yml.getString("api-key").orEmpty()
-                    val secret = yml.getString("api-secret").orEmpty()
-                    if (key.isBlank() || secret.isBlank()) null
-                    else ThesieutocCardProvider(http::get, key, secret, enabledTypes(), logger)
-                }
-                Card2kCardProvider.NAME -> {
-                    val partnerId = yml.getString("partner-id").orEmpty()
-                    val partnerKey = yml.getString("partner-key").orEmpty()
-                    if (partnerId.isBlank() || partnerKey.isBlank()) null
-                    else Card2kCardProvider(http::postForm, partnerId, partnerKey, enabledTypes(), logger)
-                }
+                NencerCardProvider.CARD2K -> nencer(NencerCardProvider.CARD2K_BASE_URL)
+                NencerCardProvider.THESIEURE -> nencer(yml.getString("base-url").orEmpty())
                 else -> null
             }
         }
