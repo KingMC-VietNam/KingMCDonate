@@ -129,7 +129,7 @@ class CardPaymentDao(database: Database) : Dao(database) {
         amount = getLong("amount"),
         serial = getString("serial"),
         pin = getString("pin"),
-        status = PaymentStatus.valueOf(getString("status")),
+        status = PaymentStatus.fromStorage(getString("status")) ?: PaymentStatus.FAILED,
         referenceCode = getString("reference_code"),
         cardProvider = getString("card_provider") ?: "",
         transactionId = getString("transaction_id"),

@@ -21,10 +21,10 @@ class PluginConfig(root: ConfigurationSection) {
     val webhook: WebhookConfig = WebhookConfig(root.getConfigurationSection("webhook"))
 
     /** How often the reward outbox is drained, in ticks. */
-    val rewardDeliveryIntervalTicks: Long = root.getLong("reward-delivery-interval", 40L)
+    val rewardDeliveryIntervalTicks: Long = root.getLong("reward-delivery-interval", 40L).coerceAtLeast(1L)
 
     /** A claimed-but-undelivered outbox row older than this many minutes is requeued. */
-    val staleClaimMinutes: Long = root.getLong("stale-claim-minutes", 5L)
+    val staleClaimMinutes: Long = root.getLong("stale-claim-minutes", 5L).coerceAtLeast(1L)
 
     class DatabaseConfig(section: ConfigurationSection?) {
         /** `sqlite` (default) or `mysql`. */
@@ -35,7 +35,7 @@ class PluginConfig(root: ConfigurationSection) {
         val mysqlDatabase: String = section?.getString("mysql.database", "kingmcdonate") ?: "kingmcdonate"
         val mysqlUsername: String = section?.getString("mysql.username", "root") ?: "root"
         val mysqlPassword: String = section?.getString("mysql.password", "") ?: ""
-        val mysqlPoolSize: Int = section?.getInt("mysql.pool-size", 10) ?: 10
+        val mysqlPoolSize: Int = (section?.getInt("mysql.pool-size", 10) ?: 10).coerceAtLeast(1)
     }
 
     class CurrencyConfig(section: ConfigurationSection?) {
@@ -59,7 +59,7 @@ class PluginConfig(root: ConfigurationSection) {
         /** When true, new card intake is blocked with a maintenance notice; in-flight orders still settle. */
         val maintenance: Boolean = section?.getBoolean("maintenance", false) ?: false
         /** How often WAITING orders are re-polled, in seconds. */
-        val pollIntervalSeconds: Long = section?.getLong("poll-interval", 15L) ?: 15L
+        val pollIntervalSeconds: Long = (section?.getLong("poll-interval", 15L) ?: 15L).coerceAtLeast(1L)
         /**
          * Delay between consecutive gateway re-checks within one poll sweep, in milliseconds.
          * Spreads the per-order `check` calls so a burst of WAITING orders does not hit the
@@ -92,7 +92,7 @@ class PluginConfig(root: ConfigurationSection) {
         /** When true, new bank intake is blocked; PENDING orders still settle. */
         val maintenance: Boolean = section?.getBoolean("maintenance", false) ?: false
         /** How often PENDING orders are polled, in seconds. */
-        val pollIntervalSeconds: Long = section?.getLong("poll-interval", 20L) ?: 20L
+        val pollIntervalSeconds: Long = (section?.getLong("poll-interval", 20L) ?: 20L).coerceAtLeast(1L)
         /** A PENDING order older than this many minutes is marked FAILED. */
         val timeoutMinutes: Long = section?.getLong("timeout", 30L) ?: 30L
 
@@ -125,9 +125,10 @@ class PluginConfig(root: ConfigurationSection) {
     }
 
     class HttpConfig(section: ConfigurationSection?) {
-        val connectTimeoutSeconds: Long = section?.getLong("connect-timeout-seconds", 10L) ?: 10L
-        val requestTimeoutSeconds: Long = section?.getLong("request-timeout-seconds", 30L) ?: 30L
-        val maxRetries: Int = section?.getInt("max-retries", 3) ?: 3
+        val connectTimeoutSeconds: Long = (section?.getLong("connect-timeout-seconds", 10L) ?: 10L).coerceAtLeast(1L)
+        val requestTimeoutSeconds: Long = (section?.getLong("request-timeout-seconds", 30L) ?: 30L).coerceAtLeast(1L)
+        /** Total attempts per request (>= 1); the loop bound, not the number of extra retries. */
+        val maxRetries: Int = (section?.getInt("max-retries", 3) ?: 3).coerceAtLeast(1)
     }
 
     /**

@@ -159,7 +159,7 @@ class BankPaymentDao(database: Database) : Dao(database) {
         playerUuid = UUID.fromString(getString("player_uuid")),
         amount = getLong("amount"),
         referenceCode = getString("reference_code"),
-        status = PaymentStatus.valueOf(getString("status")),
+        status = PaymentStatus.fromStorage(getString("status")) ?: PaymentStatus.FAILED,
         provider = getString("provider"),
         ownerServer = getString("owner_server"),
         externalRef = getString("external_ref"),

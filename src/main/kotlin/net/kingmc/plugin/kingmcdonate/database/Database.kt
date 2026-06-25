@@ -36,11 +36,15 @@ class Database(
                 hikari.jdbcUrl = "jdbc:sqlite:${file.absolutePath}"
                 hikari.driverClassName = "org.sqlite.JDBC"
                 hikari.maximumPoolSize = 1 // SQLite is single-writer; a bigger pool only serializes
+                // Wait (not fail) on a held lock, and use WAL so reads don't block the writer.
+                hikari.connectionInitSql = "PRAGMA busy_timeout = 5000"
+                hikari.addDataSourceProperty("journal_mode", "WAL")
+                hikari.addDataSourceProperty("synchronous", "NORMAL")
             }
             Dialect.MYSQL -> {
                 hikari.jdbcUrl =
                     "jdbc:mysql://${config.mysqlHost}:${config.mysqlPort}/${config.mysqlDatabase}" +
-                    "?useSSL=false"
+                    "?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=utf8"
                 hikari.driverClassName = "com.mysql.cj.jdbc.Driver"
                 hikari.username = config.mysqlUsername
                 hikari.password = config.mysqlPassword

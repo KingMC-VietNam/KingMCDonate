@@ -101,8 +101,21 @@ class Migration0001 : Migration {
             """,
         )
 
+        // Secondary indexes for the hot lookup paths: poll sweeps filter by (owner_server, status),
+        // history reads by player, and the reward outbox drains undelivered/unclaimed rows.
+        // MySQL has no `CREATE INDEX IF NOT EXISTS`; migrations run once per version so plain DDL is safe.
+        val ifNotExists = if (dialect == Dialect.SQLITE) "IF NOT EXISTS " else ""
+        val indexes = listOf(
+            "CREATE INDEX ${ifNotExists}idx_card_payments_server_status ON card_payments (owner_server, status)",
+            "CREATE INDEX ${ifNotExists}idx_card_payments_player ON card_payments (player_uuid, created_at)",
+            "CREATE INDEX ${ifNotExists}idx_bank_payments_server_status ON bank_payments (owner_server, status)",
+            "CREATE INDEX ${ifNotExists}idx_bank_payments_player ON bank_payments (player_uuid, created_at)",
+            "CREATE INDEX ${ifNotExists}idx_pending_reward_pending ON pending_reward (delivered, claimed_by)",
+        )
+
         connection.createStatement().use { stmt ->
             for (sql in statements) stmt.executeUpdate(sql.trimIndent())
+            for (sql in indexes) stmt.executeUpdate(sql)
         }
     }
 }

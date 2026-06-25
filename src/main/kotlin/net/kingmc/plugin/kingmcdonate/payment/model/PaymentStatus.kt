@@ -13,4 +13,9 @@ enum class PaymentStatus {
     ;
 
     val storageValue: String get() = name
+
+    companion object {
+        /** Parse a stored status, returning null for any unrecognised value (so one bad row never aborts a batch). */
+        fun fromStorage(value: String?): PaymentStatus? = entries.firstOrNull { it.storageValue == value }
+    }
 }
