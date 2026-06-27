@@ -2,6 +2,7 @@ package net.kingmc.plugin.kingmcdonate
 
 import com.tcoded.folialib.FoliaLib
 import net.kingmc.plugin.kingmcdonate.command.BankCommand
+import net.kingmc.plugin.kingmcdonate.command.BossBarCommand
 import net.kingmc.plugin.kingmcdonate.command.CommandRouter
 import net.kingmc.plugin.kingmcdonate.command.FakeBankSubCommand
 import net.kingmc.plugin.kingmcdonate.command.FakeCardSubCommand
@@ -9,6 +10,15 @@ import net.kingmc.plugin.kingmcdonate.command.LichSuNapCommand
 import net.kingmc.plugin.kingmcdonate.command.LichSuSubCommand
 import net.kingmc.plugin.kingmcdonate.command.NapTheCommand
 import net.kingmc.plugin.kingmcdonate.command.ReloadCommand
+import net.kingmc.plugin.kingmcdonate.command.TopNapCommand
+import net.kingmc.plugin.kingmcdonate.discord.DiscordService
+import net.kingmc.plugin.kingmcdonate.leaderboard.LeaderboardDao
+import net.kingmc.plugin.kingmcdonate.leaderboard.LeaderboardService
+import net.kingmc.plugin.kingmcdonate.milestone.MilestoneBossBar
+import net.kingmc.plugin.kingmcdonate.milestone.MilestoneDao
+import net.kingmc.plugin.kingmcdonate.milestone.MilestoneJoinListener
+import net.kingmc.plugin.kingmcdonate.milestone.MilestoneService
+import net.kingmc.plugin.kingmcdonate.placeholder.KmdExpansion
 import net.kingmc.plugin.kingmcdonate.config.ConfigManager
 import net.kingmc.plugin.kingmcdonate.currency.CurrencyRegistry
 import net.kingmc.plugin.kingmcdonate.database.Database
@@ -26,6 +36,8 @@ import net.kingmc.plugin.kingmcdonate.gui.screen.HistoryMenu
 import net.kingmc.plugin.kingmcdonate.gui.menu.MenuRegistry
 import net.kingmc.plugin.kingmcdonate.gui.menu.MenuService
 import net.kingmc.plugin.kingmcdonate.hook.PlaceholderApiHook
+import net.kingmc.plugin.kingmcdonate.payment.DonationSuccessService
+import net.kingmc.plugin.kingmcdonate.payment.SuccessBroadcaster
 import net.kingmc.plugin.kingmcdonate.payment.bank.BankConfirmService
 import net.kingmc.plugin.kingmcdonate.payment.bank.BankPaymentService
 import net.kingmc.plugin.kingmcdonate.payment.bank.BankPollService
@@ -33,6 +45,7 @@ import net.kingmc.plugin.kingmcdonate.payment.card.CardPaymentService
 import net.kingmc.plugin.kingmcdonate.payment.card.CardPollService
 import net.kingmc.plugin.kingmcdonate.payment.reward.RewardDeliveryListener
 import net.kingmc.plugin.kingmcdonate.payment.reward.RewardDeliveryService
+import net.kingmc.plugin.kingmcdonate.promo.PromoService
 import net.kingmc.plugin.kingmcdonate.provider.bank.BankProviderRegistry
 import net.kingmc.plugin.kingmcdonate.provider.card.CardProviderRegistry
 import net.kingmc.plugin.kingmcdonate.provider.card.CardType
@@ -59,10 +72,14 @@ class KingMCDonate : JavaPlugin() {
     private lateinit var foliaLib: FoliaLib
     private lateinit var scheduler: Scheduler
     private lateinit var configManager: ConfigManager
+    private lateinit var donationSuccess: DonationSuccessService
     private var database: Database? = null
     private var menuRegistry: MenuRegistry? = null
     private var guiManager: GuiManager? = null
     private var webhookServer: WebhookServer? = null
+    private var expansion: KmdExpansion? = null
+    private var bossBar: MilestoneBossBar? = null
+    private var leaderboard: LeaderboardService? = null
 
     // Re-read on every access so services always see the latest reloaded config/messages.
     private val configRef = { configManager.config }
@@ -81,6 +98,9 @@ class KingMCDonate : JavaPlugin() {
     override fun onDisable() {
         // Stop accepting callbacks before tearing down the scheduler/database the handlers use.
         webhookServer?.stop()
+        expansion?.unregisterIfPresent()
+        bossBar?.stop()
+        leaderboard?.shutdown()
         if (this::scheduler.isInitialized) scheduler.shutdown()
         database?.close()
     }
@@ -120,6 +140,17 @@ class KingMCDonate : JavaPlugin() {
             PendingRewardDao(database), scheduler, pluginLogger, configRef, messagesRef,
         )
 
+        val promo = PromoService { configManager.promo }
+        val broadcaster = SuccessBroadcaster(scheduler, configRef)
+        // Hooks default to no-ops; setupEngagement attaches the real ones once milestone/discord/leaderboard exist.
+        donationSuccess = DonationSuccessService(
+            rewardSink = rewardDelivery,
+            playerDao = PlayerDao(database),
+            logger = pluginLogger,
+            config = configRef,
+            broadcaster = broadcaster::broadcast,
+        )
+
         PlaceholderApiHook.install(pluginLogger)
         val guiManager = GuiManager(scheduler)
         val menuRegistry = MenuRegistry(this, pluginLogger).apply { load() }
@@ -127,10 +158,11 @@ class KingMCDonate : JavaPlugin() {
         this.menuRegistry = menuRegistry
         this.guiManager = guiManager
 
-        val card = setupCard(http, database, currency, rewardDelivery, menus)
-        val bank = setupBank(http, database, currency, rewardDelivery)
+        val card = setupCard(http, database, currency, menus, promo, donationSuccess)
+        val bank = setupBank(http, database, currency, promo, donationSuccess)
         startWebhookServer(config, listOfNotNull(card.webhookHandler, bank.webhookHandler))
 
+        setupEngagement(http, database, rewardDelivery, promo, donationSuccess, card.cardPaymentDao)
         registerCommands(currency, card, bank, menus)
         server.pluginManager.registerEvents(guiManager, this)
         server.pluginManager.registerEvents(card.chatInput, this)
@@ -150,8 +182,9 @@ class KingMCDonate : JavaPlugin() {
         http: Http,
         database: Database,
         currency: CurrencyRegistry,
-        rewardDelivery: RewardDeliveryService,
         menus: MenuService,
+        promo: PromoService,
+        donationSuccess: DonationSuccessService,
     ): CardSubsystem {
         val providers = CardProviderRegistry(
             pluginLogger,
@@ -166,7 +199,8 @@ class KingMCDonate : JavaPlugin() {
             PlayerDao(database),
             currency,
             providers,
-            rewardDelivery,
+            promo,
+            donationSuccess,
             scheduler,
             pluginLogger,
             configRef,
@@ -207,7 +241,8 @@ class KingMCDonate : JavaPlugin() {
         http: Http,
         database: Database,
         currency: CurrencyRegistry,
-        rewardDelivery: RewardDeliveryService,
+        promo: PromoService,
+        donationSuccess: DonationSuccessService,
     ): BankSubsystem {
         val providers = BankProviderRegistry(
             pluginLogger,
@@ -224,7 +259,8 @@ class KingMCDonate : JavaPlugin() {
             PlayerTotalsDao(database),
             PlayerDao(database),
             currency,
-            rewardDelivery,
+            promo,
+            donationSuccess,
             clearQr = { uuid -> Bukkit.getPlayer(uuid)?.let { p -> scheduler.runAtEntity(p) { qrRenderer.clear(p) } } },
             logger = pluginLogger,
             config = configRef,
@@ -270,6 +306,56 @@ class KingMCDonate : JavaPlugin() {
         }
     }
 
+    private fun setupEngagement(
+        http: Http,
+        database: Database,
+        rewardDelivery: RewardDeliveryService,
+        promo: PromoService,
+        donationSuccess: DonationSuccessService,
+        cardPaymentDao: CardPaymentDao,
+    ) {
+        val milestoneDao = MilestoneDao(database)
+        val leaderboardService = LeaderboardService(LeaderboardDao(database), scheduler, configRef, pluginLogger)
+        val milestoneService = MilestoneService(
+            milestoneDao, { configManager.milestones }, { configManager.serverMilestones },
+            rewardDelivery, scheduler, pluginLogger,
+        )
+        val bossBarUi = MilestoneBossBar(
+            milestoneDao, { configManager.milestones }, { configManager.serverMilestones },
+            scheduler, configRef,
+        )
+        val discord = DiscordService(
+            http, scheduler, { configManager.discord }, configRef, cardPaymentDao::findByReference, pluginLogger,
+        )
+
+        // Attach hooks now that collaborators exist.
+        donationSuccess.milestoneHook = { d -> milestoneService.check(d) }
+        donationSuccess.leaderboardHook = { d -> leaderboardService.invalidatePlayer(d.uuid) }
+        donationSuccess.bossbarHook = { uuid -> bossBarUi.refresh(uuid) }
+        donationSuccess.discordHook = { d ->
+            when (d.method) {
+                "card" -> discord.notifyCard(d)
+                "bank" -> discord.notifyBank(d)
+            }
+        }
+
+        milestoneService.onPlayerMilestone = { d, t -> discord.notifyPlayerMilestone(d, t) }
+        milestoneService.onServerMilestone = { d, t -> discord.notifyServerMilestone(d, t) }
+
+        server.pluginManager.registerEvents(MilestoneJoinListener(bossBarUi, milestoneService, scheduler), this)
+        bossBarUi.start()
+
+        val expansion = KmdExpansion.create(this, leaderboardService, promo)
+        expansion.installIfPresent()
+
+        getCommand("topnap")?.setExecutor(TopNapCommand(leaderboardService, scheduler, messagesRef))
+        getCommand("napbossbar")?.setExecutor(BossBarCommand(bossBarUi, configRef, messagesRef))
+
+        this.expansion = expansion
+        this.bossBar = bossBarUi
+        this.leaderboard = leaderboardService
+    }
+
     private fun registerCommands(
         currency: CurrencyRegistry,
         card: CardSubsystem,
@@ -277,7 +363,7 @@ class KingMCDonate : JavaPlugin() {
         menus: MenuService,
     ) {
         val router = CommandRouter(messagesRef).apply {
-            register(ReloadCommand(configManager, currency, card.providers, bank.providers, menus.registry, guiManager))
+            register(ReloadCommand(configManager, currency, card.providers, bank.providers, menus.registry, guiManager, bossBar, leaderboard, expansion))
             register(LichSuSubCommand(card.cardPaymentDao, scheduler, messagesRef))
             register(FakeCardSubCommand(card.service, configRef, messagesRef))
             register(FakeBankSubCommand(bank.service, messagesRef))

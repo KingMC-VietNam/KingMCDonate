@@ -29,6 +29,10 @@ commands:
     description: Xem top nạp
     usage: /topnap
     permission: kingmcdonate.topnap
+  napbossbar:
+    description: Bật/tắt thanh tiến độ mốc nạp
+    usage: /napbossbar
+    permission: kingmcdonate.bossbar
   lichsunap:
     description: Xem lịch sử nạp
     usage: /lichsunap [player]
@@ -54,3 +58,6 @@ permissions:
   kingmcdonate.admin:
     description: Quyền quản trị KingMCDonate
     default: op
+  kingmcdonate.bossbar:
+    description: Cho phép bật/tắt bossbar mốc nạp
+    default: true

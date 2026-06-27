@@ -16,6 +16,8 @@ repositories {
     maven("https://repo.rosewooddev.io/repository/public/")
     // XSeries fallback + VaultAPI
     maven("https://jitpack.io")
+    // PlaceholderAPI
+    maven("https://repo.extendedclip.com/content/repositories/placeholderapi/")
 }
 
 dependencies {
@@ -26,6 +28,8 @@ dependencies {
     // --- Soft-depend currency APIs: compile against, provided at runtime by the actual plugins ---
     compileOnly("org.black_ixx:playerpoints:3.2.6")
     compileOnly("com.github.MilkBowl:VaultAPI:1.7") { exclude(group = "org.bukkit") }
+    compileOnly("me.clip:placeholderapi:2.11.6")
+    testImplementation("me.clip:placeholderapi:2.11.6")
 
     // --- Shaded + relocated (not on Maven Central, so the libraries: loader can't fetch them) ---
     implementation("com.tcoded:FoliaLib:0.5.1")                 // Folia-safe scheduler

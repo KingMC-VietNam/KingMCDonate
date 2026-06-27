@@ -48,6 +48,16 @@ class Http(
      * pass false for a charge-creating POST so a lost response is never re-sent (which could
      * double-charge) — the caller reconciles such a request by polling instead.
      */
+    /** JSON POST (e.g. a Discord webhook). Retries IO/5xx like other calls. */
+    fun postJson(url: String, json: String): String =
+        execute(
+            baseRequest(url)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(json))
+                .build(),
+            HttpResponse.BodyHandlers.ofString(),
+        )
+
     fun postForm(url: String, params: Map<String, String>, retry: Boolean = true): String =
         execute(
             baseRequest(url)
