@@ -31,6 +31,7 @@ class SePayBankProviderTest {
         provider = "sepay",
         ownerServer = "node-a",
         externalRef = null,
+        point = 0,
         rewardApplied = false,
         createdAt = 0,
         updatedAt = 0,

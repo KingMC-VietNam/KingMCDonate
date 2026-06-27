@@ -62,8 +62,8 @@ class BankDaoTest {
     @Test
     fun `status flip to success is single-shot`() {
         val ref = insert()
-        val first = database.transaction { conn -> bank.resolveSuccessWithinTxn(conn, ref, 2_000) }
-        val second = database.transaction { conn -> bank.resolveSuccessWithinTxn(conn, ref, 3_000) }
+        val first = database.transaction { conn -> bank.resolveSuccessWithinTxn(conn, ref, 50, 2_000) }
+        val second = database.transaction { conn -> bank.resolveSuccessWithinTxn(conn, ref, 50, 3_000) }
         assertEquals(1, first)
         assertEquals(0, second)
     }
@@ -71,7 +71,7 @@ class BankDaoTest {
     @Test
     fun `reward-applied claim is single-shot`() {
         val ref = insert()
-        database.transaction { conn -> bank.resolveSuccessWithinTxn(conn, ref, 2_000) }
+        database.transaction { conn -> bank.resolveSuccessWithinTxn(conn, ref, 50, 2_000) }
         assertEquals(1, bank.claimRewardApplied(ref, 3_000))
         assertEquals(0, bank.claimRewardApplied(ref, 4_000))
     }
@@ -82,7 +82,7 @@ class BankDaoTest {
         assertEquals(1, bank.findPendingByServer("node-a").size)
         assertEquals(0, bank.findPendingByServer("node-b").size)
 
-        database.transaction { conn -> bank.resolveSuccessWithinTxn(conn, ref, 2_000) }
+        database.transaction { conn -> bank.resolveSuccessWithinTxn(conn, ref, 50, 2_000) }
         assertEquals(1, bank.findSuccessUnrewardedByServer("node-a").size)
         bank.claimRewardApplied(ref, 3_000)
         assertEquals(0, bank.findSuccessUnrewardedByServer("node-a").size)

@@ -103,14 +103,15 @@ class BankPaymentDao(database: Database) : Dao(database) {
      * confirmation transaction. Returns the affected row count (callers proceed
      * only on 1).
      */
-    fun resolveSuccessWithinTxn(conn: Connection, referenceCode: String, now: Long): Int =
+    fun resolveSuccessWithinTxn(conn: Connection, referenceCode: String, point: Long, now: Long): Int =
         conn.prepareStatement(
-            "UPDATE bank_payments SET status = ?, updated_at = ? WHERE reference_code = ? AND status = ?",
+            "UPDATE bank_payments SET status = ?, point = ?, updated_at = ? WHERE reference_code = ? AND status = ?",
         ).use { ps ->
             ps.setString(1, PaymentStatus.SUCCESS.storageValue)
-            ps.setLong(2, now)
-            ps.setString(3, referenceCode)
-            ps.setString(4, PaymentStatus.PENDING.storageValue)
+            ps.setLong(2, point)
+            ps.setLong(3, now)
+            ps.setString(4, referenceCode)
+            ps.setString(5, PaymentStatus.PENDING.storageValue)
             ps.executeUpdate()
         }
 
@@ -163,6 +164,7 @@ class BankPaymentDao(database: Database) : Dao(database) {
         provider = getString("provider"),
         ownerServer = getString("owner_server"),
         externalRef = getString("external_ref"),
+        point = getLong("point"),
         rewardApplied = getInt("reward_applied") == 1,
         createdAt = getLong("created_at"),
         updatedAt = getLong("updated_at"),

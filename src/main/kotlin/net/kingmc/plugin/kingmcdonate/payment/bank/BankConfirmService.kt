@@ -9,15 +9,13 @@ import net.kingmc.plugin.kingmcdonate.database.dao.PlayerDao
 import net.kingmc.plugin.kingmcdonate.database.dao.PlayerTotalsDao
 import net.kingmc.plugin.kingmcdonate.database.dao.ProcessedBankTxDao
 import net.kingmc.plugin.kingmcdonate.database.dao.isUniqueViolation
+import net.kingmc.plugin.kingmcdonate.payment.Donation
+import net.kingmc.plugin.kingmcdonate.payment.DonationSuccessService
 import net.kingmc.plugin.kingmcdonate.payment.model.BankPayment
 import net.kingmc.plugin.kingmcdonate.payment.model.PaymentStatus
-import net.kingmc.plugin.kingmcdonate.payment.reward.RewardCommands
-import net.kingmc.plugin.kingmcdonate.payment.reward.RewardPayload
-import net.kingmc.plugin.kingmcdonate.payment.reward.RewardSink
 import net.kingmc.plugin.kingmcdonate.provider.bank.BankConfirmation
+import net.kingmc.plugin.kingmcdonate.promo.PromoService
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger
-import net.kingmc.plugin.kingmcdonate.util.Text
-import org.bukkit.Bukkit
 import java.sql.SQLException
 import java.util.UUID
 
@@ -36,7 +34,8 @@ class BankConfirmService(
     private val playerTotalsDao: PlayerTotalsDao,
     private val playerDao: PlayerDao,
     private val currency: CurrencyRegistry,
-    private val rewardSink: RewardSink,
+    private val promo: PromoService,
+    private val donationSuccess: DonationSuccessService,
     private val clearQr: (UUID) -> Unit,
     private val logger: PluginLogger,
     private val config: () -> PluginConfig,
@@ -62,7 +61,7 @@ class BankConfirmService(
     /** Re-apply the gated external credit for a SUCCESS order whose credit was not applied (reconcile). */
     fun reapplyReward(order: BankPayment) {
         if (order.status != PaymentStatus.SUCCESS) return
-        applyReward(order)
+        applyReward(order, order.point)
     }
 
     private fun resolvePending(order: BankPayment, confirmation: BankConfirmation) {
@@ -83,7 +82,7 @@ class BankConfirmService(
         val committed = try {
             database.transaction { conn ->
                 processedBankTxDao.insertWithinTxn(conn, confirmation.transactionId, order.referenceCode, now)
-                val rows = bankPaymentDao.resolveSuccessWithinTxn(conn, order.referenceCode, now)
+                val rows = bankPaymentDao.resolveSuccessWithinTxn(conn, order.referenceCode, point, now)
                 if (rows != 1) throw NotPendingException()
                 playerTotalsDao.add(conn, order.playerUuid, METHOD_BANK, order.amount, point, now)
             }
@@ -102,13 +101,12 @@ class BankConfirmService(
         if (!committed) return
 
         logger.debug { "Bank SUCCESS ref=${order.referenceCode} uuid=${order.playerUuid} amount=${order.amount} +${point}pt" }
-        applyReward(order)
+        applyReward(order, point)
         clearQr(order.playerUuid)
     }
 
     /** Gate the external reward so confirm and any reconcile pass together apply it at most once. */
-    private fun applyReward(order: BankPayment) {
-        val point = pointFor(order.amount)
+    private fun applyReward(order: BankPayment, point: Long) {
         if (bankPaymentDao.claimRewardApplied(order.referenceCode, System.currentTimeMillis()) != 1) {
             logger.debug { "Bank ${order.referenceCode}: reward already applied; skipping credit." }
             return
@@ -118,26 +116,10 @@ class BankConfirmService(
         } catch (e: Exception) {
             logger.error("Bank ${order.referenceCode}: point credit failed uuid=${order.playerUuid}; reconcile manually.", e)
         }
-        enqueueReward(order, point)
-    }
-
-    private fun enqueueReward(order: BankPayment, point: Long) {
         val name = playerDao.findName(order.playerUuid)
-            ?: Bukkit.getOfflinePlayer(order.playerUuid).name
-            ?: order.playerUuid.toString()
-        val vars = mapOf(
-            "player" to name,
-            "amount" to order.amount.toString(),
-            "point" to point.toString(),
-            "ref" to order.referenceCode,
+        donationSuccess.onSuccess(
+            Donation(order.playerUuid, name, METHOD_BANK, order.amount, point, order.referenceCode, MessageKeys.BANK_SUCCESS),
         )
-        val commands = config().rewards.commandsFor(order.amount).map { RewardCommands.format(it, vars) }
-        val payload = RewardPayload(
-            messageKey = MessageKeys.BANK_SUCCESS,
-            messageVars = mapOf("amount" to Text.formatMoney(order.amount), "point" to point.toString()),
-            commands = commands,
-        )
-        rewardSink.enqueue(order.playerUuid, order.referenceCode, payload)
     }
 
     private fun lateTransfer(order: BankPayment, confirmation: BankConfirmation) {
@@ -171,8 +153,11 @@ class BankConfirmService(
         }
     }
 
-    /** points = amount / 1000 * bank.point-rate, rounded half-up. */
-    fun pointFor(amountVnd: Long): Long = Math.round(amountVnd / 1000.0 * config().bank.pointRate)
+    /** Base points (amount/1000 * rate) with the active promo bonus applied. */
+    fun pointFor(amountVnd: Long): Long {
+        val base = Math.round(amountVnd / 1000.0 * config().bank.pointRate)
+        return promo.applyBonus(base, System.currentTimeMillis())
+    }
 
     companion object {
         const val METHOD_BANK = "bank"

@@ -13,30 +13,30 @@ import java.util.concurrent.Executors
  * Blocking I/O (DB queries, bank polling, Discord webhooks) runs on a
  * virtual-thread executor ([runIo], Java 21) instead of the platform thread pool.
  */
-class Scheduler(private val foliaLib: FoliaLib) {
+open class Scheduler(private val foliaLib: FoliaLib?) {
 
-    private val impl get() = foliaLib.scheduler
+    private val impl get() = foliaLib!!.scheduler
 
     /** Virtual-thread-per-task executor for blocking I/O. */
     private val ioExecutor = Executors.newVirtualThreadPerTaskExecutor()
 
     /** Blocking I/O (DB / HTTP / polling) — runs on a virtual thread. */
-    fun runIo(task: Runnable) {
+    open fun runIo(task: Runnable) {
         ioExecutor.execute(task)
     }
 
     /** Short off-main async work via the platform scheduler. */
-    fun runAsync(task: Runnable) {
+    open fun runAsync(task: Runnable) {
         impl.runAsync { task.run() }
     }
 
     /** Global, non-player-bound work on the next tick (GlobalRegionScheduler on Folia). */
-    fun runNextTick(task: Runnable) {
+    open fun runNextTick(task: Runnable) {
         impl.runNextTick { task.run() }
     }
 
     /** Work touching a single player (entity scheduler on Folia, main thread on Spigot). */
-    fun runAtEntity(player: Player, task: Runnable) {
+    open fun runAtEntity(player: Player, task: Runnable) {
         impl.runAtEntity(player) { task.run() }
     }
 

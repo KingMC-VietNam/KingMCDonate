@@ -8,18 +8,17 @@ import net.kingmc.plugin.kingmcdonate.database.Database
 import net.kingmc.plugin.kingmcdonate.database.dao.CardPaymentDao
 import net.kingmc.plugin.kingmcdonate.database.dao.PlayerDao
 import net.kingmc.plugin.kingmcdonate.database.dao.PlayerTotalsDao
+import net.kingmc.plugin.kingmcdonate.payment.Donation
+import net.kingmc.plugin.kingmcdonate.payment.DonationSuccessService
 import net.kingmc.plugin.kingmcdonate.payment.model.CardPayment
 import net.kingmc.plugin.kingmcdonate.payment.model.PaymentStatus
-import net.kingmc.plugin.kingmcdonate.payment.reward.RewardCommands
-import net.kingmc.plugin.kingmcdonate.payment.reward.RewardSink
-import net.kingmc.plugin.kingmcdonate.payment.reward.RewardPayload
 import net.kingmc.plugin.kingmcdonate.provider.card.CardOutcome
 import net.kingmc.plugin.kingmcdonate.provider.card.CardProviderRegistry
 import net.kingmc.plugin.kingmcdonate.provider.card.CardRequest
 import net.kingmc.plugin.kingmcdonate.provider.card.CardType
+import net.kingmc.plugin.kingmcdonate.promo.PromoService
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger
 import net.kingmc.plugin.kingmcdonate.util.Scheduler
-import net.kingmc.plugin.kingmcdonate.util.Text
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import java.util.UUID
@@ -37,7 +36,8 @@ class CardPaymentService(
     private val playerDao: PlayerDao,
     private val currency: CurrencyRegistry,
     private val providers: CardProviderRegistry,
-    private val rewardSink: RewardSink,
+    private val promo: PromoService,
+    private val donationSuccess: DonationSuccessService,
     private val scheduler: Scheduler,
     private val logger: PluginLogger,
     private val config: () -> PluginConfig,
@@ -155,13 +155,16 @@ class CardPaymentService(
             return
         }
 
-        val point = config().card.denominations[declaredAmount]
-        if (point == null) {
+        val basePoint = config().card.denominations[declaredAmount]
+        if (basePoint == null) {
             cardPaymentDao.resolve(referenceCode, PaymentStatus.FAILED, 0, System.currentTimeMillis())
             logger.warn("Card $referenceCode: amount $declaredAmount is not a configured denomination; not rewarded.")
             message(uuid, MessageKeys.CARD_WRONG_DENOMINATION)
             return
         }
+
+        val now0 = System.currentTimeMillis()
+        val point = promo.applyBonus(basePoint, now0)
 
         if (!currency.active.isAvailable()) {
             // Reward backend is down: keep the order open instead of flipping it SUCCESS so points
@@ -204,9 +207,8 @@ class CardPaymentService(
 
     /**
      * Gate the external reward so the resolving caller and any reconcile pass credit at most once:
-     * credit points by uuid (the currency provider dispatches the credit to the region thread
-     * itself), then enqueue the player-present reward (success message and reward commands) to the
-     * outbox so it reaches the player on whichever node they are online and survives a rejoin.
+     * credit points by uuid, then hand off to [DonationSuccessService] for all post-success work
+     * (success message + reward commands via the outbox, milestones, first-topup, broadcast, Discord).
      */
     private fun applyReward(referenceCode: String, uuid: UUID, name: String?, declaredAmount: Long, point: Long) {
         if (cardPaymentDao.claimRewardApplied(referenceCode, System.currentTimeMillis()) != 1) {
@@ -218,22 +220,8 @@ class CardPaymentService(
         } catch (e: Exception) {
             logger.error("Card $referenceCode: reward credit failed uuid=$uuid point=$point; reconcile manually.", e)
         }
-        val playerName = name ?: Bukkit.getOfflinePlayer(uuid).name ?: uuid.toString()
-        val vars = mapOf(
-            "player" to playerName,
-            "amount" to declaredAmount.toString(),
-            "point" to point.toString(),
-            "ref" to referenceCode,
-        )
-        val commands = config().rewards.commandsFor(declaredAmount).map { RewardCommands.format(it, vars) }
-        rewardSink.enqueue(
-            uuid,
-            referenceCode,
-            RewardPayload(
-                messageKey = MessageKeys.CARD_SUCCESS,
-                messageVars = mapOf("amount" to Text.formatMoney(declaredAmount), "point" to point.toString()),
-                commands = commands,
-            ),
+        donationSuccess.onSuccess(
+            Donation(uuid, name, METHOD_CARD, declaredAmount, point, referenceCode, MessageKeys.CARD_SUCCESS),
         )
     }
 

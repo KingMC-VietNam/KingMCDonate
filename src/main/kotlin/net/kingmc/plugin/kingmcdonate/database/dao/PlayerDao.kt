@@ -26,4 +26,30 @@ class PlayerDao(database: Database) : Dao(database) {
             ps.executeQuery().use { rs -> if (rs.next()) rs.getString("name") else null }
         }
     }
+
+    /**
+     * Atomically flip `first_topup_done` 0 -> 1, returning true only for the call that
+     * wins. Ensures a row exists first so a player whose name was never recorded still
+     * gets exactly one first-topup grant across the cluster.
+     */
+    fun claimFirstTopup(playerUuid: UUID): Boolean = withConnection { conn ->
+        ensureRow(conn, playerUuid)
+        conn.prepareStatement(
+            "UPDATE players SET first_topup_done = 1 WHERE uuid = ? AND first_topup_done = 0",
+        ).use { ps ->
+            ps.setString(1, playerUuid.toString())
+            ps.executeUpdate() == 1
+        }
+    }
+
+    private fun ensureRow(conn: java.sql.Connection, playerUuid: UUID) {
+        val sql = "INSERT INTO players (uuid, name) VALUES (?, NULL) " + when (database.dialect) {
+            Dialect.SQLITE -> "ON CONFLICT(uuid) DO NOTHING"
+            Dialect.MYSQL -> "ON DUPLICATE KEY UPDATE uuid = uuid"
+        }
+        conn.prepareStatement(sql).use { ps ->
+            ps.setString(1, playerUuid.toString())
+            ps.executeUpdate()
+        }
+    }
 }

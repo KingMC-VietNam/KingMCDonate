@@ -8,6 +8,7 @@ import net.kingmc.plugin.kingmcdonate.database.dao.BankPaymentDao
 import net.kingmc.plugin.kingmcdonate.database.dao.PlayerDao
 import net.kingmc.plugin.kingmcdonate.database.dao.PlayerTotalsDao
 import net.kingmc.plugin.kingmcdonate.database.dao.ProcessedBankTxDao
+import net.kingmc.plugin.kingmcdonate.payment.DonationSuccessService
 import net.kingmc.plugin.kingmcdonate.payment.bank.BankConfirmService
 import net.kingmc.plugin.kingmcdonate.payment.model.PaymentStatus
 import net.kingmc.plugin.kingmcdonate.payment.reward.RewardPayload
@@ -45,18 +46,30 @@ class BankConfirmServiceTest {
         return PluginConfig(yaml)
     }
 
-    private fun buildService(currencyAvailable: Boolean = true): BankConfirmService {
+    private fun buildService(currencyAvailable: Boolean = true): BankConfirmService =
+        buildServiceWithPromo(net.kingmc.plugin.kingmcdonate.promo.PromoConfig(emptyList()), currencyAvailable)
+
+    private fun buildServiceWithPromo(
+        promoCfg: net.kingmc.plugin.kingmcdonate.promo.PromoConfig,
+        currencyAvailable: Boolean = true,
+    ): BankConfirmService {
         fakeCurrency = FakeCurrencyProvider(available = currencyAvailable)
         val currency = CurrencyRegistry(logger) { fakeCurrency }.apply { load(config.currency) }
         enqueued = mutableListOf()
         val sink = object : RewardSink {
-            override fun enqueue(playerUuid: UUID, referenceCode: String, payload: RewardPayload) {
-                enqueued.add(playerUuid)
-            }
+            override fun enqueue(playerUuid: UUID, referenceCode: String, payload: RewardPayload) { enqueued.add(playerUuid) }
         }
+        val promo = net.kingmc.plugin.kingmcdonate.promo.PromoService { promoCfg }
+        val success = DonationSuccessService(
+            rewardSink = sink,
+            playerDao = PlayerDao(database),
+            logger = logger,
+            config = { config(1.0) },
+            broadcaster = {},
+        )
         return BankConfirmService(
             database, bank, ProcessedBankTxDao(database), totals, PlayerDao(database),
-            currency, sink, clearQr = {}, logger = logger, config = { config(1.0) },
+            currency, promo, success, clearQr = {}, logger = logger, config = { config(1.0) },
         )
     }
 
@@ -137,12 +150,27 @@ class BankConfirmServiceTest {
     }
 
     @Test
+    fun `active promo increases credited points and totals`() {
+        // Rebuild the service with a +100% promo active now.
+        val now = System.currentTimeMillis()
+        val promoCfg = net.kingmc.plugin.kingmcdonate.promo.PromoConfig(
+            listOf(net.kingmc.plugin.kingmcdonate.promo.PromoConfig.Promo("x", 100.0, now - 1000, now + 60_000)),
+        )
+        service = buildServiceWithPromo(promoCfg)
+        val (uuid, ref) = newOrder(amount = 50_000) // base 50 points at rate 1.0
+        service.confirm(BankConfirmation(ref, "TXP", 50_000))
+        assertEquals(100L, fakeCurrency.balance(uuid)) // 50 * (1 + 100/100)
+        assertEquals(50_000L, totalAll(uuid))          // amount_vnd is face, unaffected by promo
+        assertEquals(100L, bank.findByReference(ref)!!.point) // persisted point matches credited amount
+    }
+
+    @Test
     fun `reconcile after a credit gap applies the credit once without re-adding totals`() {
         val (uuid, ref) = newOrder()
         // Simulate a crash after the atomic commit but before the gated credit:
         // flip the order to SUCCESS with totals, leaving reward_applied = 0.
         database.transaction { conn ->
-            bank.resolveSuccessWithinTxn(conn, ref, 2_000)
+            bank.resolveSuccessWithinTxn(conn, ref, 50, 2_000)
             totals.add(conn, uuid, "bank", 50_000, 50, 2_000)
         }
         val order = bank.findByReference(ref)!!

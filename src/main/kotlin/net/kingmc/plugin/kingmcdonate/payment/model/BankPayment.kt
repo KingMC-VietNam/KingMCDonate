@@ -12,6 +12,7 @@ data class BankPayment(
     val provider: String,
     val ownerServer: String,
     val externalRef: String?,
+    val point: Long,
     val rewardApplied: Boolean,
     val createdAt: Long,
     val updatedAt: Long,

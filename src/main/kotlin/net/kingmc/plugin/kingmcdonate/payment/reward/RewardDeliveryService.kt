@@ -3,6 +3,7 @@ package net.kingmc.plugin.kingmcdonate.payment.reward
 import com.google.gson.Gson
 import net.kingmc.plugin.kingmcdonate.config.Messages
 import net.kingmc.plugin.kingmcdonate.config.PluginConfig
+import net.kingmc.plugin.kingmcdonate.util.Text
 import net.kingmc.plugin.kingmcdonate.database.dao.PendingRewardDao
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger
 import net.kingmc.plugin.kingmcdonate.util.Scheduler
@@ -73,6 +74,7 @@ class RewardDeliveryService(
         payload.messageKey?.let { key ->
             messages().send(player, key, *payload.messageVars.map { it.key to it.value }.toTypedArray())
         }
+        payload.message?.let { player.sendMessage(Text.colorize(it)) }
         if (payload.commands.isNotEmpty()) {
             RewardCommands.run(payload.commands, player.uniqueId, player.name, emptyMap(), scheduler, logger)
         }

@@ -20,7 +20,7 @@ class SePayWebhookHandlerTest {
     private val order = BankPayment(
         id = 1, playerUuid = UUID.randomUUID(), amount = 50_000, referenceCode = "KMD7X9A2QP",
         status = PaymentStatus.PENDING, provider = "sepay", ownerServer = "node-a", externalRef = null,
-        rewardApplied = false, createdAt = 0, updatedAt = 0,
+        point = 0, rewardApplied = false, createdAt = 0, updatedAt = 0,
     )
 
     private var confirmed: net.kingmc.plugin.kingmcdonate.provider.bank.BankConfirmation? = null
