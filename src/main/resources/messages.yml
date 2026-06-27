@@ -63,3 +63,14 @@ fakecard-done: "&aĐã mô phỏng nạp thẻ &e{amount} &acho &e{player}&a."
 fakecard-player-not-found: "&cKhông tìm thấy người chơi &e{player}&c đang online."
 fakebank-usage: "&cDùng: &e/kingmcdonate fakebank <player> <số tiền>"
 fakebank-done: "&aĐã mô phỏng nạp bank &e{amount} &acho &e{player}&a."
+
+# Bossbar mốc nạp
+bossbar-disabled: "&cThanh tiến độ mốc nạp đang tắt trên server."
+bossbar-shown: "&aĐã bật thanh tiến độ mốc nạp."
+bossbar-hidden: "&7Đã ẩn thanh tiến độ mốc nạp."
+milestone-reached: "&aChúc mừng! Bạn đã đạt mốc nạp &e{threshold}đ&a!"
+
+# Top nạp
+topnap-header: "&6===== &eTOP NẠP &6====="
+topnap-entry: "&e#{rank} &f{player} &7- &a{value}"
+topnap-empty: "&7Chưa có ai nạp."

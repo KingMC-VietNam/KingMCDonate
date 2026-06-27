@@ -51,4 +51,12 @@ object MessageKeys {
     const val BANK_USAGE = "bank-usage"
     const val FAKEBANK_USAGE = "fakebank-usage"
     const val FAKEBANK_DONE = "fakebank-done"
+
+    const val BOSSBAR_DISABLED = "bossbar-disabled"
+    const val BOSSBAR_SHOWN = "bossbar-shown"
+    const val BOSSBAR_HIDDEN = "bossbar-hidden"
+    const val TOPNAP_HEADER = "topnap-header"
+    const val TOPNAP_ENTRY = "topnap-entry"
+    const val TOPNAP_EMPTY = "topnap-empty"
+    const val MILESTONE_REACHED = "milestone-reached"
 }

@@ -1,0 +1,51 @@
+# ============================================================
+#  Discord Webhook — thông báo nạp & mốc
+# ============================================================
+# enabled: bật/tắt toàn bộ thông báo Discord.
+# serial-visible-chars: số ký tự CUỐI của seri/PIN còn hiện (phần còn lại thay bằng *).
+#
+# "payload" chính là JSON webhook của Discord, viết thẳng dạng YAML. Bạn có thể thiết kế
+# tại https://discohook.org/ rồi dán vào. Placeholder thay tự động trong mọi chuỗi:
+#   %PLAYER% %AMOUNT% %POINT% %POINT_UNIT% %BALANCE% %METHOD% %SERVER% %TIME% %REF%
+#   (card thêm %SERIAL% %PIN% đã che; mốc thêm %THRESHOLD%)
+# color của embed: "#RRGGBB" (tự đổi sang số Discord).
+#
+# Định tuyến: mỗi event (card-success, bank-success, player-milestone, server-milestone)
+# có thể có webhook riêng dưới "events"; không khai -> dùng "default".
+enabled: false
+serial-visible-chars: 3
+
+default:
+  - enabled: true
+    url: "https://discord.com/api/webhooks/ID/TOKEN"
+    payload:
+      username: "KingMCDonate"
+      embeds:
+        - title: "💸 Nạp thành công"
+          description: "Cảm ơn bạn đã ủng hộ server!"
+          color: "#58b9ff"
+          fields:
+            - name: "Người chơi"
+              value: "%PLAYER%"
+              inline: true
+            - name: "Số tiền"
+              value: "%AMOUNT%đ"
+              inline: true
+            - name: "Nhận"
+              value: "%POINT% %POINT_UNIT%"
+              inline: true
+            - name: "Phương thức"
+              value: "%METHOD%"
+              inline: true
+            - name: "Server"
+              value: "%SERVER%"
+              inline: true
+          footer:
+            text: "%TIME% • %REF%"
+
+events: {}
+#  player-milestone:
+#    - enabled: true
+#      url: "https://discord.com/api/webhooks/ID/TOKEN"
+#      payload:
+#        content: "🏆 %PLAYER% đạt mốc nạp %THRESHOLD%đ!"

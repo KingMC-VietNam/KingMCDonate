@@ -1,0 +1,18 @@
+# ============================================================
+#  Mốc nạp TOÀN SERVER (tổng mọi người chơi)
+# ============================================================
+# Khi tổng nạp toàn server (theo kỳ) đạt mốc -> chạy commands MỘT LẦN cho cả mạng.
+# Lệnh server thường không gắn người chơi cụ thể (chạy console). {player} = người kích hoạt mốc.
+milestones:
+  all:
+#    - threshold: 10000000
+#      message: "&6Server đã đạt mốc nạp &e{threshold}đ&6 nhờ &e{player}&6!"
+#      bossbar:
+#        enabled: true
+#        color: YELLOW
+#        style: SOLID
+#      commands:
+#        - "console: broadcast &aServer đạt mốc {threshold}đ!"
+  day: []
+  week: []
+  month: []

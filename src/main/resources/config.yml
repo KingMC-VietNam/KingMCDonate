@@ -193,3 +193,46 @@ webhook:
   # URL public của server (kèm domain/HTTPS). Chỉ để THAM KHẢO: dán
   # <public-base-url><base-path>/<cổng> vào dashboard SePay/card2k. Vd "https://napthe.example.com".
   public-base-url: ""
+
+# ============================================================
+#  Đơn vị point (hiển thị ở Discord / placeholder)
+# ============================================================
+point-unit: "point"
+
+# ============================================================
+#  Thưởng nạp lần đầu (first-topup)
+# ============================================================
+first-topup:
+  # Bật để chạy danh sách lệnh MỘT LẦN ở giao dịch thành công đầu tiên của mỗi người chơi.
+  enabled: false
+  # Biến: {player} {amount} {point} {ref}. Prefix console:/player:.
+  commands:
+    - "console: broadcast &e{player} &7lần đầu ủng hộ server!"
+
+# ============================================================
+#  Thông báo toàn server khi nạp thành công (broadcast)
+# ============================================================
+broadcast:
+  on-success: false
+  # Biến: {player} {amount} {point} {method}. Hỗ trợ màu & và &#RRGGBB.
+  format: "&a{player} &7vừa ủng hộ &e{amount} &7(&b{point} point&7)!"
+
+# ============================================================
+#  Thanh tiến độ mốc nạp (bossbar)
+# ============================================================
+bossbar:
+  # Công tắc tổng. Người chơi có thể tự ẩn/hiện bằng /napbossbar.
+  enabled: true
+  # Chu kỳ cập nhật tiến độ (ticks).
+  update-interval: 40
+  # Thời gian hiển thị mỗi mốc trước khi xoay sang mốc kế (giây) khi có nhiều mốc.
+  cycle-interval: 6
+
+# ============================================================
+#  Bảng xếp hạng (top nạp)
+# ============================================================
+leaderboard:
+  # Thời gian cache mỗi bảng (giây).
+  cache-ttl-seconds: 60
+  # Số hạng lưu/hiển thị.
+  size: 10

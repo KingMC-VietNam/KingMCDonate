@@ -25,8 +25,9 @@ class Migration0001 : Migration {
             // uuid <-> name
             """
             CREATE TABLE IF NOT EXISTS players (
-                uuid VARCHAR(36) PRIMARY KEY,
-                name VARCHAR(16)
+                uuid             VARCHAR(36) PRIMARY KEY,
+                name             VARCHAR(16),
+                first_topup_done INT NOT NULL DEFAULT 0
             )
             """,
             // card top-ups
@@ -61,6 +62,7 @@ class Migration0001 : Migration {
                 provider       VARCHAR(32) NOT NULL,
                 owner_server   VARCHAR(64) NOT NULL,
                 external_ref   VARCHAR(128),
+                point          BIGINT NOT NULL DEFAULT 0,
                 reward_applied INT NOT NULL DEFAULT 0,
                 created_at     BIGINT NOT NULL,
                 updated_at     BIGINT NOT NULL
@@ -100,6 +102,19 @@ class Migration0001 : Migration {
                 PRIMARY KEY (player_uuid, period, period_key, method)
             )
             """,
+            // milestone completions: at-most-once grant per (scope, subject, period_key, threshold)
+            """
+            CREATE TABLE IF NOT EXISTS milestone_completions (
+                id           $id,
+                scope        VARCHAR(8)  NOT NULL,
+                subject      VARCHAR(36) NOT NULL,
+                period       VARCHAR(8)  NOT NULL,
+                period_key   VARCHAR(16) NOT NULL,
+                threshold    BIGINT      NOT NULL,
+                completed_at BIGINT      NOT NULL,
+                UNIQUE (scope, subject, period, period_key, threshold)
+            )
+            """,
         )
 
         // Secondary indexes for the hot lookup paths: poll sweeps filter by (owner_server, status),
@@ -112,6 +127,8 @@ class Migration0001 : Migration {
             "CREATE INDEX ${ifNotExists}idx_bank_payments_server_status ON bank_payments (owner_server, status)",
             "CREATE INDEX ${ifNotExists}idx_bank_payments_player ON bank_payments (player_uuid, created_at)",
             "CREATE INDEX ${ifNotExists}idx_pending_reward_pending ON pending_reward (delivered, claimed_by)",
+            "CREATE INDEX ${ifNotExists}idx_milestone_completions_lookup " +
+                "ON milestone_completions (scope, subject, period, period_key)",
         )
 
         connection.createStatement().use { stmt ->

@@ -26,6 +26,12 @@ class PluginConfig(root: ConfigurationSection) {
     /** A claimed-but-undelivered outbox row older than this many minutes is requeued. */
     val staleClaimMinutes: Long = root.getLong("stale-claim-minutes", 5L).coerceAtLeast(1L)
 
+    val pointUnit: String = root.getString("point-unit", "point")!!
+    val broadcast: BroadcastConfig = BroadcastConfig(root.getConfigurationSection("broadcast"))
+    val firstTopup: FirstTopupConfig = FirstTopupConfig(root.getConfigurationSection("first-topup"))
+    val bossbar: BossBarConfig = BossBarConfig(root.getConfigurationSection("bossbar"))
+    val leaderboard: LeaderboardConfig = LeaderboardConfig(root.getConfigurationSection("leaderboard"))
+
     class DatabaseConfig(section: ConfigurationSection?) {
         /** `sqlite` (default) or `mysql`. */
         val type: String = section?.getString("type", "sqlite")?.lowercase() ?: "sqlite"
@@ -149,5 +155,28 @@ class PluginConfig(root: ConfigurationSection) {
             val trimmed = raw.trim().trimEnd('/')
             return if (trimmed.startsWith("/")) trimmed else "/$trimmed"
         }
+    }
+
+    class BroadcastConfig(section: ConfigurationSection?) {
+        val onSuccess: Boolean = section?.getBoolean("on-success", false) ?: false
+        val format: String = section?.getString("format", "") ?: ""
+    }
+
+    class FirstTopupConfig(section: ConfigurationSection?) {
+        val enabled: Boolean = section?.getBoolean("enabled", false) ?: false
+        val commands: List<String> = section?.getStringList("commands") ?: emptyList()
+    }
+
+    class BossBarConfig(section: ConfigurationSection?) {
+        val enabled: Boolean = section?.getBoolean("enabled", true) ?: true
+        /** How often the bar progress/title is refreshed, in ticks. */
+        val updateIntervalTicks: Long = (section?.getLong("update-interval", 40L) ?: 40L).coerceAtLeast(1L)
+        /** How long each milestone is shown before cycling to the next, in seconds. */
+        val cycleIntervalSeconds: Long = (section?.getLong("cycle-interval", 6L) ?: 6L).coerceAtLeast(1L)
+    }
+
+    class LeaderboardConfig(section: ConfigurationSection?) {
+        val cacheTtlSeconds: Long = (section?.getLong("cache-ttl-seconds", 60L) ?: 60L).coerceAtLeast(1L)
+        val size: Int = (section?.getInt("size", 10) ?: 10).coerceIn(1, 100)
     }
 }

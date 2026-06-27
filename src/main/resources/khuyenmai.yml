@@ -1,0 +1,11 @@
+# ============================================================
+#  Khuyến mãi nạp theo lịch
+# ============================================================
+# Mỗi khung thời gian cộng thêm % POINT cho mọi giao dịch xác nhận trong khoảng [from, to].
+# Trùng khung -> ưu tiên rate cao nhất. Chỉ cộng vào point (không đổi số tiền nạp face).
+# Định dạng thời gian: "yyyy-MM-dd HH:mm" theo giờ máy chủ.
+promotions: []
+#  - name: "Cuối tuần x2"
+#    rate: 100          # +100% point
+#    from: "2026-06-28 00:00"
+#    to: "2026-06-30 23:59"

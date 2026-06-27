@@ -52,6 +52,7 @@ class MigrationRunnerTest {
         val expected = listOf(
             "config_kv", "players", "card_payments", "bank_payments",
             "processed_bank_tx", "pending_reward", "player_totals",
+            "milestone_completions",
         )
         for (table in expected) {
             // Throws if the table is missing.
@@ -89,6 +90,41 @@ class MigrationRunnerTest {
         runner().migrate()
         insertTx("TX-DUP")
         assertThrows(SQLException::class.java) { insertTx("TX-DUP") }
+    }
+
+    @Test
+    fun `players table has first_topup_done column`() {
+        runner().migrate()
+        ds.connection.use { conn ->
+            conn.createStatement().executeUpdate(
+                "INSERT INTO players (uuid, name, first_topup_done) VALUES ('u-ft', 'Bob', 1)",
+            )
+            conn.createStatement().executeQuery(
+                "SELECT first_topup_done FROM players WHERE uuid = 'u-ft'",
+            ).use { rs ->
+                rs.next()
+                assertEquals(1, rs.getInt(1))
+            }
+        }
+    }
+
+    @Test
+    fun `milestone_completions enforces unique completion`() {
+        runner().migrate()
+        insertCompletion("PLAYER", "u1", "ALL", "all", 100000)
+        assertThrows(SQLException::class.java) { insertCompletion("PLAYER", "u1", "ALL", "all", 100000) }
+        // A different period_key for the same threshold is a distinct completion.
+        insertCompletion("PLAYER", "u1", "DAY", "2026-06-26", 100000)
+    }
+
+    private fun insertCompletion(scope: String, subject: String, period: String, key: String, threshold: Long) {
+        ds.connection.use {
+            it.createStatement().executeUpdate(
+                "INSERT INTO milestone_completions " +
+                    "(scope, subject, period, period_key, threshold, completed_at) " +
+                    "VALUES ('$scope', '$subject', '$period', '$key', $threshold, 0)",
+            )
+        }
     }
 
     private fun insertBank(ref: String) {
