@@ -1,7 +1,7 @@
-package net.kingmc.plugin.kingmcdonate.milestone
+package net.kingmc.plugin.kingmcdonate.database
 
 import net.kingmc.plugin.kingmcdonate.config.PluginConfig
-import net.kingmc.plugin.kingmcdonate.database.Database
+import net.kingmc.plugin.kingmcdonate.database.dao.MilestoneDao
 import net.kingmc.plugin.kingmcdonate.database.dao.PlayerTotalsDao
 import net.kingmc.plugin.kingmcdonate.util.Period
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger

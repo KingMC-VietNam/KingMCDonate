@@ -1,5 +1,6 @@
 package net.kingmc.plugin.kingmcdonate.milestone
 
+import net.kingmc.plugin.kingmcdonate.database.dao.MilestoneDao
 import net.kingmc.plugin.kingmcdonate.payment.Donation
 import net.kingmc.plugin.kingmcdonate.payment.reward.RewardCommands
 import net.kingmc.plugin.kingmcdonate.payment.reward.RewardPayload

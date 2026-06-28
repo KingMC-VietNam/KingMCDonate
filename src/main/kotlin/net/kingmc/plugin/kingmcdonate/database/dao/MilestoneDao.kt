@@ -1,8 +1,6 @@
-package net.kingmc.plugin.kingmcdonate.milestone
+package net.kingmc.plugin.kingmcdonate.database.dao
 
 import net.kingmc.plugin.kingmcdonate.database.Database
-import net.kingmc.plugin.kingmcdonate.database.dao.Dao
-import net.kingmc.plugin.kingmcdonate.database.dao.isUniqueViolation
 import net.kingmc.plugin.kingmcdonate.util.Period
 import java.sql.SQLException
 import java.util.UUID

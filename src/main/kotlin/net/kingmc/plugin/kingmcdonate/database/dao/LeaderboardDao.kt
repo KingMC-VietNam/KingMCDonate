@@ -1,7 +1,6 @@
-package net.kingmc.plugin.kingmcdonate.leaderboard
+package net.kingmc.plugin.kingmcdonate.database.dao
 
 import net.kingmc.plugin.kingmcdonate.database.Database
-import net.kingmc.plugin.kingmcdonate.database.dao.Dao
 import net.kingmc.plugin.kingmcdonate.util.Period
 import java.util.UUID
 

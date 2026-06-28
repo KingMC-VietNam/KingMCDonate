@@ -1,6 +1,7 @@
 package net.kingmc.plugin.kingmcdonate.leaderboard
 
 import net.kingmc.plugin.kingmcdonate.config.PluginConfig
+import net.kingmc.plugin.kingmcdonate.database.dao.LeaderboardDao
 import net.kingmc.plugin.kingmcdonate.util.Period
 import net.kingmc.plugin.kingmcdonate.util.Periods
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger

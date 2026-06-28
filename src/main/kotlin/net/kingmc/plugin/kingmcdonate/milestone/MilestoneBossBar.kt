@@ -1,6 +1,7 @@
 package net.kingmc.plugin.kingmcdonate.milestone
 
 import net.kingmc.plugin.kingmcdonate.config.PluginConfig
+import net.kingmc.plugin.kingmcdonate.database.dao.MilestoneDao
 import net.kingmc.plugin.kingmcdonate.util.Period
 import net.kingmc.plugin.kingmcdonate.util.Periods
 import net.kingmc.plugin.kingmcdonate.util.Scheduler

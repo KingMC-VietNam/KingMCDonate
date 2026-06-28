@@ -3,6 +3,7 @@ package net.kingmc.plugin.kingmcdonate.milestone
 import net.kingmc.plugin.kingmcdonate.config.MessageKeys
 import net.kingmc.plugin.kingmcdonate.config.PluginConfig
 import net.kingmc.plugin.kingmcdonate.database.Database
+import net.kingmc.plugin.kingmcdonate.database.dao.MilestoneDao
 import net.kingmc.plugin.kingmcdonate.database.dao.PlayerTotalsDao
 import net.kingmc.plugin.kingmcdonate.payment.Donation
 import net.kingmc.plugin.kingmcdonate.payment.DirectScheduler

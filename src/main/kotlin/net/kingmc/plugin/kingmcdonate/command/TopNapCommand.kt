@@ -2,7 +2,7 @@ package net.kingmc.plugin.kingmcdonate.command
 
 import net.kingmc.plugin.kingmcdonate.config.MessageKeys
 import net.kingmc.plugin.kingmcdonate.config.Messages
-import net.kingmc.plugin.kingmcdonate.leaderboard.LeaderboardDao
+import net.kingmc.plugin.kingmcdonate.database.dao.LeaderboardDao
 import net.kingmc.plugin.kingmcdonate.leaderboard.LeaderboardService
 import net.kingmc.plugin.kingmcdonate.util.Period
 import net.kingmc.plugin.kingmcdonate.util.Scheduler

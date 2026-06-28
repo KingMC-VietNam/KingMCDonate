@@ -1,6 +1,6 @@
 package net.kingmc.plugin.kingmcdonate.placeholder
 
-import net.kingmc.plugin.kingmcdonate.leaderboard.LeaderboardDao
+import net.kingmc.plugin.kingmcdonate.database.dao.LeaderboardDao
 import net.kingmc.plugin.kingmcdonate.leaderboard.LeaderboardService
 import net.kingmc.plugin.kingmcdonate.util.Period
 import org.junit.jupiter.api.Assertions.assertEquals

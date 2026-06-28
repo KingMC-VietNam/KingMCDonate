@@ -12,10 +12,8 @@ import net.kingmc.plugin.kingmcdonate.command.NapTheCommand
 import net.kingmc.plugin.kingmcdonate.command.ReloadCommand
 import net.kingmc.plugin.kingmcdonate.command.TopNapCommand
 import net.kingmc.plugin.kingmcdonate.discord.DiscordService
-import net.kingmc.plugin.kingmcdonate.leaderboard.LeaderboardDao
 import net.kingmc.plugin.kingmcdonate.leaderboard.LeaderboardService
 import net.kingmc.plugin.kingmcdonate.milestone.MilestoneBossBar
-import net.kingmc.plugin.kingmcdonate.milestone.MilestoneDao
 import net.kingmc.plugin.kingmcdonate.milestone.MilestoneJoinListener
 import net.kingmc.plugin.kingmcdonate.milestone.MilestoneService
 import net.kingmc.plugin.kingmcdonate.placeholder.KmdExpansion
@@ -24,6 +22,8 @@ import net.kingmc.plugin.kingmcdonate.currency.CurrencyRegistry
 import net.kingmc.plugin.kingmcdonate.database.Database
 import net.kingmc.plugin.kingmcdonate.database.dao.BankPaymentDao
 import net.kingmc.plugin.kingmcdonate.database.dao.CardPaymentDao
+import net.kingmc.plugin.kingmcdonate.database.dao.LeaderboardDao
+import net.kingmc.plugin.kingmcdonate.database.dao.MilestoneDao
 import net.kingmc.plugin.kingmcdonate.database.dao.PendingRewardDao
 import net.kingmc.plugin.kingmcdonate.database.dao.PlayerDao
 import net.kingmc.plugin.kingmcdonate.database.dao.PlayerTotalsDao

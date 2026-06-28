@@ -2,6 +2,7 @@ package net.kingmc.plugin.kingmcdonate.leaderboard
 
 import net.kingmc.plugin.kingmcdonate.config.PluginConfig
 import net.kingmc.plugin.kingmcdonate.database.Database
+import net.kingmc.plugin.kingmcdonate.database.dao.LeaderboardDao
 import net.kingmc.plugin.kingmcdonate.database.dao.PlayerDao
 import net.kingmc.plugin.kingmcdonate.database.dao.PlayerTotalsDao
 import net.kingmc.plugin.kingmcdonate.payment.DirectScheduler

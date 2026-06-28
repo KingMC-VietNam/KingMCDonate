@@ -1,7 +1,7 @@
 package net.kingmc.plugin.kingmcdonate.placeholder
 
 import me.clip.placeholderapi.expansion.PlaceholderExpansion
-import net.kingmc.plugin.kingmcdonate.leaderboard.LeaderboardDao
+import net.kingmc.plugin.kingmcdonate.database.dao.LeaderboardDao
 import net.kingmc.plugin.kingmcdonate.leaderboard.LeaderboardService
 import net.kingmc.plugin.kingmcdonate.promo.PromoService
 import net.kingmc.plugin.kingmcdonate.util.Period
