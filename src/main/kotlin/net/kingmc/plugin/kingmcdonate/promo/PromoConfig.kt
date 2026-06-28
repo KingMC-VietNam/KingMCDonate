@@ -45,6 +45,6 @@ class PromoConfig {
     }
 
     companion object {
-        private val FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+        private val FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
     }
 }

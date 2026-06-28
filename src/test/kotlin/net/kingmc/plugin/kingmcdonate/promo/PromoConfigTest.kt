@@ -20,12 +20,12 @@ class PromoConfigTest {
             promotions:
               cuoi-tuan-x2:
                 rate: 100
-                from: "2026-06-28 00:00"
-                to: "2026-06-30 23:59"
+                from: "28/06/2026 00:00"
+                to: "30/06/2026 23:59"
               tet:
                 rate: 50
-                from: "2026-02-01 00:00"
-                to: "2026-02-10 23:59"
+                from: "01/02/2026 00:00"
+                to: "10/02/2026 23:59"
             """.trimIndent(),
         )
         assertEquals(2, c.promotions.size)
@@ -47,11 +47,11 @@ class PromoConfigTest {
               bad:
                 rate: 10
                 from: "not-a-date"
-                to: "2026-02-10 23:59"
+                to: "10/02/2026 23:59"
               good:
                 rate: 20
-                from: "2026-02-01 00:00"
-                to: "2026-02-10 23:59"
+                from: "01/02/2026 00:00"
+                to: "10/02/2026 23:59"
             """.trimIndent(),
         )
         assertEquals(listOf("good"), c.promotions.map { it.name })
