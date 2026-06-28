@@ -1,7 +1,7 @@
 # ============================================================
 #  card2k — cổng gạch thẻ cào (giao thức Nencer)
 # ============================================================
-# Lấy partner-id / partner-key tại bảng điều khiển card2k.com.
+# Lấy partner-id / partner-key tại bảng điều khiển card2k.net.
 # Cùng giao thức với thesieure; base-url của card2k cố định nên không cần khai báo ở đây.
 
 # ID đối tác (partner id) do card2k cấp.
@@ -13,8 +13,8 @@ partner-id: ""
 partner-key: ""
 
 # ----- Sandbox (môi trường test) -----
-# false (mặc định): gạch thẻ thật tại https://card2k.com.
-# true: gửi thẻ tới cổng test https://sandbox.card2k.com — KHÔNG tốn tiền, dùng để chạy thử
+# false (mặc định): gạch thẻ thật tại https://card2k.net.
+# true: gửi thẻ tới cổng test https://sandbox.card2k.net — KHÔNG tốn tiền, dùng để chạy thử
 #       toàn bộ luồng nạp thẻ + trả thưởng trước khi go-live.
 #
 # Quy ước kết quả của sandbox dựa trên 3 ký tự CUỐI của mã thẻ (code):

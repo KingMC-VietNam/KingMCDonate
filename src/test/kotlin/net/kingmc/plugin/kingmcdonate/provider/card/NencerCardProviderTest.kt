@@ -13,7 +13,7 @@ class NencerCardProviderTest {
     private val request = CardRequest(UUID.randomUUID(), CardType.VIETTEL, 10_000, "seri", "pin", "REF1")
 
     private fun provider(response: String) =
-        NencerCardProvider("card2k", "https://card2k.com", { _, _, _ -> response }, "pid", "pkey", setOf(CardType.VIETTEL), logger)
+        NencerCardProvider("card2k", "https://card2k.net", { _, _, _ -> response }, "pid", "pkey", setOf(CardType.VIETTEL), logger)
 
     @Test
     fun `submit acknowledges intake as WAITING even when status is success`() {
@@ -87,7 +87,7 @@ class NencerCardProviderTest {
             "pid", "pkey", setOf(CardType.VIETTEL), logger,
         )
         provider.check("REF1", request)
-        assertEquals("https://sandbox.card2k.com/chargingws/v2", calledUrl)
+        assertEquals("https://sandbox.card2k.net/chargingws/v2", calledUrl)
     }
 
     @Test
@@ -99,7 +99,7 @@ class NencerCardProviderTest {
             "pid", "pkey", setOf(CardType.VIETTEL), logger,
         )
         provider.check("REF1", request)
-        assertEquals("https://card2k.com/chargingws/v2", calledUrl)
+        assertEquals("https://card2k.net/chargingws/v2", calledUrl)
     }
 
     @Test
@@ -125,7 +125,7 @@ class NencerCardProviderTest {
         var chargeRetry: Boolean? = null
         var checkRetry: Boolean? = null
         val provider = NencerCardProvider(
-            "card2k", "https://card2k.com",
+            "card2k", "https://card2k.net",
             { _, params, retry ->
                 if (params["command"] == "charging") chargeRetry = retry else checkRetry = retry
                 """{"status":99,"message":"pending"}"""

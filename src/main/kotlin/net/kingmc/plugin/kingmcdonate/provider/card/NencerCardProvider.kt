@@ -96,10 +96,10 @@ class NencerCardProvider(
         const val THESIEURE = "thesieure"
 
         /** card2k uses a fixed domain; thesieure's domain is partner-specific and read from config. */
-        const val CARD2K_BASE_URL = "https://card2k.com"
+        const val CARD2K_BASE_URL = "https://card2k.net"
 
         /** card2k's test gateway: resolves a card by the last 3 digits of its PIN (001/002/other). */
-        const val CARD2K_SANDBOX_BASE_URL = "https://sandbox.card2k.com"
+        const val CARD2K_SANDBOX_BASE_URL = "https://sandbox.card2k.net"
 
         private const val COMMAND_CHARGE = "charging"
         private const val COMMAND_CHECK = "check"
