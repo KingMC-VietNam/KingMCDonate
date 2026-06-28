@@ -15,10 +15,10 @@ class DiscordConfig(section: ConfigurationSection?) {
     /** Trailing serial/PIN characters left visible in card notifications; the rest is masked. */
     val serialVisibleChars: Int = (section?.getInt("serial-visible-chars", 3) ?: 3).coerceAtLeast(0)
 
-    private val defaultHooks: List<Hook> = readHooks(section?.getList("default"))
+    private val defaultHooks: List<Hook> = readHooks(section?.getConfigurationSection("default"))
     private val eventHooks: Map<String, List<Hook>> =
         section?.getConfigurationSection("events")?.let { events ->
-            events.getKeys(false).associateWith { readHooks(events.getList(it)) }
+            events.getKeys(false).associateWith { readHooks(events.getConfigurationSection(it)) }
         } ?: emptyMap()
 
     data class Hook(val enabled: Boolean, val url: String, val payload: Map<String, Any?>)
@@ -26,18 +26,24 @@ class DiscordConfig(section: ConfigurationSection?) {
     /** Hooks for [event], or the default list when the event has no specific configuration. */
     fun hooksFor(event: String): List<Hook> = eventHooks[event] ?: defaultHooks
 
-    @Suppress("UNCHECKED_CAST")
-    private fun readHooks(list: List<*>?): List<Hook> = list.orEmpty().mapNotNull { raw ->
-        val map = raw as? Map<*, *> ?: return@mapNotNull null
-        val url = map["url"]?.toString() ?: return@mapNotNull null
-        val enabled = (map["enabled"] as? Boolean) ?: true
-        val payload = (map["payload"] as? Map<*, *>)?.let { coerce(it) } ?: emptyMap()
-        Hook(enabled, url, payload)
-    }
+    /** Each child key of [section] is a hook name; an entry without a `url` is skipped. */
+    private fun readHooks(section: ConfigurationSection?): List<Hook> =
+        section?.getKeys(false).orEmpty().mapNotNull { name ->
+            val hook = section?.getConfigurationSection(name) ?: return@mapNotNull null
+            val url = hook.getString("url") ?: return@mapNotNull null
+            val enabled = hook.getBoolean("enabled", true)
+            val payload = hook.getConfigurationSection("payload")?.let { deepMap(it) } ?: emptyMap()
+            Hook(enabled, url, payload)
+        }
 
-    @Suppress("UNCHECKED_CAST")
-    private fun coerce(map: Map<*, *>): Map<String, Any?> =
-        map.entries.associate { (k, v) -> k.toString() to v }
+    /** Convert a section to nested maps, leaving list values (Discord JSON arrays) verbatim. */
+    private fun deepMap(section: ConfigurationSection): Map<String, Any?> =
+        section.getKeys(false).associateWith { key ->
+            when (val value = section.get(key)) {
+                is ConfigurationSection -> deepMap(value)
+                else -> value
+            }
+        }
 
     companion object {
         const val EVENT_CARD = "card-success"

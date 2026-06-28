@@ -4,8 +4,10 @@
 # enabled: bật/tắt toàn bộ thông báo Discord.
 # serial-visible-chars: số ký tự CUỐI của seri/PIN còn hiện (phần còn lại thay bằng *).
 #
-# "payload" chính là JSON webhook của Discord, viết thẳng dạng YAML. Bạn có thể thiết kế
-# tại https://discohook.org/ rồi dán vào. Placeholder thay tự động trong mọi chuỗi:
+# Mỗi webhook là một mục có KEY tên gợi nhớ (vd "main") dưới "default" hoặc "events.<event>".
+# "payload" chính là JSON webhook của Discord, viết thẳng dạng YAML (embeds/fields giữ dạng
+# danh sách "-" vì là mảng JSON chuẩn của Discord). Thiết kế tại https://discohook.org/ rồi dán.
+# Placeholder thay tự động trong mọi chuỗi:
 #   %PLAYER% %AMOUNT% %POINT% %POINT_UNIT% %BALANCE% %METHOD% %SERVER% %TIME% %REF%
 #   (card thêm %SERIAL% %PIN% đã che; mốc thêm %THRESHOLD%)
 # color của embed: "#RRGGBB" (tự đổi sang số Discord).
@@ -16,7 +18,8 @@ enabled: false
 serial-visible-chars: 3
 
 default:
-  - enabled: true
+  main:
+    enabled: true
     url: "https://discord.com/api/webhooks/ID/TOKEN"
     payload:
       username: "KingMCDonate"
@@ -45,7 +48,8 @@ default:
 
 events: {}
 #  player-milestone:
-#    - enabled: true
+#    main:
+#      enabled: true
 #      url: "https://discord.com/api/webhooks/ID/TOKEN"
 #      payload:
 #        content: "🏆 %PLAYER% đạt mốc nạp %THRESHOLD%đ!"

@@ -19,13 +19,17 @@ class PromoConfig {
         this.promotions = promotions
     }
 
-    /** Build from the `promotions:` list of `khuyenmai.yml`. */
+    /**
+     * Build from the `promotions:` section of `khuyenmai.yml`. Each child key is the
+     * promotion's name (an operator label, not shown to players); its value holds
+     * `rate`/`from`/`to`. An entry with a missing rate or unparseable time is skipped.
+     */
     constructor(section: ConfigurationSection?) {
-        promotions = section?.getMapList("promotions").orEmpty().mapNotNull { raw ->
-            val name = raw["name"]?.toString() ?: return@mapNotNull null
-            val rate = (raw["rate"] as? Number)?.toDouble() ?: return@mapNotNull null
-            val from = parse(raw["from"]?.toString()) ?: return@mapNotNull null
-            val to = parse(raw["to"]?.toString()) ?: return@mapNotNull null
+        promotions = section?.getKeys(false).orEmpty().mapNotNull { name ->
+            val entry = section?.getConfigurationSection(name) ?: return@mapNotNull null
+            val rate = (entry.get("rate") as? Number)?.toDouble() ?: return@mapNotNull null
+            val from = parse(entry.getString("from")) ?: return@mapNotNull null
+            val to = parse(entry.getString("to")) ?: return@mapNotNull null
             Promo(name, rate, from, to)
         }
     }

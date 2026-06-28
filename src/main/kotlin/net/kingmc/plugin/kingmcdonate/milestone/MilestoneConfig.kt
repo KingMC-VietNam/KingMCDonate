@@ -28,18 +28,17 @@ class MilestoneConfig(section: ConfigurationSection?) {
     fun forPeriod(period: Period): List<Entry> = byPeriod[period] ?: emptyList()
 
     private fun read(section: ConfigurationSection?, period: Period): List<Entry> {
-        val key = period.name.lowercase()
-        val raw = section?.getMapList(key).orEmpty()
-        return raw.mapNotNull { map ->
-            val threshold = (map["threshold"] as? Number)?.toLong() ?: return@mapNotNull null
-            @Suppress("UNCHECKED_CAST")
-            val commands = (map["commands"] as? List<*>)?.map { it.toString() } ?: emptyList()
-            val message = map["message"]?.toString()
-            val bar = map["bossbar"] as? Map<*, *>
+        val periodSection = section?.getConfigurationSection(period.name.lowercase()) ?: return emptyList()
+        return periodSection.getKeys(false).mapNotNull { key ->
+            val threshold = key.toLongOrNull() ?: return@mapNotNull null
+            val entry = periodSection.getConfigurationSection(key) ?: return@mapNotNull null
+            val commands = entry.getStringList("commands")
+            val message = entry.getString("message")
+            val bar = entry.getConfigurationSection("bossbar")
             val bossBar = BossBarSpec(
-                enabled = (bar?.get("enabled") as? Boolean) ?: false,
-                color = bar?.get("color")?.toString() ?: "GREEN",
-                style = bar?.get("style")?.toString() ?: "SEGMENTED_10",
+                enabled = bar?.getBoolean("enabled", false) ?: false,
+                color = bar?.getString("color") ?: "GREEN",
+                style = bar?.getString("style") ?: "SEGMENTED_10",
             )
             Entry(period, threshold, message, commands, bossBar)
         }.sortedBy { it.threshold }

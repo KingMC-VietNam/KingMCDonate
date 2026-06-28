@@ -20,7 +20,7 @@ class MilestoneConfigTest {
             """
             milestones:
               all:
-                - threshold: 200000
+                200000:
                   message: "&aMốc {threshold}"
                   commands:
                     - "console: give {player} gem 2"
@@ -28,10 +28,10 @@ class MilestoneConfigTest {
                     enabled: true
                     color: BLUE
                     style: SEGMENTED_10
-                - threshold: 100000
+                100000:
                   commands: []
               day:
-                - threshold: 50000
+                50000:
                   commands: ["console: say {player}"]
             """.trimIndent(),
         )
@@ -50,7 +50,7 @@ class MilestoneConfigTest {
             """
             milestones:
               all:
-                - threshold: 1000
+                1000:
                   commands: []
             """.trimIndent(),
         )

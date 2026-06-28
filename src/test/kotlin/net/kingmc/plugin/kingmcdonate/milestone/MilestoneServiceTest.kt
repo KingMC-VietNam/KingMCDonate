@@ -62,11 +62,11 @@ class MilestoneServiceTest {
             """
             milestones:
               all:
-                - threshold: 50000
+                50000:
                   commands: ["console: a {player}"]
-                - threshold: 100000
+                100000:
                   commands: ["console: b {player}"]
-                - threshold: 200000
+                200000:
                   commands: ["console: c {player}"]
             """.trimIndent(),
         )
@@ -89,7 +89,7 @@ class MilestoneServiceTest {
             """
             milestones:
               all:
-                - threshold: 100000
+                100000:
                   commands: ["console: server {threshold}"]
             """.trimIndent(),
         )

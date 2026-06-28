@@ -20,13 +20,15 @@ class DiscordConfigTest {
             enabled: true
             serial-visible-chars: 4
             default:
-              - enabled: true
+              main:
+                enabled: true
                 url: "https://d/default"
                 payload:
                   content: "default %PLAYER%"
             events:
               card-success:
-                - enabled: true
+                card:
+                  enabled: true
                   url: "https://d/card"
                   payload:
                     content: "card %PLAYER%"
@@ -44,7 +46,8 @@ class DiscordConfigTest {
             """
             enabled: true
             default:
-              - enabled: true
+              main:
+                enabled: true
                 url: "https://d/x"
                 payload:
                   embeds:
