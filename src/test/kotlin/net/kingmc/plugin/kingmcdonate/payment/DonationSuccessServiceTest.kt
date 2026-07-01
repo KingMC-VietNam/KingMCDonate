@@ -28,6 +28,7 @@ class DonationSuccessServiceTest {
     private val milestoneCalls = mutableListOf<Donation>()
     private val discordCalls = mutableListOf<Donation>()
     private val broadcastCalls = mutableListOf<Donation>()
+    private val eventCalls = mutableListOf<Donation>()
 
     private fun config(yaml: String): PluginConfig {
         val y = YamlConfiguration(); y.loadFromString(yaml); return PluginConfig(y)
@@ -49,6 +50,7 @@ class DonationSuccessServiceTest {
             discordHook = { discordCalls.add(it) }
             leaderboardHook = { }
             bossbarHook = { }
+            eventHook = { eventCalls.add(it) }
         }
     }
 
@@ -79,6 +81,7 @@ class DonationSuccessServiceTest {
         assertEquals(listOf("console: say Alice 100000 1000 REF1"), enqueued[0].commands)
         assertEquals(1, milestoneCalls.size)
         assertEquals(1, discordCalls.size)
+        assertEquals(1, eventCalls.size)
     }
 
     @Test
