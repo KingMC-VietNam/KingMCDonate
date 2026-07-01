@@ -37,6 +37,9 @@ class BankPollService(
 
     private val polling = AtomicBoolean(false)
 
+    /** Called when an order expires and is closed as failed. Notification only. */
+    var onFailed: (uuid: UUID, amountVnd: Long, referenceCode: String, reason: String) -> Unit = { _, _, _, _ -> }
+
     fun start() {
         scheduler.runIo(::poll)
         val periodTicks = config().bank.pollIntervalSeconds.coerceAtLeast(1) * TICKS_PER_SECOND
@@ -62,6 +65,7 @@ class BankPollService(
             if (bankPaymentDao.markFailed(order.referenceCode, now) == 1) {
                 logger.warn("Bank order ${order.referenceCode} timed out; marked FAILED.")
                 notifyExpired(order.playerUuid)
+                onFailed(order.playerUuid, order.amount, order.referenceCode, "expired")
             }
         }
 

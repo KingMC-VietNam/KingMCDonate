@@ -46,6 +46,9 @@ class CardPaymentService(
 
     private class NotResolvableException : RuntimeException()
 
+    /** Called when an order is closed as failed (gateway rejection or timeout). Notification only. */
+    var onFailed: (uuid: UUID, amountVnd: Long, referenceCode: String, reason: String) -> Unit = { _, _, _, _ -> }
+
     /** Validate and start a card top-up for an online [player]. */
     fun submit(player: Player, type: CardType, declaredAmount: Long, serial: String, pin: String) {
         if (config().card.maintenance) {
@@ -131,17 +134,19 @@ class CardPaymentService(
                 logger.debug { "Card FAILED ref=$referenceCode: ${outcome.message}" }
                 val reason = outcome.message.ifBlank { messages().get(MessageKeys.CARD_REASON_GENERIC) }
                 message(uuid, MessageKeys.CARD_FAILED, "reason" to reason)
+                onFailed(uuid, declaredAmount, referenceCode, outcome.message.ifBlank { "failed" })
             }
             PaymentStatus.PENDING -> Unit
         }
     }
 
     /** Mark an expired WAITING order FAILED (called by the poll service on timeout). */
-    fun timeout(referenceCode: String, uuid: UUID) {
+    fun timeout(referenceCode: String, uuid: UUID, amountVnd: Long) {
         val rows = cardPaymentDao.resolve(referenceCode, PaymentStatus.FAILED, 0, System.currentTimeMillis())
         if (rows == 1) {
             logger.warn("Card order $referenceCode timed out while WAITING; marked FAILED.")
             message(uuid, MessageKeys.CARD_FAILED, "reason" to messages().get(MessageKeys.CARD_REASON_TIMEOUT))
+            onFailed(uuid, amountVnd, referenceCode, "timeout")
         }
     }
 

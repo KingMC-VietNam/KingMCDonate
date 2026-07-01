@@ -40,10 +40,10 @@ class MilestoneService(
     }
 
     /** Called after a player milestone is granted when a triggering donation is present. */
-    var onPlayerMilestone: (Donation, Long) -> Unit = { _, _ -> }
+    var onPlayerMilestone: (Donation, Long, Period) -> Unit = { _, _, _ -> }
 
     /** Called after a server milestone is granted. */
-    var onServerMilestone: (Donation, Long) -> Unit = { _, _ -> }
+    var onServerMilestone: (Donation, Long, Period) -> Unit = { _, _, _ -> }
 
     /** Full check after a success: player milestones for the donor, server milestones globally. */
     fun check(d: Donation) {
@@ -70,7 +70,7 @@ class MilestoneService(
                 if (entry.threshold > current || entry.threshold in done) continue
                 if (!dao.claimCompletion(MilestoneDao.SCOPE_PLAYER, uuid.toString(), period.name, periodKey, entry.threshold, now)) continue
                 logger.debug { "Player milestone reached uuid=$uuid period=$period threshold=${entry.threshold}" }
-                grantPlayer(uuid, name, entry, current, d)
+                grantPlayer(uuid, name, entry, current, d, period)
             }
         }
     }
@@ -87,26 +87,26 @@ class MilestoneService(
                 if (entry.threshold > current || entry.threshold in done) continue
                 if (!dao.claimCompletion(MilestoneDao.SCOPE_SERVER, MilestoneDao.SERVER_SUBJECT, period.name, periodKey, entry.threshold, now)) continue
                 logger.warn("Server milestone reached: ${entry.threshold} (${period.name}), triggered by ${d.name}")
-                grantServer(d, entry, current)
+                grantServer(d, entry, current, period)
             }
         }
     }
 
-    private fun grantPlayer(uuid: UUID, name: String, entry: MilestoneConfig.Entry, current: Long, d: Donation?) {
+    private fun grantPlayer(uuid: UUID, name: String, entry: MilestoneConfig.Entry, current: Long, d: Donation?, period: Period) {
         val vars = vars(name, entry, current, d)
         val commands = entry.commands.map { RewardCommands.format(it, vars) }
         val message = entry.message?.let { applyVars(it, vars) }
         rewardSink.enqueue(uuid, d?.referenceCode ?: "milestone", RewardPayload(message = message, commands = commands))
-        if (d != null) onPlayerMilestone(d, entry.threshold)
+        if (d != null) onPlayerMilestone(d, entry.threshold, period)
     }
 
-    private fun grantServer(d: Donation, entry: MilestoneConfig.Entry, current: Long) {
+    private fun grantServer(d: Donation, entry: MilestoneConfig.Entry, current: Long, period: Period) {
         val vars = vars(d.name ?: d.uuid.toString(), entry, current, d)
         val commands = entry.commands.map { RewardCommands.format(it, vars) }
         // Server reward commands are global (not tied to the triggering donor's presence):
         // run on the confirming node via the injectable runner.
         serverRewardRunner(commands, d)
-        onServerMilestone(d, entry.threshold)
+        onServerMilestone(d, entry.threshold, period)
     }
 
     private fun vars(name: String, entry: MilestoneConfig.Entry, current: Long, d: Donation?): Map<String, String> = mapOf(

@@ -43,6 +43,7 @@ class DonationSuccessService(
     var discordHook: (Donation) -> Unit = {}
     var leaderboardHook: (Donation) -> Unit = {}
     var bossbarHook: (UUID) -> Unit = {}
+    var eventHook: (Donation) -> Unit = {}
 
     fun onSuccess(d: Donation) {
         val name = resolveName(d)
@@ -55,6 +56,7 @@ class DonationSuccessService(
         discordHook(d)
         if (config().broadcast.onSuccess) broadcaster(d)
         bossbarHook(d.uuid)
+        eventHook(d)
     }
 
     private fun enqueueSuccessReward(d: Donation, name: String) {

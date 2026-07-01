@@ -79,7 +79,7 @@ class CardPollService(
                     // Force one final check (ignoring backoff) before failing so a charged-but-slow card
                     // that the backoff starved isn't failed unchecked; timeout() no-ops if it resolved.
                     if (queryGateway && payment.cardProvider == provider.name) forceFinalCheck(payment, provider)
-                    service.timeout(payment.referenceCode, payment.playerUuid)
+                    service.timeout(payment.referenceCode, payment.playerUuid, payment.amount)
                     continue
                 }
                 // Webhook-only: housekeeping (timeout above) runs, but the gateway is not polled.

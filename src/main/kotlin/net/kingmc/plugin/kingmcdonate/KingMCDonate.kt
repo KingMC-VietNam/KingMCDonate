@@ -341,8 +341,8 @@ class KingMCDonate : JavaPlugin() {
             }
         }
 
-        milestoneService.onPlayerMilestone = { d, t -> discord.notifyPlayerMilestone(d, t) }
-        milestoneService.onServerMilestone = { d, t -> discord.notifyServerMilestone(d, t) }
+        milestoneService.onPlayerMilestone = { d, t, _ -> discord.notifyPlayerMilestone(d, t) }
+        milestoneService.onServerMilestone = { d, t, _ -> discord.notifyServerMilestone(d, t) }
 
         server.pluginManager.registerEvents(MilestoneJoinListener(bossBarUi, milestoneService, scheduler), this)
         bossBarUi.start()
