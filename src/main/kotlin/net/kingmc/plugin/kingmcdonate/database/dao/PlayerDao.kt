@@ -19,6 +19,14 @@ class PlayerDao(database: Database) : Dao(database) {
         }
     }
 
+    /** Uuid of a player last seen under [name] (case-insensitive), or null if unknown. */
+    fun findUuid(name: String): UUID? = withConnection { conn ->
+        conn.prepareStatement("SELECT uuid FROM players WHERE LOWER(name) = LOWER(?) LIMIT 1").use { ps ->
+            ps.setString(1, name)
+            ps.executeQuery().use { rs -> if (rs.next()) UUID.fromString(rs.getString("uuid")) else null }
+        }
+    }
+
     /** Last-seen name for [playerUuid], or null if unknown. */
     fun findName(playerUuid: UUID): String? = withConnection { conn ->
         conn.prepareStatement("SELECT name FROM players WHERE uuid = ?").use { ps ->

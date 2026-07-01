@@ -4,7 +4,9 @@ import net.kingmc.plugin.kingmcdonate.config.PluginConfig
 import net.kingmc.plugin.kingmcdonate.database.dao.PlayerDao
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger
 import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -44,5 +46,18 @@ class PlayerDaoTest {
         // No prior upsert: the claim must still work (insert-then-update path).
         assertTrue(dao.claimFirstTopup(uuid))
         assertFalse(dao.claimFirstTopup(uuid))
+    }
+
+    @Test
+    fun `findUuid resolves a known name case-insensitively`() {
+        val uuid = UUID.randomUUID()
+        dao.upsert(uuid, "Alice")
+        assertEquals(uuid, dao.findUuid("Alice"))
+        assertEquals(uuid, dao.findUuid("alice"))
+    }
+
+    @Test
+    fun `findUuid returns null for an unknown name`() {
+        assertNull(dao.findUuid("Nobody"))
     }
 }
