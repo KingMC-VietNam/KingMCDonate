@@ -52,6 +52,8 @@ object MessageKeys {
     const val FAKEBANK_USAGE = "fakebank-usage"
     const val FAKEBANK_DONE = "fakebank-done"
 
+    const val MANUAL_SUCCESS = "manual-success"
+
     const val BOSSBAR_DISABLED = "bossbar-disabled"
     const val BOSSBAR_SHOWN = "bossbar-shown"
     const val BOSSBAR_HIDDEN = "bossbar-hidden"
