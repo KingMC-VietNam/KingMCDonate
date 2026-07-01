@@ -95,7 +95,7 @@ class ManualCreditService(
             logger.error("Manual credit $referenceCode: reward credit failed uuid=$uuid point=$point; reconcile manually.", e)
         }
         donationSuccess.onSuccess(
-            Donation(uuid, name, bucket.method, amount, point, referenceCode, MessageKeys.MANUAL_SUCCESS),
+            Donation(uuid, name, bucket.method, amount, point, referenceCode, MessageKeys.MANUAL_SUCCESS, MANUAL_PROVIDER),
         )
     }
 

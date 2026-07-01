@@ -19,6 +19,7 @@ data class Donation(
     val point: Long,
     val referenceCode: String,
     val successMessageKey: String,
+    val provider: String,
 )
 
 /**

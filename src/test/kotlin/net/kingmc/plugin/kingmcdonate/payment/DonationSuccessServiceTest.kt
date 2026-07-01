@@ -61,7 +61,7 @@ class DonationSuccessServiceTest {
     @AfterEach
     fun tearDown() = database.close()
 
-    private fun donation(uuid: UUID) = Donation(uuid, "Alice", "card", 100_000, 1000, "REF1", MessageKeys.CARD_SUCCESS)
+    private fun donation(uuid: UUID) = Donation(uuid, "Alice", "card", 100_000, 1000, "REF1", MessageKeys.CARD_SUCCESS, "card2k")
 
     @Test
     fun `enqueues success message with reward commands and calls hooks`() {

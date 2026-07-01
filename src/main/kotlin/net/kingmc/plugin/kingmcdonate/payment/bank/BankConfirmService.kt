@@ -118,7 +118,7 @@ class BankConfirmService(
         }
         val name = playerDao.findName(order.playerUuid)
         donationSuccess.onSuccess(
-            Donation(order.playerUuid, name, METHOD_BANK, order.amount, point, order.referenceCode, MessageKeys.BANK_SUCCESS),
+            Donation(order.playerUuid, name, METHOD_BANK, order.amount, point, order.referenceCode, MessageKeys.BANK_SUCCESS, order.provider),
         )
     }
 

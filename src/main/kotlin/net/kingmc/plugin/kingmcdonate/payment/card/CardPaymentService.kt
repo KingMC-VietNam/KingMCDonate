@@ -196,13 +196,13 @@ class CardPaymentService(
         if (!committed) return
 
         logger.debug { "Card SUCCESS ref=$referenceCode uuid=$uuid +${point}pt amount=$declaredAmount" }
-        applyReward(referenceCode, uuid, name, declaredAmount, point)
+        applyReward(referenceCode, uuid, name, declaredAmount, point, providers.active.name)
     }
 
     /** Re-apply the gated external credit for a SUCCESS order whose credit was not applied (reconcile). */
     fun reapplyReward(order: CardPayment) {
         if (order.status != PaymentStatus.SUCCESS) return
-        applyReward(order.referenceCode, order.playerUuid, order.playerName, order.amount, order.point)
+        applyReward(order.referenceCode, order.playerUuid, order.playerName, order.amount, order.point, order.cardProvider)
     }
 
     /**
@@ -210,7 +210,7 @@ class CardPaymentService(
      * credit points by uuid, then hand off to [DonationSuccessService] for all post-success work
      * (success message + reward commands via the outbox, milestones, first-topup, broadcast, Discord).
      */
-    private fun applyReward(referenceCode: String, uuid: UUID, name: String?, declaredAmount: Long, point: Long) {
+    private fun applyReward(referenceCode: String, uuid: UUID, name: String?, declaredAmount: Long, point: Long, provider: String) {
         if (cardPaymentDao.claimRewardApplied(referenceCode, System.currentTimeMillis()) != 1) {
             logger.debug { "Card $referenceCode: reward already applied; skipping credit." }
             return
@@ -221,7 +221,7 @@ class CardPaymentService(
             logger.error("Card $referenceCode: reward credit failed uuid=$uuid point=$point; reconcile manually.", e)
         }
         donationSuccess.onSuccess(
-            Donation(uuid, name, METHOD_CARD, declaredAmount, point, referenceCode, MessageKeys.CARD_SUCCESS),
+            Donation(uuid, name, METHOD_CARD, declaredAmount, point, referenceCode, MessageKeys.CARD_SUCCESS, provider),
         )
     }
 

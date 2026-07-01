@@ -55,7 +55,7 @@ class MilestoneServiceTest {
     }
 
     private fun donation(uuid: UUID, amount: Long) =
-        Donation(uuid, "Alice", "card", amount, amount / 100, "REF", MessageKeys.CARD_SUCCESS)
+        Donation(uuid, "Alice", "card", amount, amount / 100, "REF", MessageKeys.CARD_SUCCESS, "card2k")
 
     @Test
     fun `grants every newly-crossed player milestone once (retroactive)`() {
