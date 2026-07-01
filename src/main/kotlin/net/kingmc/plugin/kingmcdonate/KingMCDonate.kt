@@ -12,6 +12,9 @@ import net.kingmc.plugin.kingmcdonate.command.LichSuSubCommand
 import net.kingmc.plugin.kingmcdonate.command.NapTheCommand
 import net.kingmc.plugin.kingmcdonate.command.ReloadCommand
 import net.kingmc.plugin.kingmcdonate.command.TopNapCommand
+import net.kingmc.plugin.kingmcdonate.api.KingMCDonateAPI
+import net.kingmc.plugin.kingmcdonate.api.KingMCDonateAPIImpl
+import net.kingmc.plugin.kingmcdonate.api.KmdEventPublisher
 import net.kingmc.plugin.kingmcdonate.discord.DiscordService
 import net.kingmc.plugin.kingmcdonate.leaderboard.LeaderboardService
 import net.kingmc.plugin.kingmcdonate.milestone.MilestoneBossBar
@@ -66,6 +69,7 @@ import net.kingmc.plugin.kingmcdonate.webhook.WebhookHandler
 import net.kingmc.plugin.kingmcdonate.webhook.WebhookRouter
 import net.kingmc.plugin.kingmcdonate.webhook.WebhookServer
 import org.bukkit.Bukkit
+import org.bukkit.plugin.ServicePriority
 import org.bukkit.plugin.java.JavaPlugin
 
 class KingMCDonate : JavaPlugin() {
@@ -98,6 +102,9 @@ class KingMCDonate : JavaPlugin() {
     }
 
     override fun onDisable() {
+        // Withdraw the public API before tearing anything down so no caller gets a half-dead instance.
+        KingMCDonateAPI.set(null)
+        server.servicesManager.unregisterAll(this)
         // Stop accepting callbacks before tearing down the scheduler/database the handlers use.
         webhookServer?.stop()
         expansion?.unregisterIfPresent()
@@ -164,8 +171,17 @@ class KingMCDonate : JavaPlugin() {
         val bank = setupBank(http, database, currency, promo, donationSuccess)
         startWebhookServer(config, listOfNotNull(card.webhookHandler, bank.webhookHandler))
 
-        setupEngagement(http, database, rewardDelivery, promo, donationSuccess, card.cardPaymentDao)
-        registerCommands(currency, card, bank, menus, database)
+        // Fire the public Bukkit events off the existing hooks (attach, do not replace them).
+        val eventPublisher = KmdEventPublisher(scheduler, pluginLogger)
+        card.service.onFailed = { uuid, amount, ref, reason -> eventPublisher.fireFailed(uuid, "card", amount, ref, reason) }
+        bank.pollService.onFailed = { uuid, amount, ref, reason -> eventPublisher.fireFailed(uuid, "bank", amount, ref, reason) }
+        val manualCredit = ManualCreditService(
+            database, card.cardPaymentDao, bank.bankPaymentDao, PlayerTotalsDao(database), PlayerDao(database),
+            currency, donationSuccess, scheduler, pluginLogger, configRef,
+        )
+
+        setupEngagement(http, database, rewardDelivery, promo, donationSuccess, card.cardPaymentDao, eventPublisher, manualCredit)
+        registerCommands(currency, card, bank, menus, database, manualCredit)
         server.pluginManager.registerEvents(guiManager, this)
         server.pluginManager.registerEvents(card.chatInput, this)
         server.pluginManager.registerEvents(RewardDeliveryListener(rewardDelivery), this)
@@ -315,6 +331,8 @@ class KingMCDonate : JavaPlugin() {
         promo: PromoService,
         donationSuccess: DonationSuccessService,
         cardPaymentDao: CardPaymentDao,
+        eventPublisher: KmdEventPublisher,
+        manualCredit: ManualCreditService,
     ) {
         val milestoneDao = MilestoneDao(database)
         val leaderboardService = LeaderboardService(LeaderboardDao(database), scheduler, configRef, pluginLogger)
@@ -340,9 +358,10 @@ class KingMCDonate : JavaPlugin() {
                 "bank" -> discord.notifyBank(d)
             }
         }
+        donationSuccess.eventHook = { d -> eventPublisher.fireSuccess(d) }
 
-        milestoneService.onPlayerMilestone = { d, t, _ -> discord.notifyPlayerMilestone(d, t) }
-        milestoneService.onServerMilestone = { d, t, _ -> discord.notifyServerMilestone(d, t) }
+        milestoneService.onPlayerMilestone = { d, t, p -> discord.notifyPlayerMilestone(d, t); eventPublisher.firePlayerMilestone(d, t, p) }
+        milestoneService.onServerMilestone = { d, t, p -> discord.notifyServerMilestone(d, t); eventPublisher.fireServerMilestone(d, t, p) }
 
         server.pluginManager.registerEvents(MilestoneJoinListener(bossBarUi, milestoneService, scheduler), this)
         bossBarUi.start()
@@ -356,6 +375,13 @@ class KingMCDonate : JavaPlugin() {
         this.expansion = expansion
         this.bossBar = bossBarUi
         this.leaderboard = leaderboardService
+
+        // Expose the public API via both the static singleton and the Bukkit ServicesManager.
+        val api = KingMCDonateAPIImpl(leaderboardService, manualCredit) { uuid ->
+            Bukkit.getOfflinePlayer(uuid).name ?: uuid.toString()
+        }
+        KingMCDonateAPI.set(api)
+        server.servicesManager.register(KingMCDonateAPI::class.java, api, this, ServicePriority.Normal)
     }
 
     private fun registerCommands(
@@ -364,11 +390,8 @@ class KingMCDonate : JavaPlugin() {
         bank: BankSubsystem,
         menus: MenuService,
         database: Database,
+        manualCredit: ManualCreditService,
     ) {
-        val manualCredit = ManualCreditService(
-            database, card.cardPaymentDao, bank.bankPaymentDao, PlayerTotalsDao(database), PlayerDao(database),
-            currency, donationSuccess, scheduler, pluginLogger, configRef,
-        )
         val router = CommandRouter(messagesRef).apply {
             register(ReloadCommand(configManager, currency, card.providers, bank.providers, menus.registry, guiManager, bossBar, leaderboard, expansion))
             register(LichSuSubCommand(card.cardPaymentDao, scheduler, messagesRef))
