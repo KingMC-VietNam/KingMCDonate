@@ -5,6 +5,7 @@ import net.kingmc.plugin.kingmcdonate.command.BankCommand
 import net.kingmc.plugin.kingmcdonate.command.BossBarCommand
 import net.kingmc.plugin.kingmcdonate.command.CommandRouter
 import net.kingmc.plugin.kingmcdonate.command.FakeBankSubCommand
+import net.kingmc.plugin.kingmcdonate.command.GiveSubCommand
 import net.kingmc.plugin.kingmcdonate.command.FakeCardSubCommand
 import net.kingmc.plugin.kingmcdonate.command.LichSuNapCommand
 import net.kingmc.plugin.kingmcdonate.command.LichSuSubCommand
@@ -37,6 +38,7 @@ import net.kingmc.plugin.kingmcdonate.gui.menu.MenuRegistry
 import net.kingmc.plugin.kingmcdonate.gui.menu.MenuService
 import net.kingmc.plugin.kingmcdonate.hook.PlaceholderApiHook
 import net.kingmc.plugin.kingmcdonate.payment.DonationSuccessService
+import net.kingmc.plugin.kingmcdonate.payment.ManualCreditService
 import net.kingmc.plugin.kingmcdonate.payment.SuccessBroadcaster
 import net.kingmc.plugin.kingmcdonate.payment.bank.BankConfirmService
 import net.kingmc.plugin.kingmcdonate.payment.bank.BankPaymentService
@@ -163,7 +165,7 @@ class KingMCDonate : JavaPlugin() {
         startWebhookServer(config, listOfNotNull(card.webhookHandler, bank.webhookHandler))
 
         setupEngagement(http, database, rewardDelivery, promo, donationSuccess, card.cardPaymentDao)
-        registerCommands(currency, card, bank, menus)
+        registerCommands(currency, card, bank, menus, database)
         server.pluginManager.registerEvents(guiManager, this)
         server.pluginManager.registerEvents(card.chatInput, this)
         server.pluginManager.registerEvents(RewardDeliveryListener(rewardDelivery), this)
@@ -361,12 +363,18 @@ class KingMCDonate : JavaPlugin() {
         card: CardSubsystem,
         bank: BankSubsystem,
         menus: MenuService,
+        database: Database,
     ) {
+        val manualCredit = ManualCreditService(
+            database, card.cardPaymentDao, bank.bankPaymentDao, PlayerTotalsDao(database), PlayerDao(database),
+            currency, donationSuccess, scheduler, pluginLogger, configRef,
+        )
         val router = CommandRouter(messagesRef).apply {
             register(ReloadCommand(configManager, currency, card.providers, bank.providers, menus.registry, guiManager, bossBar, leaderboard, expansion))
             register(LichSuSubCommand(card.cardPaymentDao, scheduler, messagesRef))
             register(FakeCardSubCommand(card.service, configRef, messagesRef))
             register(FakeBankSubCommand(bank.service, messagesRef))
+            register(GiveSubCommand(manualCredit, PlayerDao(database), scheduler, pluginLogger, configRef, messagesRef))
         }
         getCommand("kingmcdonate")?.apply {
             setExecutor(router)
