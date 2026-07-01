@@ -54,6 +54,12 @@ object MessageKeys {
 
     const val MANUAL_SUCCESS = "manual-success"
 
+    const val GIVE_USAGE = "give-usage"
+    const val GIVE_DONE = "give-done"
+    const val GIVE_INVALID_BUCKET = "give-invalid-bucket"
+    const val GIVE_OFFLINE_NEEDS_FORCE = "give-offline-needs-force"
+    const val GIVE_NEVER_JOINED = "give-never-joined"
+
     const val BOSSBAR_DISABLED = "bossbar-disabled"
     const val BOSSBAR_SHOWN = "bossbar-shown"
     const val BOSSBAR_HIDDEN = "bossbar-hidden"
