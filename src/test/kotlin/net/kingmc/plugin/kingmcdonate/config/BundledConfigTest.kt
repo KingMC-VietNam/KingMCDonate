@@ -1,6 +1,7 @@
 package net.kingmc.plugin.kingmcdonate.config
 
 import net.kingmc.plugin.kingmcdonate.discord.DiscordConfig
+import net.kingmc.plugin.kingmcdonate.gui.menu.MenuDefinition
 import net.kingmc.plugin.kingmcdonate.milestone.MilestoneConfig
 import net.kingmc.plugin.kingmcdonate.promo.PromoConfig
 import org.bukkit.configuration.file.YamlConfiguration
@@ -37,6 +38,15 @@ class BundledConfigTest {
             }
             MilestoneConfig(y.getConfigurationSection("milestones")) // parses without throwing
         }
+    }
+
+    @Test
+    fun `topnap menu parses with content slots and toggle labels`() {
+        val y = load("menus/topnap.yml")
+        val def = MenuDefinition.parse("topnap", y)
+        assertTrue(def.contentSlots.isNotEmpty(), "topnap must declare paginated content slots")
+        assertEquals("Tiền nạp", y.getString("metric-labels.AMOUNT"))
+        assertEquals("Tất cả", y.getString("period-labels.ALL"))
     }
 
     @Test

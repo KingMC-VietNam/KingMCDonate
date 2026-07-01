@@ -39,6 +39,6 @@ class MenuRegistry(private val plugin: JavaPlugin, private val logger: PluginLog
     }
 
     companion object {
-        private val DEFAULTS = listOf("card-type.yml", "card-price.yml", "history.yml")
+        private val DEFAULTS = listOf("card-type.yml", "card-price.yml", "history.yml", "topnap.yml")
     }
 }
