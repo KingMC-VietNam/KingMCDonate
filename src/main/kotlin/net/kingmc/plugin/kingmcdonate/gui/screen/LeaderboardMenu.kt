@@ -83,8 +83,9 @@ class LeaderboardMenu(
         }
 
         private fun reload() {
+            val target = view // capture on the region thread; don't read the field off-thread
             scheduler.runIo {
-                val next = leaderboard.topEager(view.metric, view.period)
+                val next = leaderboard.topEager(target.metric, target.period)
                 scheduler.runAtEntity(player) { if (isViewing()) render(next) }
             }
         }
