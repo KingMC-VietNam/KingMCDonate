@@ -37,9 +37,11 @@ import net.kingmc.plugin.kingmcdonate.gui.screen.CardTopupMenu
 import net.kingmc.plugin.kingmcdonate.gui.screen.ChatInputListener
 import net.kingmc.plugin.kingmcdonate.gui.GuiManager
 import net.kingmc.plugin.kingmcdonate.gui.screen.HistoryMenu
+import net.kingmc.plugin.kingmcdonate.gui.screen.LeaderboardMenu
 import net.kingmc.plugin.kingmcdonate.gui.menu.MenuRegistry
 import net.kingmc.plugin.kingmcdonate.gui.menu.MenuService
 import net.kingmc.plugin.kingmcdonate.hook.PlaceholderApiHook
+import net.kingmc.plugin.kingmcdonate.leaderboard.HeadResolver
 import net.kingmc.plugin.kingmcdonate.payment.DonationSuccessService
 import net.kingmc.plugin.kingmcdonate.payment.ManualCreditService
 import net.kingmc.plugin.kingmcdonate.payment.SuccessBroadcaster
@@ -180,7 +182,7 @@ class KingMCDonate : JavaPlugin() {
             currency, donationSuccess, scheduler, pluginLogger, configRef,
         )
 
-        setupEngagement(http, database, rewardDelivery, promo, donationSuccess, card.cardPaymentDao, eventPublisher, manualCredit)
+        setupEngagement(http, database, rewardDelivery, promo, donationSuccess, card.cardPaymentDao, eventPublisher, manualCredit, menus)
         registerCommands(currency, card, bank, menus, database, manualCredit)
         server.pluginManager.registerEvents(guiManager, this)
         server.pluginManager.registerEvents(card.chatInput, this)
@@ -333,6 +335,7 @@ class KingMCDonate : JavaPlugin() {
         cardPaymentDao: CardPaymentDao,
         eventPublisher: KmdEventPublisher,
         manualCredit: ManualCreditService,
+        menus: MenuService,
     ) {
         val milestoneDao = MilestoneDao(database)
         val leaderboardService = LeaderboardService(LeaderboardDao(database), scheduler, configRef, pluginLogger)
@@ -369,7 +372,8 @@ class KingMCDonate : JavaPlugin() {
         val expansion = KmdExpansion.create(this, leaderboardService, promo)
         expansion.installIfPresent()
 
-        getCommand("topnap")?.setExecutor(TopNapCommand(leaderboardService, scheduler, messagesRef))
+        val leaderboardMenu = LeaderboardMenu(menus, leaderboardService, HeadResolver(pluginLogger), scheduler)
+        getCommand("topnap")?.setExecutor(TopNapCommand(leaderboardService, leaderboardMenu, scheduler, messagesRef))
         getCommand("napbossbar")?.setExecutor(BossBarCommand(bossBarUi, configRef, messagesRef))
 
         this.expansion = expansion
