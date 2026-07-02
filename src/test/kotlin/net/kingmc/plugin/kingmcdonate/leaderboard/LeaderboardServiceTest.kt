@@ -57,6 +57,19 @@ class LeaderboardServiceTest {
     }
 
     @Test
+    fun `topEager returns data on the first call, unlike the async top`() {
+        val a = UUID.randomUUID(); val b = UUID.randomUUID()
+        players.upsert(a, "Alice"); players.upsert(b, "Bob")
+        totals.add(a, "card", 30_000, 300, 0)
+        totals.add(b, "bank", 90_000, 900, 0)
+        val s = service()
+        // Single call, no priming: eager load populates and returns real data immediately.
+        val top = s.topEager(LeaderboardDao.Metric.AMOUNT, Period.ALL)
+        assertEquals(listOf("Bob", "Alice"), top.map { it.name })
+        assertEquals(listOf(90_000L, 30_000L), top.map { it.value })
+    }
+
+    @Test
     fun `top point ranks by points`() {
         val a = UUID.randomUUID(); val b = UUID.randomUUID()
         players.upsert(a, "Alice"); players.upsert(b, "Bob")

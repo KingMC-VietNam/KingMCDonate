@@ -47,6 +47,28 @@ class LeaderboardService(
         return current?.value ?: emptyList()
     }
 
+    /**
+     * Like [top] but on a cache miss loads the board synchronously and caches it before
+     * returning, so the first caller gets real data instead of an empty placeholder.
+     * Blocks on a DB read — call off the main thread (e.g. a virtual IO thread).
+     */
+    fun topEager(metric: LeaderboardDao.Metric, period: Period): List<LeaderboardDao.Entry> {
+        val now = System.currentTimeMillis()
+        val periodKey = Periods.key(period, now)
+        val key = "${metric.name}:${period.name}"
+        val current = boards[key]
+        if (fresh(current, periodKey, now)) return current!!.value
+        return try {
+            val loadedAt = System.currentTimeMillis()
+            val entries = dao.top(metric, period, periodKey, config().leaderboard.size)
+            boards[key] = Snapshot(periodKey, entries, loadedAt + ttlMillis())
+            entries
+        } catch (e: Exception) {
+            logger.error("Leaderboard eager refresh failed", e)
+            current?.value ?: emptyList()
+        }
+    }
+
     fun playerStat(uuid: UUID, metric: LeaderboardDao.Metric, period: Period): Long {
         val now = System.currentTimeMillis()
         val periodKey = Periods.key(period, now)
