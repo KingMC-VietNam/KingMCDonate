@@ -109,15 +109,21 @@ class MilestoneService(
         onServerMilestone(d, entry.threshold, period)
     }
 
-    private fun vars(name: String, entry: MilestoneConfig.Entry, current: Long, d: Donation?): Map<String, String> = mapOf(
-        "player" to name,
-        "threshold" to entry.threshold.toString(),
-        "current" to current.toString(),
-        "amount" to (d?.amountVnd?.toString() ?: "0"),
-        "point" to (d?.point?.toString() ?: "0"),
-        "ref" to (d?.referenceCode ?: ""),
-    )
+    private fun vars(name: String, entry: MilestoneConfig.Entry, current: Long, d: Donation?): Map<String, String> =
+        messageVars(name, entry.threshold, current, d)
 
     private fun applyVars(raw: String, vars: Map<String, String>): String =
         vars.entries.fold(raw) { acc, (k, v) -> acc.replace("{$k}", v) }
+
+    companion object {
+        /** Pure token map for milestone messages/commands; donation-scoped tokens default when [d] is null. */
+        fun messageVars(name: String, threshold: Long, current: Long, d: Donation?): Map<String, String> = mapOf(
+            "player" to name,
+            "threshold" to threshold.toString(),
+            "current" to current.toString(),
+            "amount" to (d?.amountVnd?.toString() ?: "0"),
+            "point" to (d?.point?.toString() ?: "0"),
+            "ref" to (d?.referenceCode ?: ""),
+        )
+    }
 }
