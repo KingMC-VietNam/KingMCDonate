@@ -1,5 +1,6 @@
 package net.kingmc.plugin.kingmcdonate.gui.screen
 
+import net.kingmc.plugin.kingmcdonate.bedrock.HistoryForm
 import net.kingmc.plugin.kingmcdonate.config.MessageKeys
 import net.kingmc.plugin.kingmcdonate.config.Messages
 import net.kingmc.plugin.kingmcdonate.database.dao.BankPaymentDao
@@ -29,6 +30,7 @@ class HistoryMenu(
     private val menus: MenuService,
     private val scheduler: Scheduler,
     private val messages: () -> Messages,
+    private val bedrockForm: HistoryForm? = null,
 ) {
 
     private data class Entry(
@@ -44,6 +46,7 @@ class HistoryMenu(
     }
 
     fun open(player: Player) {
+        if (bedrockForm?.trySend(player) == true) return
         val definition = menus.registry.get("history") ?: return
         val gui = menus.create(definition, player, menus.baseTokens(player))
         val entryItem = definition.root.getConfigurationSection("entry-item")
