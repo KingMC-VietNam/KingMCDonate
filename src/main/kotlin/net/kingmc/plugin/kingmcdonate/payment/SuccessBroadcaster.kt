@@ -17,15 +17,20 @@ class SuccessBroadcaster(
     fun broadcast(d: Donation) {
         val format = config().broadcast.format
         if (format.isBlank()) return
-        val text = Text.colorize(
+        val text = render(format, d)
+        for (player in Bukkit.getOnlinePlayers()) {
+            scheduler.runAtEntity(player) { player.sendMessage(text) }
+        }
+    }
+
+    companion object {
+        /** Pure: substitute the donation tokens into [format] and colorize. No Bukkit access. */
+        fun render(format: String, d: Donation): String = Text.colorize(
             format
                 .replace("{player}", d.name ?: d.uuid.toString())
                 .replace("{amount}", Text.formatMoney(d.amountVnd))
                 .replace("{point}", d.point.toString())
                 .replace("{method}", d.method),
         )
-        for (player in Bukkit.getOnlinePlayers()) {
-            scheduler.runAtEntity(player) { player.sendMessage(text) }
-        }
     }
 }
