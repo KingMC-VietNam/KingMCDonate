@@ -1,5 +1,6 @@
 package net.kingmc.plugin.kingmcdonate.gui.screen
 
+import net.kingmc.plugin.kingmcdonate.bedrock.CardForm
 import net.kingmc.plugin.kingmcdonate.config.PluginConfig
 import net.kingmc.plugin.kingmcdonate.gui.MenuItem
 import net.kingmc.plugin.kingmcdonate.gui.Pagination
@@ -26,6 +27,7 @@ class CardTopupMenu(
     private val input: CardInput,
     private val menus: MenuService,
     private val config: () -> PluginConfig,
+    private val bedrockForm: CardForm? = null,
 ) {
 
     init {
@@ -33,6 +35,7 @@ class CardTopupMenu(
     }
 
     fun openTypeMenu(player: Player) {
+        if (bedrockForm?.trySend(player) == true) return
         val definition = menus.registry.get("card-type") ?: return
         val gui = menus.create(definition, player, menus.baseTokens(player))
         val cardItems = definition.root.getConfigurationSection("card-items")
