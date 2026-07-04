@@ -42,6 +42,10 @@ import net.kingmc.plugin.kingmcdonate.gui.screen.LeaderboardMenu
 import net.kingmc.plugin.kingmcdonate.gui.menu.MenuRegistry
 import net.kingmc.plugin.kingmcdonate.gui.menu.MenuService
 import net.kingmc.plugin.kingmcdonate.hook.PlaceholderApiHook
+import net.kingmc.plugin.kingmcdonate.bedrock.BedrockForms
+import net.kingmc.plugin.kingmcdonate.bedrock.CardForm
+import net.kingmc.plugin.kingmcdonate.bedrock.HistoryForm
+import net.kingmc.plugin.kingmcdonate.bedrock.LeaderboardForm
 import net.kingmc.plugin.kingmcdonate.leaderboard.HeadResolver
 import net.kingmc.plugin.kingmcdonate.payment.Donation
 import net.kingmc.plugin.kingmcdonate.payment.DonationSuccessService
@@ -185,7 +189,15 @@ class KingMCDonate : JavaPlugin() {
         this.menuRegistry = menuRegistry
         this.guiManager = guiManager
 
-        val card = setupCard(http, database, currency, menus, promo, donationSuccess)
+        // Bedrock forms are optional: only touch the Floodgate-backed code when the plugin is present,
+        // so a server without Floodgate never loads org.geysermc classes (no NoClassDefFoundError).
+        val bedrockForms: BedrockForms? = if (server.pluginManager.getPlugin("floodgate") != null) {
+            BedrockForms.create().also { if (it.isAvailable) pluginLogger.info("Floodgate detected; Bedrock forms enabled.") }
+        } else {
+            null
+        }
+
+        val card = setupCard(http, database, currency, menus, promo, donationSuccess, bedrockForms)
         val bank = setupBank(http, database, currency, promo, donationSuccess)
         startWebhookServer(config, listOfNotNull(card.webhookHandler, bank.webhookHandler))
 
@@ -198,8 +210,8 @@ class KingMCDonate : JavaPlugin() {
             currency, donationSuccess, scheduler, pluginLogger, configRef,
         )
 
-        setupEngagement(http, database, rewardDelivery, promo, donationSuccess, card.cardPaymentDao, eventPublisher, manualCredit, menus)
-        registerCommands(currency, card, bank, menus, database, manualCredit)
+        setupEngagement(http, database, rewardDelivery, promo, donationSuccess, card.cardPaymentDao, eventPublisher, manualCredit, menus, bedrockForms)
+        registerCommands(currency, card, bank, menus, database, manualCredit, bedrockForms)
         server.pluginManager.registerEvents(guiManager, this)
         server.pluginManager.registerEvents(card.chatInput, this)
         server.pluginManager.registerEvents(RewardDeliveryListener(rewardDelivery), this)
@@ -221,6 +233,7 @@ class KingMCDonate : JavaPlugin() {
         menus: MenuService,
         promo: PromoService,
         donationSuccess: DonationSuccessService,
+        bedrockForms: BedrockForms?,
     ): CardSubsystem {
         val providers = CardProviderRegistry(
             pluginLogger,
@@ -244,7 +257,10 @@ class KingMCDonate : JavaPlugin() {
         )
         val chatInput = ChatInputListener(scheduler, messagesRef)
         val cardInput = CardInput(this, chatInput, messagesRef)
-        val menu = CardTopupMenu(service, providers, cardInput, menus, configRef)
+        val cardForm = bedrockForms?.let {
+            CardForm(service, providers, it, scheduler, configRef) { configManager.bedrockForms }
+        }
+        val menu = CardTopupMenu(service, providers, cardInput, menus, configRef, cardForm)
 
         val mode = configRef().card.confirmation
         val webhookHandler: WebhookHandler? = if (mode.usesWebhook && configRef().webhook.enabled) {
@@ -352,6 +368,7 @@ class KingMCDonate : JavaPlugin() {
         eventPublisher: KmdEventPublisher,
         manualCredit: ManualCreditService,
         menus: MenuService,
+        bedrockForms: BedrockForms?,
     ) {
         val milestoneDao = MilestoneDao(database)
         val pointLogDao = PointLogDao(database)
@@ -414,7 +431,10 @@ class KingMCDonate : JavaPlugin() {
         val expansion = KmdExpansion.create(this, leaderboardService, promo)
         expansion.installIfPresent()
 
-        val leaderboardMenu = LeaderboardMenu(menus, leaderboardService, HeadResolver(pluginLogger), scheduler)
+        val leaderboardForm = bedrockForms?.let {
+            LeaderboardForm(leaderboardService, it, scheduler) { configManager.bedrockForms }
+        }
+        val leaderboardMenu = LeaderboardMenu(menus, leaderboardService, HeadResolver(pluginLogger), scheduler, leaderboardForm)
         getCommand("topnap")?.setExecutor(TopNapCommand(leaderboardService, leaderboardMenu, scheduler, messagesRef))
         getCommand("napbossbar")?.setExecutor(BossBarCommand(bossBarUi, configRef, messagesRef))
 
@@ -445,6 +465,7 @@ class KingMCDonate : JavaPlugin() {
         menus: MenuService,
         database: Database,
         manualCredit: ManualCreditService,
+        bedrockForms: BedrockForms?,
     ) {
         val router = CommandRouter(messagesRef).apply {
             register(ReloadCommand(configManager, currency, card.providers, bank.providers, menus.registry, guiManager, bossBar, leaderboard, expansion))
@@ -464,7 +485,10 @@ class KingMCDonate : JavaPlugin() {
             tabCompleter = napThe
         }
 
-        val historyMenu = HistoryMenu(card.cardPaymentDao, bank.bankPaymentDao, menus, scheduler, messagesRef)
+        val historyForm = bedrockForms?.let {
+            HistoryForm(card.cardPaymentDao, bank.bankPaymentDao, it, scheduler, messagesRef) { configManager.bedrockForms }
+        }
+        val historyMenu = HistoryMenu(card.cardPaymentDao, bank.bankPaymentDao, menus, scheduler, messagesRef, historyForm)
         val lichSu = LichSuNapCommand(card.cardPaymentDao, historyMenu, scheduler, messagesRef)
         getCommand("lichsunap")?.setExecutor(lichSu)
 
