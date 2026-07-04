@@ -19,15 +19,14 @@ class Pagination<T>(
 ) {
 
     private var items: List<T> = emptyList()
-    private var page = 0
+    private val state = PageState(contentSlots.size)
 
-    val pageCount: Int get() = if (items.isEmpty()) 1 else (items.size + pageSize - 1) / pageSize
-    val pageIndex: Int get() = page
-    private val pageSize: Int get() = contentSlots.size.coerceAtLeast(1)
+    val pageCount: Int get() = state.pageCount
+    val pageIndex: Int get() = state.pageIndex
 
     fun setItems(list: List<T>) {
         items = list
-        page = 0
+        state.reset(list.size)
         draw()
     }
 
@@ -43,21 +42,15 @@ class Pagination<T>(
     }
 
     fun next() {
-        if (page + 1 < pageCount) {
-            page++
-            draw()
-        }
+        if (state.next()) draw()
     }
 
     fun previous() {
-        if (page > 0) {
-            page--
-            draw()
-        }
+        if (state.previous()) draw()
     }
 
     private fun draw() {
-        val start = page * pageSize
+        val start = state.startIndex()
         contentSlots.forEachIndexed { i, slot ->
             val index = start + i
             if (index < items.size) gui.set(slot, render(items[index])) else gui.clear(slot)
