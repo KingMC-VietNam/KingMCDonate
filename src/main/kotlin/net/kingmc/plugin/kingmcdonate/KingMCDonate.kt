@@ -190,7 +190,7 @@ class KingMCDonate : JavaPlugin() {
         this.guiManager = guiManager
 
         // Bedrock forms are optional: only touch the Floodgate-backed code when the plugin is present,
-        // so a server without Floodgate never loads org.geysermc classes (no NoClassDefFoundError).
+        // so a server without Floodgate never loads the Floodgate/Cumulus classes (no NoClassDefFoundError).
         val bedrockForms: BedrockForms? = if (server.pluginManager.getPlugin("floodgate") != null) {
             BedrockForms.create().also { if (it.isAvailable) pluginLogger.info("Floodgate detected; Bedrock forms enabled.") }
         } else {
