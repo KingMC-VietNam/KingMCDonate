@@ -18,6 +18,8 @@ repositories {
     maven("https://jitpack.io")
     // PlaceholderAPI
     maven("https://repo.extendedclip.com/content/repositories/placeholderapi/")
+    // Floodgate/Cumulus (Bedrock forms)
+    maven("https://repo.opencollab.dev/main/")
 }
 
 dependencies {
@@ -30,6 +32,8 @@ dependencies {
     compileOnly("com.github.MilkBowl:VaultAPI:1.7") { exclude(group = "org.bukkit") }
     compileOnly("me.clip:placeholderapi:2.11.6")
     testImplementation("me.clip:placeholderapi:2.11.6")
+    // Floodgate API (brings Cumulus transitively) for Bedrock forms; provided at runtime by the Floodgate plugin.
+    compileOnly("org.geysermc.floodgate:api:2.2.4-SNAPSHOT")
 
     // --- Shaded + relocated (not on Maven Central, so the libraries: loader can't fetch them) ---
     implementation("com.tcoded:FoliaLib:0.5.1")                 // Folia-safe scheduler
