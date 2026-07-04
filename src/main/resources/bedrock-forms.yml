@@ -1,0 +1,47 @@
+# Cau hinh form Bedrock (Floodgate/Geyser).
+# LUU Y: form Bedrock KHONG ho tro mau/MiniMessage -> chi dung chu thuong (plain text).
+# enabled (tong): bat/tat toan bo form Bedrock; moi form co enabled rieng ben duoi.
+# Nguoi choi Java luon dung GUI ruong nhu cu; chi nguoi choi Bedrock nhan form.
+
+enabled: true
+
+# Form nap the (thay chuoi loai the -> menh gia -> nhap seri/pin bang mot form duy nhat)
+card:
+  enabled: true
+  title: "KingMCDonate - Nap the"
+  type-label: "Loai the"
+  price-label: "Menh gia"
+  warning: "Luu y: nhap sai menh gia se bi tru theo gia tri that cua the"
+  serial-label: "So seri"
+  serial-placeholder: "Nhap so seri"
+  pin-label: "Ma the"
+  pin-placeholder: "Nhap ma the (PIN)"
+  submit-label: "Bam Submit de nap the"
+
+# Form lich su nap
+history:
+  enabled: true
+  title: "Lich su nap"
+  # Placeholder: {time} {label} {amount} {status}
+  entry-format: "{time} - {label} - {amount} - {status}"
+  empty: "Chua co giao dich nao"
+  close: "Dong"
+
+# Form top nap (doi chi so tien/diem va ky tat ca/ngay/tuan/thang)
+leaderboard:
+  enabled: true
+  title: "Top nap"
+  # Placeholder: {rank} {name} {value}
+  entry-format: "#{rank} {name} - {value}"
+  empty: "Chua co ai nap"
+  metric-button: "Doi chi so ({metric})"
+  period-button: "Doi ky ({period})"
+  close: "Dong"
+  metric-labels:
+    AMOUNT: "Tien"
+    POINT: "Diem"
+  period-labels:
+    ALL: "Tat ca"
+    DAY: "Ngay"
+    WEEK: "Tuan"
+    MONTH: "Thang"

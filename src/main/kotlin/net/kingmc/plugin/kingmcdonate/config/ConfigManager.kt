@@ -40,6 +40,10 @@ class ConfigManager(private val plugin: JavaPlugin, private val logger: PluginLo
     lateinit var discord: DiscordConfig
         private set
 
+    @Volatile
+    lateinit var bedrockForms: BedrockFormsConfig
+        private set
+
     /** First-time load: copy defaults if absent, then parse. Throws on a parse error. */
     fun load() {
         saveDefault("config.yml")
@@ -51,6 +55,7 @@ class ConfigManager(private val plugin: JavaPlugin, private val logger: PluginLo
         saveDefault("mocnaptong.yml")
         saveDefault("khuyenmai.yml")
         saveDefault("discord.yml")
+        saveDefault("bedrock-forms.yml")
         applyAndLog(parse())
     }
 
@@ -70,6 +75,7 @@ class ConfigManager(private val plugin: JavaPlugin, private val logger: PluginLo
         val serverMilestones: MilestoneConfig,
         val promo: PromoConfig,
         val discord: DiscordConfig,
+        val bedrockForms: BedrockFormsConfig,
     )
 
     private fun parse(): Parsed {
@@ -81,7 +87,8 @@ class ConfigManager(private val plugin: JavaPlugin, private val logger: PluginLo
         val server = MilestoneConfig(loadStrict(File(plugin.dataFolder, "mocnaptong.yml")).getConfigurationSection("milestones"))
         val promo = PromoConfig(loadStrict(File(plugin.dataFolder, "khuyenmai.yml")))
         val discord = DiscordConfig(loadStrict(File(plugin.dataFolder, "discord.yml")))
-        return Parsed(newConfig, newMessages, player, server, promo, discord)
+        val bedrockForms = BedrockFormsConfig(loadStrict(File(plugin.dataFolder, "bedrock-forms.yml")))
+        return Parsed(newConfig, newMessages, player, server, promo, discord, bedrockForms)
     }
 
     private fun applyAndLog(parsed: Parsed) {
@@ -91,6 +98,7 @@ class ConfigManager(private val plugin: JavaPlugin, private val logger: PluginLo
         serverMilestones = parsed.serverMilestones
         promo = parsed.promo
         discord = parsed.discord
+        bedrockForms = parsed.bedrockForms
         logger.debugMode = parsed.config.debug
         logger.debug {
             "Config loaded: db=${parsed.config.database.type}, currency=${parsed.config.currency.provider}, " +
