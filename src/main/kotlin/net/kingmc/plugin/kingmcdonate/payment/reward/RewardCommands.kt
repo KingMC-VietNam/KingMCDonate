@@ -1,5 +1,6 @@
 package net.kingmc.plugin.kingmcdonate.payment.reward
 
+import net.kingmc.plugin.kingmcdonate.KingMCDonateContext
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger
 import net.kingmc.plugin.kingmcdonate.util.Scheduler
 import org.bukkit.Bukkit
@@ -41,7 +42,10 @@ object RewardCommands {
             }
             when (parsed.context) {
                 // Console commands are server-global and safe to dispatch on the current region thread.
-                Context.CONSOLE -> Bukkit.dispatchCommand(console, command)
+                Context.CONSOLE -> {
+                    KingMCDonateContext.activityLogOrNull?.log("CONSOLE", "reward for $playerName: $command")
+                    Bukkit.dispatchCommand(console, command)
+                }
                 // Player commands touch region-bound player state: run them on the player's own
                 // region thread (Folia-safe), and skip when the player is offline.
                 Context.PLAYER -> {
@@ -50,6 +54,7 @@ object RewardCommands {
                         logger.debug { "Reward command skipped (player $playerName offline): $command" }
                         continue
                     }
+                    KingMCDonateContext.activityLogOrNull?.log("PLAYER", "reward as $playerName: $command")
                     scheduler.runAtEntity(player) { player.performCommand(command) }
                 }
             }

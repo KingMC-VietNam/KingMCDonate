@@ -31,6 +31,7 @@ import net.kingmc.plugin.kingmcdonate.database.dao.MilestoneDao
 import net.kingmc.plugin.kingmcdonate.database.dao.PendingRewardDao
 import net.kingmc.plugin.kingmcdonate.database.dao.PlayerDao
 import net.kingmc.plugin.kingmcdonate.database.dao.PlayerTotalsDao
+import net.kingmc.plugin.kingmcdonate.database.dao.PointLogDao
 import net.kingmc.plugin.kingmcdonate.database.dao.ProcessedBankTxDao
 import net.kingmc.plugin.kingmcdonate.gui.screen.CardInput
 import net.kingmc.plugin.kingmcdonate.gui.screen.CardTopupMenu
@@ -42,8 +43,10 @@ import net.kingmc.plugin.kingmcdonate.gui.menu.MenuRegistry
 import net.kingmc.plugin.kingmcdonate.gui.menu.MenuService
 import net.kingmc.plugin.kingmcdonate.hook.PlaceholderApiHook
 import net.kingmc.plugin.kingmcdonate.leaderboard.HeadResolver
+import net.kingmc.plugin.kingmcdonate.payment.Donation
 import net.kingmc.plugin.kingmcdonate.payment.DonationSuccessService
 import net.kingmc.plugin.kingmcdonate.payment.ManualCreditService
+import net.kingmc.plugin.kingmcdonate.payment.model.PointLogEntry
 import net.kingmc.plugin.kingmcdonate.payment.SuccessBroadcaster
 import net.kingmc.plugin.kingmcdonate.payment.bank.BankConfirmService
 import net.kingmc.plugin.kingmcdonate.payment.bank.BankPaymentService
@@ -60,6 +63,7 @@ import net.kingmc.plugin.kingmcdonate.render.PacketEventsQrMapRenderer
 import net.kingmc.plugin.kingmcdonate.render.QrListener
 import net.kingmc.plugin.kingmcdonate.render.QrMapRenderer
 import net.kingmc.plugin.kingmcdonate.config.PluginConfig
+import net.kingmc.plugin.kingmcdonate.util.ActivityLog
 import net.kingmc.plugin.kingmcdonate.util.Http
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger
 import net.kingmc.plugin.kingmcdonate.util.Scheduler
@@ -88,6 +92,7 @@ class KingMCDonate : JavaPlugin() {
     private var expansion: KmdExpansion? = null
     private var bossBar: MilestoneBossBar? = null
     private var leaderboard: LeaderboardService? = null
+    private var activityLog: ActivityLog? = null
 
     // Re-read on every access so services always see the latest reloaded config/messages.
     private val configRef = { configManager.config }
@@ -114,6 +119,7 @@ class KingMCDonate : JavaPlugin() {
         leaderboard?.shutdown()
         if (this::scheduler.isInitialized) scheduler.shutdown()
         database?.close()
+        activityLog?.close()
     }
 
     /** Wires every subsystem in dependency order. Any failure aborts enable. */
@@ -127,6 +133,16 @@ class KingMCDonate : JavaPlugin() {
         if (config.serverId == "default") {
             pluginLogger.warn("server-id is 'default'; set a unique server-id per node before running multi-server.")
         }
+
+        val activityLog = ActivityLog.create(
+            dataFolder,
+            config.activityLog.enabled,
+            config.activityLog.maxSizeKb * 1024,
+            config.activityLog.maxFiles,
+            pluginLogger,
+        )
+        this.activityLog = activityLog
+        KingMCDonateContext.initActivityLog(activityLog)
 
         val database = Database(config.database, dataFolder, pluginLogger).apply {
             connect()
@@ -338,6 +354,7 @@ class KingMCDonate : JavaPlugin() {
         menus: MenuService,
     ) {
         val milestoneDao = MilestoneDao(database)
+        val pointLogDao = PointLogDao(database)
         val leaderboardService = LeaderboardService(LeaderboardDao(database), scheduler, configRef, pluginLogger)
         val milestoneService = MilestoneService(
             milestoneDao, { configManager.milestones }, { configManager.serverMilestones },
@@ -362,6 +379,31 @@ class KingMCDonate : JavaPlugin() {
             }
         }
         donationSuccess.eventHook = { d -> eventPublisher.fireSuccess(d) }
+        donationSuccess.auditHook = { d ->
+            try {
+                pointLogDao.record(
+                    PointLogEntry(
+                        playerUuid = d.uuid,
+                        playerName = d.name,
+                        amount = d.point,
+                        method = d.method,
+                        provider = d.provider,
+                        referenceCode = d.referenceCode,
+                        actor = d.actor,
+                        server = configRef().serverId,
+                        content = auditContent(d),
+                        createdAt = System.currentTimeMillis(),
+                    ),
+                )
+            } catch (e: Exception) {
+                pluginLogger.error("Point ledger write failed ref=${d.referenceCode}", e)
+            }
+            activityLog?.log(
+                "POINT",
+                "+${d.point} ${d.method} provider=${d.provider} ref=${d.referenceCode} " +
+                    "player=${d.name ?: d.uuid} actor=${d.actor ?: "-"}",
+            )
+        }
 
         milestoneService.onPlayerMilestone = { d, t, p -> discord.notifyPlayerMilestone(d, t); eventPublisher.firePlayerMilestone(d, t, p) }
         milestoneService.onServerMilestone = { d, t, p -> discord.notifyServerMilestone(d, t); eventPublisher.fireServerMilestone(d, t, p) }
@@ -386,6 +428,14 @@ class KingMCDonate : JavaPlugin() {
         }
         KingMCDonateAPI.set(api)
         server.servicesManager.register(KingMCDonateAPI::class.java, api, this, ServicePriority.Normal)
+    }
+
+    /** Short human-readable description of a point change for the ledger `content` column. */
+    private fun auditContent(d: Donation): String = when {
+        d.provider == ManualCreditService.MANUAL_PROVIDER -> "Manual credit (${d.method})"
+        d.method == "card" -> "Card top-up ${d.provider}"
+        d.method == "bank" -> "Bank top-up ${d.provider}"
+        else -> d.method
     }
 
     private fun registerCommands(

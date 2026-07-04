@@ -1,5 +1,6 @@
 package net.kingmc.plugin.kingmcdonate.command
 
+import net.kingmc.plugin.kingmcdonate.KingMCDonateContext
 import net.kingmc.plugin.kingmcdonate.config.MessageKeys
 import net.kingmc.plugin.kingmcdonate.config.Messages
 import net.kingmc.plugin.kingmcdonate.config.PluginConfig
@@ -61,10 +62,14 @@ class GiveSubCommand(
             feedback(sender, MessageKeys.GIVE_OFFLINE_NEEDS_FORCE, "player" to name)
             return
         }
-        service.give(a.bucket, uuid, name, a.amount, a.point)
+        service.give(a.bucket, uuid, name, a.amount, a.point, sender.name)
         logger.info(
             "[MANUAL] actor=${sender.name} target=$name/$uuid method=${a.bucket.method} " +
                 "amount=${a.amount} point=${a.point ?: "auto"}",
+        )
+        KingMCDonateContext.activityLogOrNull?.log(
+            "COMMAND",
+            "give by ${sender.name}: target=$name method=${a.bucket.method} amount=${a.amount} point=${a.point ?: "auto"}",
         )
         feedback(
             sender, MessageKeys.GIVE_DONE,

@@ -5,6 +5,7 @@ import net.kingmc.plugin.kingmcdonate.config.Messages
 import net.kingmc.plugin.kingmcdonate.config.PluginConfig
 import net.kingmc.plugin.kingmcdonate.currency.CurrencyRegistry
 import net.kingmc.plugin.kingmcdonate.database.Database
+import net.kingmc.plugin.kingmcdonate.util.ActivityLog
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger
 import net.kingmc.plugin.kingmcdonate.util.Scheduler
 
@@ -34,13 +35,26 @@ object KingMCDonateContext {
     lateinit var currency: CurrencyRegistry
         private set
 
+    lateinit var activityLog: ActivityLog
+        private set
+
     val config: PluginConfig get() = configManager.config
     val messages: Messages get() = configManager.messages
+
+    /**
+     * The activity log, or null before bootstrap wires it. Inline call sites use this
+     * so unit tests that never run bootstrap simply skip logging instead of failing.
+     */
+    val activityLogOrNull: ActivityLog? get() = if (this::activityLog.isInitialized) activityLog else null
 
     internal fun init(plugin: KingMCDonate, scheduler: Scheduler, logger: PluginLogger) {
         this.plugin = plugin
         this.scheduler = scheduler
         this.logger = logger
+    }
+
+    internal fun initActivityLog(activityLog: ActivityLog) {
+        this.activityLog = activityLog
     }
 
     internal fun initCore(configManager: ConfigManager, database: Database, currency: CurrencyRegistry) {

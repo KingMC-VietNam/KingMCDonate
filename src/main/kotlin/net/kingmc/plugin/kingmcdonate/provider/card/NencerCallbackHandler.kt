@@ -1,5 +1,6 @@
 package net.kingmc.plugin.kingmcdonate.provider.card
 
+import net.kingmc.plugin.kingmcdonate.KingMCDonateContext
 import net.kingmc.plugin.kingmcdonate.payment.model.PaymentStatus
 import net.kingmc.plugin.kingmcdonate.util.Hashing
 import net.kingmc.plugin.kingmcdonate.webhook.CardWebhookDeps
@@ -50,6 +51,9 @@ class NencerCallbackHandler(
         val outcome = CardOutcome(mapStatus(status), transactionId, recognized, message)
 
         deps.logger.debug { "$providerKey callback ref=$reference status=$status -> ${outcome.status}" }
+        KingMCDonateContext.activityLogOrNull?.log(
+            "WEBHOOK", "$providerKey callback ref=$reference status=$status -> ${outcome.status}",
+        )
         deps.applyOutcome(reference, order.playerUuid, order.playerName, order.amount, outcome)
         return WebhookResponse.ok()
     }

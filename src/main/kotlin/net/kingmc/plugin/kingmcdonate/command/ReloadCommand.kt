@@ -1,5 +1,6 @@
 package net.kingmc.plugin.kingmcdonate.command
 
+import net.kingmc.plugin.kingmcdonate.KingMCDonateContext
 import net.kingmc.plugin.kingmcdonate.config.ConfigManager
 import net.kingmc.plugin.kingmcdonate.config.MessageKeys
 import net.kingmc.plugin.kingmcdonate.currency.CurrencyRegistry
@@ -36,6 +37,7 @@ class ReloadCommand(
     override val permission = "kingmcdonate.admin"
 
     override fun execute(sender: CommandSender, args: List<String>) {
+        KingMCDonateContext.activityLogOrNull?.log("COMMAND", "reload by ${sender.name}")
         if (configManager.reload()) {
             currency.load(configManager.config.currency)
             cardProviders.load(configManager.config.card.provider)

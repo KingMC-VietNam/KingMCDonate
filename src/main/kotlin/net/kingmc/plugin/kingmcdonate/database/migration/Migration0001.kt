@@ -115,6 +115,23 @@ class Migration0001 : Migration {
                 UNIQUE (scope, subject, period, period_key, threshold)
             )
             """,
+            // append-only ledger of every point change (card/bank/manual credit), separate from
+            // the transaction tables so admins can audit balance movement without gateway noise
+            """
+            CREATE TABLE IF NOT EXISTS point_log (
+                id             $id,
+                player_uuid    VARCHAR(36) NOT NULL,
+                player_name    VARCHAR(16),
+                amount         BIGINT      NOT NULL,
+                method         VARCHAR(8)  NOT NULL,
+                provider       VARCHAR(32),
+                reference_code VARCHAR(32),
+                actor          VARCHAR(64),
+                server         VARCHAR(64) NOT NULL DEFAULT '',
+                content        VARCHAR(255),
+                created_at     BIGINT      NOT NULL
+            )
+            """,
         )
 
         // Secondary indexes for the hot lookup paths: poll sweeps filter by (owner_server, status),
@@ -129,6 +146,7 @@ class Migration0001 : Migration {
             "CREATE INDEX ${ifNotExists}idx_pending_reward_pending ON pending_reward (delivered, claimed_by)",
             "CREATE INDEX ${ifNotExists}idx_milestone_completions_lookup " +
                 "ON milestone_completions (scope, subject, period, period_key)",
+            "CREATE INDEX ${ifNotExists}idx_point_log_player ON point_log (player_uuid, created_at)",
         )
 
         connection.createStatement().use { stmt ->

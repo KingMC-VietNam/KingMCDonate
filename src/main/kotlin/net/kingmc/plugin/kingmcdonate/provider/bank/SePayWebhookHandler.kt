@@ -2,6 +2,7 @@ package net.kingmc.plugin.kingmcdonate.provider.bank
 
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
+import net.kingmc.plugin.kingmcdonate.KingMCDonateContext
 import net.kingmc.plugin.kingmcdonate.util.Hashing
 import net.kingmc.plugin.kingmcdonate.webhook.BankWebhookDeps
 import net.kingmc.plugin.kingmcdonate.webhook.WebhookHandler
@@ -61,9 +62,15 @@ class SePayWebhookHandler(
         val order = orders.firstOrNull { it.amount == payload.transferAmount } ?: orders.firstOrNull()
         if (order != null) {
             deps.logger.debug { "SePay webhook tx=$txId matched ref=${order.referenceCode}; confirming." }
+            KingMCDonateContext.activityLogOrNull?.log(
+                "WEBHOOK", "sepay tx=$txId amount=${payload.transferAmount} matched ref=${order.referenceCode}",
+            )
             deps.confirm(BankConfirmation(order.referenceCode, txId, payload.transferAmount))
             return ACK
         }
+        KingMCDonateContext.activityLogOrNull?.log(
+            "WEBHOOK", "sepay tx=$txId amount=${payload.transferAmount} matched no pending order",
+        )
         deps.logger.warn("SePay webhook: authentic transfer tx=$txId matched no pending order; acknowledged.")
         return ACK
     }

@@ -52,7 +52,7 @@ class MigrationRunnerTest {
         val expected = listOf(
             "config_kv", "players", "card_payments", "bank_payments",
             "processed_bank_tx", "pending_reward", "player_totals",
-            "milestone_completions",
+            "milestone_completions", "point_log",
         )
         for (table in expected) {
             // Throws if the table is missing.

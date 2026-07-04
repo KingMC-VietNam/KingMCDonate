@@ -33,6 +33,7 @@ class ManualCreditServiceTest {
     private lateinit var totals: PlayerTotalsDao
     private lateinit var fakeCurrency: FakeCurrencyProvider
     private lateinit var enqueued: MutableList<UUID>
+    private lateinit var success: DonationSuccessService
     private lateinit var service: ManualCreditService
 
     private fun config(pointRate: Double = 1.0): PluginConfig {
@@ -49,7 +50,7 @@ class ManualCreditServiceTest {
         val sink = object : RewardSink {
             override fun enqueue(playerUuid: UUID, referenceCode: String, payload: RewardPayload) { enqueued.add(playerUuid) }
         }
-        val success = DonationSuccessService(
+        success = DonationSuccessService(
             rewardSink = sink,
             playerDao = PlayerDao(database),
             logger = logger,
@@ -98,7 +99,7 @@ class ManualCreditServiceTest {
     @Test
     fun `bank bucket credits flat-rate points, totals and reward, tagged manual`() {
         val uuid = UUID.randomUUID()
-        service.give(ManualCreditService.Bucket.BANK, uuid, "Alice", 50_000, null)
+        service.give(ManualCreditService.Bucket.BANK, uuid, "Alice", 50_000, null, "AdminOp")
         assertEquals(50L, fakeCurrency.balance(uuid)) // 50_000/1000 * 1.0, no promo
         assertEquals(50_000L, totalAll(uuid, "bank"))
         assertEquals(1, enqueued.size)
@@ -111,7 +112,7 @@ class ManualCreditServiceTest {
     @Test
     fun `point override replaces the flat-rate default`() {
         val uuid = UUID.randomUUID()
-        service.give(ManualCreditService.Bucket.BANK, uuid, "Bob", 50_000, 999)
+        service.give(ManualCreditService.Bucket.BANK, uuid, "Bob", 50_000, 999, "AdminOp")
         assertEquals(999L, fakeCurrency.balance(uuid))
         assertEquals(999L, row("bank_payments", uuid).third)
     }
@@ -119,7 +120,7 @@ class ManualCreditServiceTest {
     @Test
     fun `card bucket accrues to the card totals with a custom, non-denomination amount`() {
         val uuid = UUID.randomUUID()
-        service.give(ManualCreditService.Bucket.CARD, uuid, "Carol", 137_000, null)
+        service.give(ManualCreditService.Bucket.CARD, uuid, "Carol", 137_000, null, "AdminOp")
         assertEquals(137L, fakeCurrency.balance(uuid)) // 137_000/1000 * 1.0
         assertEquals(137_000L, totalAll(uuid, "card"))
         assertEquals("manual", row("card_payments", uuid).first)
@@ -130,7 +131,18 @@ class ManualCreditServiceTest {
         // ManualCreditService has no PromoService dependency: the default is purely bank point-rate.
         service = buildService(pointRate = 2.0)
         val uuid = UUID.randomUUID()
-        service.give(ManualCreditService.Bucket.BANK, uuid, "Dave", 50_000, null)
+        service.give(ManualCreditService.Bucket.BANK, uuid, "Dave", 50_000, null, "AdminOp")
         assertEquals(100L, fakeCurrency.balance(uuid)) // 50 * 2.0, no bonus multiplier
+    }
+
+    @Test
+    fun `passes the issuing actor and manual provider to the success hook for auditing`() {
+        val captured = mutableListOf<Donation>()
+        success.auditHook = { captured.add(it) }
+        val uuid = UUID.randomUUID()
+        service.give(ManualCreditService.Bucket.BANK, uuid, "Eve", 50_000, null, "AdminSteve")
+        assertEquals(1, captured.size)
+        assertEquals("AdminSteve", captured.single().actor)
+        assertEquals("manual", captured.single().provider)
     }
 }

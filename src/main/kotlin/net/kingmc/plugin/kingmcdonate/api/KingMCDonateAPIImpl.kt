@@ -34,7 +34,7 @@ internal class KingMCDonateAPIImpl(
             "bank" -> ManualCreditService.Bucket.BANK
             else -> throw IllegalArgumentException("Unknown method '$method' (expected 'card' or 'bank')")
         }
-        manualCredit.give(bucket, uuid, resolveName(uuid), amount, point)
+        manualCredit.give(bucket, uuid, resolveName(uuid), amount, point, "API")
     }
 
     private fun DonationMetric.toInternal(): LeaderboardDao.Metric = when (this) {

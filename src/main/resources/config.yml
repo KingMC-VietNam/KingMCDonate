@@ -236,3 +236,18 @@ leaderboard:
   cache-ttl-seconds: 60
   # Số hạng lưu/hiển thị.
   size: 10
+
+# ============================================================
+#  Nhật ký hoạt động (activity log) — ghi ra file riêng
+# ============================================================
+# Ghi các sự kiện vận hành (webhook nhận về, lệnh admin, lệnh console trả thưởng,
+# biến động điểm) ra file logs/activity.*.log — tách khỏi console để admin rà soát.
+# Ghi bất đồng bộ (không chặn server). Đổi cấu hình cần khởi động lại plugin.
+# Lưu ý: đây KHÁC với sổ cái điểm trong CSDL (bảng point_log) — bảng đó luôn ghi.
+activity-log:
+  # Công tắc tổng (mặc định bật).
+  enabled: true
+  # Kích thước tối đa mỗi file (KB) trước khi xoay vòng.
+  max-size-kb: 5120
+  # Số file xoay vòng giữ lại.
+  max-files: 5

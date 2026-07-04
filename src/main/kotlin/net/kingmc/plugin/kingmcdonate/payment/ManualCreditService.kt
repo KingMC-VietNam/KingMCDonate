@@ -40,9 +40,10 @@ class ManualCreditService(
 
     /**
      * Record a SUCCESS manual credit for [uuid] and run the full reward path off-thread.
-     * [pointOverride] replaces the default flat-rate points when non-null.
+     * [pointOverride] replaces the default flat-rate points when non-null. [actor] is the
+     * admin (or "API") who issued it, recorded in the point ledger for audit.
      */
-    fun give(bucket: Bucket, uuid: UUID, name: String, amount: Long, pointOverride: Long?) {
+    fun give(bucket: Bucket, uuid: UUID, name: String, amount: Long, pointOverride: Long?, actor: String) {
         scheduler.runIo {
             val now = System.currentTimeMillis()
             val point = pointOverride ?: Math.round(amount / 1000.0 * config().bank.pointRate)
@@ -76,11 +77,19 @@ class ManualCreditService(
             }
             if (!committed) return@runIo
 
-            applyReward(bucket, referenceCode, uuid, name, amount, point)
+            applyReward(bucket, referenceCode, uuid, name, amount, point, actor)
         }
     }
 
-    private fun applyReward(bucket: Bucket, referenceCode: String, uuid: UUID, name: String, amount: Long, point: Long) {
+    private fun applyReward(
+        bucket: Bucket,
+        referenceCode: String,
+        uuid: UUID,
+        name: String,
+        amount: Long,
+        point: Long,
+        actor: String,
+    ) {
         val claimed = when (bucket) {
             Bucket.CARD -> cardPaymentDao.claimRewardApplied(referenceCode, System.currentTimeMillis())
             Bucket.BANK -> bankPaymentDao.claimRewardApplied(referenceCode, System.currentTimeMillis())
@@ -95,7 +104,7 @@ class ManualCreditService(
             logger.error("Manual credit $referenceCode: reward credit failed uuid=$uuid point=$point; reconcile manually.", e)
         }
         donationSuccess.onSuccess(
-            Donation(uuid, name, bucket.method, amount, point, referenceCode, MessageKeys.MANUAL_SUCCESS, MANUAL_PROVIDER),
+            Donation(uuid, name, bucket.method, amount, point, referenceCode, MessageKeys.MANUAL_SUCCESS, MANUAL_PROVIDER, actor),
         )
     }
 

@@ -31,6 +31,7 @@ class PluginConfig(root: ConfigurationSection) {
     val firstTopup: FirstTopupConfig = FirstTopupConfig(root.getConfigurationSection("first-topup"))
     val bossbar: BossBarConfig = BossBarConfig(root.getConfigurationSection("bossbar"))
     val leaderboard: LeaderboardConfig = LeaderboardConfig(root.getConfigurationSection("leaderboard"))
+    val activityLog: ActivityLogConfig = ActivityLogConfig(root.getConfigurationSection("activity-log"))
 
     class DatabaseConfig(section: ConfigurationSection?) {
         /** `sqlite` (default) or `mysql`. */
@@ -178,5 +179,18 @@ class PluginConfig(root: ConfigurationSection) {
     class LeaderboardConfig(section: ConfigurationSection?) {
         val cacheTtlSeconds: Long = (section?.getLong("cache-ttl-seconds", 60L) ?: 60L).coerceAtLeast(1L)
         val size: Int = (section?.getInt("size", 10) ?: 10).coerceIn(1, 100)
+    }
+
+    /**
+     * Operational activity log written to its own rotating file (`logs/activity.*.log`).
+     * Enabled by default. Rotation is size-based; [maxFiles] rotated files are kept.
+     * Changes take effect on plugin restart (the file handler is opened once at enable).
+     */
+    class ActivityLogConfig(section: ConfigurationSection?) {
+        val enabled: Boolean = section?.getBoolean("enabled", true) ?: true
+        /** Max size of one log file in kilobytes before it rotates. */
+        val maxSizeKb: Int = (section?.getInt("max-size-kb", 5120) ?: 5120).coerceAtLeast(1)
+        /** Number of rotated files kept. */
+        val maxFiles: Int = (section?.getInt("max-files", 5) ?: 5).coerceIn(1, 100)
     }
 }

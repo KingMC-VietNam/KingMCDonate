@@ -20,6 +20,8 @@ data class Donation(
     val referenceCode: String,
     val successMessageKey: String,
     val provider: String,
+    /** Admin who issued a manual credit (or "API"); null for gateway-driven card/bank flows. */
+    val actor: String? = null,
 )
 
 /**
@@ -44,11 +46,13 @@ class DonationSuccessService(
     var leaderboardHook: (Donation) -> Unit = {}
     var bossbarHook: (UUID) -> Unit = {}
     var eventHook: (Donation) -> Unit = {}
+    var auditHook: (Donation) -> Unit = {}
 
     fun onSuccess(d: Donation) {
         val name = resolveName(d)
         logger.debug { "Donation success ref=${d.referenceCode} uuid=${d.uuid} method=${d.method} amount=${d.amountVnd} point=${d.point}" }
 
+        auditHook(d)
         enqueueSuccessReward(d, name)
         runFirstTopup(d, name)
         leaderboardHook(d)
