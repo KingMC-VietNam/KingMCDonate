@@ -1,5 +1,6 @@
 package net.kingmc.plugin.kingmcdonate.gui.screen
 
+import net.kingmc.plugin.kingmcdonate.bedrock.LeaderboardForm
 import net.kingmc.plugin.kingmcdonate.database.dao.LeaderboardDao
 import net.kingmc.plugin.kingmcdonate.gui.Gui
 import net.kingmc.plugin.kingmcdonate.gui.MenuItem
@@ -27,6 +28,7 @@ class LeaderboardMenu(
     private val leaderboard: LeaderboardService,
     private val heads: HeadResolver,
     private val scheduler: Scheduler,
+    private val bedrockForm: LeaderboardForm? = null,
 ) {
 
     init {
@@ -34,6 +36,7 @@ class LeaderboardMenu(
     }
 
     fun open(player: Player) {
+        if (bedrockForm?.trySend(player) == true) return
         val definition = menus.registry.get("topnap") ?: return
         val view = LeaderboardView.DEFAULT
         scheduler.runIo {
