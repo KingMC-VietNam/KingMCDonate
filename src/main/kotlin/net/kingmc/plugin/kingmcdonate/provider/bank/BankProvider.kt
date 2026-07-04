@@ -2,8 +2,17 @@ package net.kingmc.plugin.kingmcdonate.provider.bank
 
 import net.kingmc.plugin.kingmcdonate.payment.model.BankPayment
 
-/** The QR a gateway produces for an order: an image URL the client fetches and renders. */
-data class BankQr(val imageUrl: String)
+/**
+ * The QR a gateway produces for an order: an image URL the client fetches and renders, plus
+ * the receiving account details ([accountNumber], [bankName], [accountHolder]) used to build
+ * the manual-transfer message. Account fields default to empty for gateways that don't expose them.
+ */
+data class BankQr(
+    val imageUrl: String,
+    val accountNumber: String = "",
+    val bankName: String = "",
+    val accountHolder: String = "",
+)
 
 /** A transfer the gateway confirmed as matching one order, by reference, amount and gateway tx id. */
 data class BankConfirmation(

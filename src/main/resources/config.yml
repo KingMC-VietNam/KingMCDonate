@@ -138,6 +138,19 @@ bank:
   # Đơn chưa chuyển khoản quá thời gian này sẽ bị huỷ (phút). Đặt rộng để hiếm khi tiền về sau khi đã huỷ.
   timeout: 30
 
+  # Tin nhắn hướng dẫn chuyển khoản thủ công gửi kèm QR (áp dụng cả Java lẫn Bedrock).
+  # Placeholder: {bank} {account} {amount} {ref} {holder}. Dòng có {holder} sẽ bị bỏ nếu chưa đặt
+  # account-holder trong providers/sepay.yml. Nội dung {ref} PHẢI được nhập đúng để hệ thống đối soát.
+  manual-transfer:
+    enabled: true
+    lines:
+      - "&e&lChuyen khoan thu cong:"
+      - "&7Ngan hang: &f{bank}"
+      - "&7So tai khoan: &f{account}"
+      - "&7Chu tai khoan: &f{holder}"
+      - "&7So tien: &f{amount}"
+      - "&7Noi dung: &f{ref} &c(bat buoc nhap dung)"
+
 # ============================================================
 #  Trao thưởng đa server (outbox)
 # ============================================================

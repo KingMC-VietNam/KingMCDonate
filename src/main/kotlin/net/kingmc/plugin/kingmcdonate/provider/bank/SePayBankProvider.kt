@@ -32,6 +32,7 @@ class SePayBankProvider(
     private val webhookAuth: String = "none",
     private val webhookSecret: String = "",
     private val webhookApiKey: String = "",
+    private val accountHolder: String = "",
 ) : BankProvider, BankWebhookCapable {
 
     override val name = NAME
@@ -48,7 +49,7 @@ class SePayBankProvider(
             append("&template=qronly")
         }
         logger.debug { "SePay QR url ref=$referenceCode amount=$amountVnd" }
-        return BankQr(url)
+        return BankQr(url, accountNumber, bank, accountHolder)
     }
 
     override fun poll(orders: List<BankPayment>): List<BankConfirmation> {

@@ -10,6 +10,9 @@ account-number: "YOUR_BANK_ACCOUNT_NUMBER"
 # Mã / tên viết tắt ngân hàng theo SePay (vd: ACB, Vietcombank, MBBank, TPBank...).
 bank: "ACB"
 
+# Tên chủ tài khoản, hiển thị trong tin nhắn chuyển khoản thủ công (để trống thì ẩn dòng này).
+account-holder: ""
+
 # API Token (Bearer) để gọi SePay API v2. KHÔNG commit token thật lên source code.
 api-token: "YOUR_API_TOKEN"
 

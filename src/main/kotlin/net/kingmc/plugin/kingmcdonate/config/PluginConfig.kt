@@ -103,12 +103,36 @@ class PluginConfig(root: ConfigurationSection) {
         /** A PENDING order older than this many minutes is marked FAILED. */
         val timeoutMinutes: Long = section?.getLong("timeout", 30L) ?: 30L
 
+        /** Manual bank-transfer message shown to the player alongside the QR (Java and Bedrock). */
+        val manualTransfer = ManualTransferConfig(section?.getConfigurationSection("manual-transfer"))
+
         companion object {
             private const val MAX_PREFIX_LENGTH = 22
             private val NON_ALPHANUMERIC = Regex("[^A-Z0-9]")
 
             private fun sanitizePrefix(raw: String): String =
                 raw.uppercase().replace(NON_ALPHANUMERIC, "").take(MAX_PREFIX_LENGTH)
+        }
+    }
+
+    /**
+     * Manual bank-transfer message: whether it is sent and the template [lines]. Lines carry
+     * `{bank}`/`{account}`/`{amount}`/`{ref}`/`{holder}` placeholders and normal `&` colour codes;
+     * a line using `{holder}` is dropped when no holder is configured on the provider.
+     */
+    class ManualTransferConfig(section: ConfigurationSection?) {
+        val enabled: Boolean = section?.getBoolean("enabled", true) ?: true
+        val lines: List<String> = section?.getStringList("lines")?.takeIf { it.isNotEmpty() } ?: DEFAULT_LINES
+
+        companion object {
+            private val DEFAULT_LINES = listOf(
+                "&e&lManual bank transfer:",
+                "&7Bank: &f{bank}",
+                "&7Account: &f{account}",
+                "&7Holder: &f{holder}",
+                "&7Amount: &f{amount}",
+                "&7Content: &f{ref} &c(must be exact)",
+            )
         }
     }
 

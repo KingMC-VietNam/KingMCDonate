@@ -8,6 +8,7 @@ import net.kingmc.plugin.kingmcdonate.database.dao.BankPaymentDao
 import net.kingmc.plugin.kingmcdonate.database.dao.PlayerDao
 import net.kingmc.plugin.kingmcdonate.provider.bank.BankConfirmation
 import net.kingmc.plugin.kingmcdonate.provider.bank.BankProviderRegistry
+import net.kingmc.plugin.kingmcdonate.provider.bank.BankQr
 import net.kingmc.plugin.kingmcdonate.render.QrImage
 import net.kingmc.plugin.kingmcdonate.render.QrMapRenderer
 import net.kingmc.plugin.kingmcdonate.util.Http
@@ -79,6 +80,7 @@ class BankPaymentService(
         scheduler.runIo {
             try {
                 val qr = provider.createQr(amount, referenceCode)
+                sendManualTransfer(player, qr, amount, referenceCode)
                 val mapBytes = QrImage.fetchMapBytes(http, qr.imageUrl, logger)
                 if (mapBytes != null) {
                     scheduler.runAtEntity(player) { qrRenderer.show(player, mapBytes) }
@@ -87,6 +89,17 @@ class BankPaymentService(
                 logger.error("Bank $referenceCode: could not build/render QR; order still valid.", e)
             }
         }
+    }
+
+    /** Send the configured manual-transfer message (Java and Bedrock) so a player can transfer by hand. */
+    private fun sendManualTransfer(player: Player, qr: BankQr, amount: Long, referenceCode: String) {
+        val manual = config().bank.manualTransfer
+        if (!manual.enabled) return
+        val lines = BankTransferMessage.build(
+            manual.lines, qr.bankName, qr.accountNumber, Text.formatMoney(amount), referenceCode, qr.accountHolder,
+        ).map { Text.colorize(it) }
+        if (lines.isEmpty()) return
+        scheduler.runAtEntity(player) { lines.forEach { player.sendMessage(it) } }
     }
 
     /** Simulate a confirmed transfer (admin test): record a PENDING order then run the full confirm path. */

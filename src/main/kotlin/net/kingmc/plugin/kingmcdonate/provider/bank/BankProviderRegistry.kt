@@ -54,6 +54,7 @@ class BankProviderRegistry(
                         val webhookAuth = yml.getString("webhook-auth", "none").orEmpty()
                         val webhookSecret = yml.getString("webhook-secret").orEmpty()
                         val webhookApiKey = yml.getString("webhook-api-key").orEmpty()
+                        val accountHolder = yml.getString("account-holder").orEmpty()
                         if (account.isBlank() || account == SEPAY_ACCOUNT_PLACEHOLDER ||
                             bank.isBlank() || token.isBlank() || token == SEPAY_TOKEN_PLACEHOLDER
                         ) {
@@ -61,7 +62,7 @@ class BankProviderRegistry(
                         } else {
                             SePayBankProvider(
                                 http::get, account, bank, token, sandbox, logger,
-                                webhookAuth, webhookSecret, webhookApiKey,
+                                webhookAuth, webhookSecret, webhookApiKey, accountHolder,
                             )
                         }
                     }
