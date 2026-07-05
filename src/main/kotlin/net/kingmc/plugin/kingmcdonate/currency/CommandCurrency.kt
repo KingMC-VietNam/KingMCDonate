@@ -1,12 +1,15 @@
 package net.kingmc.plugin.kingmcdonate.currency
 
+import net.kingmc.plugin.kingmcdonate.payment.reward.RewardCommands
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger
 import net.kingmc.plugin.kingmcdonate.util.Scheduler
 import org.bukkit.Bukkit
 import java.util.UUID
 
 /**
- * Runs configured console commands as the reward. Always available. Commands are
+ * Runs configured commands as the reward. Always available. Each line may start with a
+ * `console:` (default) or `player:` prefix — same syntax as reward/milestone commands —
+ * so the credit can be granted either from console or as the player. Commands are
  * dispatched on the global/main region via [Scheduler.runNextTick] because Bukkit
  * command dispatch is not thread-safe and may be called from an async success path.
  * `{player}` and `{amount}` are substituted in each command.
@@ -23,14 +26,9 @@ class CommandCurrency(
 
     override fun give(uuid: UUID, amount: Long) {
         val playerName = Bukkit.getOfflinePlayer(uuid).name ?: uuid.toString()
+        val replacements = mapOf("player" to playerName, "amount" to amount.toString())
         scheduler.runNextTick {
-            for (template in commands) {
-                val command = template
-                    .replace("{player}", playerName)
-                    .replace("{amount}", amount.toString())
-                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command)
-                logger.debug { "Command currency executed for $uuid: $command" }
-            }
+            RewardCommands.run(commands, uuid, playerName, replacements, scheduler, logger)
         }
     }
 
