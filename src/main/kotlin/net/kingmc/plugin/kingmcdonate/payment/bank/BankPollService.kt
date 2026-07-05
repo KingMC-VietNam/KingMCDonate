@@ -17,11 +17,12 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Polls this node's PENDING bank orders (outbound, no bound port): once on startup
  * then on a recurring timer, with an overlap guard. Each pass fails orders past the
  * timeout and reconciles any SUCCESS order whose external credit has not been applied
- * (housekeeping, always run). When [queryGateway] is set it also asks the gateway to
+ * (housekeeping, always run). When [queryGateway] returns true it also asks the gateway to
  * match the live (and recently-failed) orders against its incoming transfers and routes
- * confirmations to [BankConfirmService]. In webhook-only confirmation [queryGateway] is
+ * confirmations to [BankConfirmService]. In webhook-only confirmation [queryGateway] returns
  * false: the gateway is not polled, but timeout, late-transfer reconcile and startup
- * resume still run. Owner-server scoping keeps two nodes from polling each other's orders.
+ * resume still run. It is read each pass so a reloaded confirmation mode / webhook toggle takes
+ * effect on the next sweep. Owner-server scoping keeps two nodes from polling each other's orders.
  */
 class BankPollService(
     private val bankPaymentDao: BankPaymentDao,
@@ -32,7 +33,7 @@ class BankPollService(
     private val logger: PluginLogger,
     private val config: () -> PluginConfig,
     private val messages: () -> Messages,
-    private val queryGateway: Boolean = true,
+    private val queryGateway: () -> Boolean = { true },
 ) {
 
     private val polling = AtomicBoolean(false)
@@ -69,7 +70,7 @@ class BankPollService(
             }
         }
 
-        if (queryGateway && providers.isAvailable) {
+        if (queryGateway() && providers.isAvailable) {
             // Match against live orders plus recently-failed ones so a late transfer is surfaced, not dropped.
             val recentFailed = bankPaymentDao.findFailedByServerSince(serverId, now - timeoutMillis * LATE_WINDOW_FACTOR)
             val orders = live + recentFailed

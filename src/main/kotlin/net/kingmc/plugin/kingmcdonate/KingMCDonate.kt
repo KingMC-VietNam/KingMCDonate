@@ -75,6 +75,7 @@ import net.kingmc.plugin.kingmcdonate.webhook.BankWebhookCapable
 import net.kingmc.plugin.kingmcdonate.webhook.BankWebhookDeps
 import net.kingmc.plugin.kingmcdonate.webhook.CardWebhookCapable
 import net.kingmc.plugin.kingmcdonate.webhook.CardWebhookDeps
+import net.kingmc.plugin.kingmcdonate.webhook.WebhookActivation
 import net.kingmc.plugin.kingmcdonate.webhook.WebhookHandler
 import net.kingmc.plugin.kingmcdonate.webhook.WebhookRouter
 import net.kingmc.plugin.kingmcdonate.webhook.WebhookServer
@@ -265,26 +266,21 @@ class KingMCDonate : JavaPlugin() {
         }
         val menu = CardTopupMenu(service, providers, cardInput, menus, configRef, cardForm)
 
-        val mode = configRef().card.confirmation
-        val webhookHandler: WebhookHandler? = if (mode.usesWebhook && configRef().webhook.enabled) {
-            val active = providers.active
-            if (active is CardWebhookCapable) {
-                active.webhookHandler(CardWebhookDeps(cardPaymentDao::findByReference, service::applyOutcome, pluginLogger))
-            } else {
-                pluginLogger.warn(
-                    "card.confirmation='${mode.name.lowercase()}' but provider '${active.name}' has no webhook " +
-                        "support; falling back to polling for card.",
-                )
-                null
-            }
-        } else {
-            null
+        val webhookHandler = cardWebhookHandler(providers, cardPaymentDao, service)
+        // Webhook resolves WAITING orders; fall back to gateway polling when webhook delivery is not active.
+        // Read live so a reloaded confirmation mode / webhook toggle takes effect without a restart.
+        val queryGateway = {
+            val mode = configRef().card.confirmation
+            val webhookActive = WebhookActivation.webhookEnabledForMode(mode, configRef().webhook.enabled) &&
+                providers.active is CardWebhookCapable
+            WebhookActivation.gatewayQueryNeeded(mode, webhookActive)
         }
-        // Webhook resolves WAITING orders; fall back to gateway polling when no handler is active.
-        val queryGateway = mode.pollsGateway || webhookHandler == null
         val pollService =
             CardPollService(cardPaymentDao, service, providers, scheduler, pluginLogger, configRef, queryGateway)
-        pluginLogger.debug { "Card confirmation: mode=${mode.name.lowercase()} queryGateway=$queryGateway webhook=${webhookHandler != null}" }
+        pluginLogger.debug {
+            "Card confirmation: mode=${configRef().card.confirmation.name.lowercase()} " +
+                "queryGateway=${queryGateway()} webhook=${webhookHandler != null}"
+        }
         return CardSubsystem(providers, cardPaymentDao, service, chatInput, menu, pollService, webhookHandler)
     }
 
@@ -325,28 +321,23 @@ class KingMCDonate : JavaPlugin() {
             bankPaymentDao, PlayerDao(database), providers, currency, confirmService, qrRenderer, http,
             scheduler, pluginLogger, configRef, messagesRef,
         )
-        val mode = configRef().bank.confirmation
-        val webhookHandler: WebhookHandler? = if (mode.usesWebhook && configRef().webhook.enabled) {
-            val active = providers.active
-            if (active is BankWebhookCapable) {
-                active.webhookHandler(BankWebhookDeps(bankPaymentDao::findByReference, confirmService::confirm, pluginLogger))
-            } else {
-                pluginLogger.warn(
-                    "bank.confirmation='${mode.name.lowercase()}' but provider '${active.name}' has no webhook " +
-                        "support; falling back to polling for bank.",
-                )
-                null
-            }
-        } else {
-            null
+        val webhookHandler = bankWebhookHandler(providers, bankPaymentDao, confirmService)
+        // Read live so a reloaded confirmation mode / webhook toggle takes effect without a restart.
+        val queryGateway = {
+            val mode = configRef().bank.confirmation
+            val webhookActive = WebhookActivation.webhookEnabledForMode(mode, configRef().webhook.enabled) &&
+                providers.active is BankWebhookCapable
+            WebhookActivation.gatewayQueryNeeded(mode, webhookActive)
         }
-        val queryGateway = mode.pollsGateway || webhookHandler == null
         val pollService = BankPollService(
             bankPaymentDao, providers, confirmService, qrRenderer, scheduler, pluginLogger, configRef, messagesRef,
             queryGateway,
         )
-        pluginLogger.debug { "Bank confirmation: mode=${mode.name.lowercase()} queryGateway=$queryGateway webhook=${webhookHandler != null}" }
-        return BankSubsystem(providers, bankPaymentDao, service, pollService, qrRenderer, webhookHandler)
+        pluginLogger.debug {
+            "Bank confirmation: mode=${configRef().bank.confirmation.name.lowercase()} " +
+                "queryGateway=${queryGateway()} webhook=${webhookHandler != null}"
+        }
+        return BankSubsystem(providers, bankPaymentDao, service, confirmService, pollService, qrRenderer, webhookHandler)
     }
 
     /** Start the single shared webhook server when any subsystem registered a handler. */
@@ -359,6 +350,50 @@ class KingMCDonate : JavaPlugin() {
         } catch (e: Exception) {
             // Keep the plugin running (polling/other features still work); the operator fixes the port.
             pluginLogger.error("Failed to bind webhook server on ${config.webhook.host}:${config.webhook.port}.", e)
+        }
+    }
+
+    /**
+     * Build the card webhook handler for the current confirmation mode + webhook toggle, or null when
+     * webhook delivery is off (mode/toggle) or the active provider has no webhook support. Reads live
+     * config so both bootstrap and reload derive the handler from the current state.
+     */
+    private fun cardWebhookHandler(
+        providers: CardProviderRegistry,
+        cardPaymentDao: CardPaymentDao,
+        service: CardPaymentService,
+    ): WebhookHandler? {
+        val mode = configRef().card.confirmation
+        if (!WebhookActivation.webhookEnabledForMode(mode, configRef().webhook.enabled)) return null
+        val active = providers.active
+        return if (active is CardWebhookCapable) {
+            active.webhookHandler(CardWebhookDeps(cardPaymentDao::findByReference, service::applyOutcome, pluginLogger))
+        } else {
+            pluginLogger.warn(
+                "card.confirmation='${mode.name.lowercase()}' but provider '${active.name}' has no webhook " +
+                    "support; falling back to polling for card.",
+            )
+            null
+        }
+    }
+
+    /** Bank counterpart of [cardWebhookHandler]; routes confirmations through [BankConfirmService]. */
+    private fun bankWebhookHandler(
+        providers: BankProviderRegistry,
+        bankPaymentDao: BankPaymentDao,
+        confirmService: BankConfirmService,
+    ): WebhookHandler? {
+        val mode = configRef().bank.confirmation
+        if (!WebhookActivation.webhookEnabledForMode(mode, configRef().webhook.enabled)) return null
+        val active = providers.active
+        return if (active is BankWebhookCapable) {
+            active.webhookHandler(BankWebhookDeps(bankPaymentDao::findByReference, confirmService::confirm, pluginLogger))
+        } else {
+            pluginLogger.warn(
+                "bank.confirmation='${mode.name.lowercase()}' but provider '${active.name}' has no webhook " +
+                    "support; falling back to polling for bank.",
+            )
+            null
         }
     }
 
@@ -522,6 +557,7 @@ class KingMCDonate : JavaPlugin() {
         val providers: BankProviderRegistry,
         val bankPaymentDao: BankPaymentDao,
         val service: BankPaymentService,
+        val confirmService: BankConfirmService,
         val pollService: BankPollService,
         val qrRenderer: QrMapRenderer,
         val webhookHandler: WebhookHandler?,
