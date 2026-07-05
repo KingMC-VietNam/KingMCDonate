@@ -39,7 +39,7 @@ commands:
     permission: kingmcdonate.lichsu
   kingmcdonate:
     description: Lệnh quản trị KingMCDonate
-    usage: /kingmcdonate <reload|lichsu|confirm|cancel|fakecard|fakebank>
+    usage: /kingmcdonate <reload|lichsu|fakecard|fakebank|give>
     permission: kingmcdonate.admin
 
 permissions:
