@@ -16,10 +16,11 @@ import java.util.concurrent.atomic.AtomicBoolean
 /**
  * Re-polls WAITING card orders owned by this node: once on startup and then on a
  * recurring timer. Each pass fails orders older than the timeout (housekeeping, always
- * run) and, when [queryGateway] is set, also re-checks each order against the active
+ * run) and, when [queryGateway] returns true, also re-checks each order against the active
  * gateway and resolves it through [CardPaymentService]. In webhook-only confirmation
- * [queryGateway] is false: the gateway is not polled, but the timeout sweep and startup
- * resume still run so a missing callback never strands an order. Working from the
+ * [queryGateway] returns false: the gateway is not polled, but the timeout sweep and startup
+ * resume still run so a missing callback never strands an order. It is read once per pass so a
+ * reloaded confirmation mode / webhook toggle takes effect on the next sweep. Working from the
  * database (not an online-player set) means a restart or a logout does not lose the
  * resolution.
  *
@@ -35,7 +36,7 @@ class CardPollService(
     private val scheduler: Scheduler,
     private val logger: PluginLogger,
     private val config: () -> PluginConfig,
-    private val queryGateway: Boolean = true,
+    private val queryGateway: () -> Boolean = { true },
 ) {
 
     private val polling = AtomicBoolean(false)
@@ -68,8 +69,10 @@ class CardPollService(
         val timeoutMillis = config().card.timeoutMinutes.coerceAtLeast(1) * 60_000L
         val spacingMillis = config().card.pollSpacingMillis
         val now = System.currentTimeMillis()
+        // Read the gateway-query decision once per pass so a reload's mode/toggle change takes effect next sweep.
+        val shouldQueryGateway = queryGateway()
         logger.debug {
-            "Sweeping ${waiting.size} WAITING card order(s) on '$serverId' (queryGateway=$queryGateway)"
+            "Sweeping ${waiting.size} WAITING card order(s) on '$serverId' (queryGateway=$shouldQueryGateway)"
         }
 
         var checkedAny = false
@@ -78,12 +81,12 @@ class CardPollService(
                 if (now - payment.createdAt > timeoutMillis) {
                     // Force one final check (ignoring backoff) before failing so a charged-but-slow card
                     // that the backoff starved isn't failed unchecked; timeout() no-ops if it resolved.
-                    if (queryGateway && payment.cardProvider == provider.name) forceFinalCheck(payment, provider)
+                    if (shouldQueryGateway && payment.cardProvider == provider.name) forceFinalCheck(payment, provider)
                     service.timeout(payment.referenceCode, payment.playerUuid, payment.amount)
                     continue
                 }
                 // Webhook-only: housekeeping (timeout above) runs, but the gateway is not polled.
-                if (!queryGateway) continue
+                if (!shouldQueryGateway) continue
                 if (payment.cardProvider != provider.name) {
                     logger.debug { "Skipping ${payment.referenceCode}: provider '${payment.cardProvider}' is not active." }
                     continue
