@@ -19,4 +19,7 @@ interface QrMapRenderer {
 
     /** Remove the QR and restore the player's real slot. No-op when none is active. */
     fun clear(player: Player)
+
+    /** Release any packet listeners on plugin disable so a reload can't leave stale listeners bound to a closed jar. */
+    fun shutdown()
 }

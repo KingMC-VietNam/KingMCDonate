@@ -30,12 +30,10 @@ class PacketEventsQrMapRenderer(private val logger: PluginLogger) : QrMapRendere
 
     private val active = ConcurrentHashMap<UUID, ActiveQr>()
 
-    init {
-        PacketEventsCreativeSlotGuard(
-            { uuid -> active[uuid]?.let { PLAYER_INV_HOTBAR_START + it.hotbarSlot } },
-            logger,
-        ).register()
-    }
+    private val slotGuard = PacketEventsCreativeSlotGuard(
+        { uuid -> active[uuid]?.let { PLAYER_INV_HOTBAR_START + it.hotbarSlot } },
+        logger,
+    ).also { it.register() }
 
     override fun show(player: Player, mapBytes: ByteArray) {
         val hotbarSlot = player.inventory.heldItemSlot
@@ -56,6 +54,10 @@ class PacketEventsQrMapRenderer(private val logger: PluginLogger) : QrMapRendere
         // The fake map was never written server-side; resyncing the inventory overwrites the client slot.
         player.updateInventory()
         logger.debug { "QR cleared uuid=${player.uniqueId}" }
+    }
+
+    override fun shutdown() {
+        slotGuard.unregister()
     }
 
     private fun sendMap(player: Player, mapBytes: ByteArray) {

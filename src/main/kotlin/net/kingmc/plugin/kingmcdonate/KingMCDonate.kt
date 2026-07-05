@@ -97,6 +97,7 @@ class KingMCDonate : JavaPlugin() {
     private var bossBar: MilestoneBossBar? = null
     private var leaderboard: LeaderboardService? = null
     private var activityLog: ActivityLog? = null
+    private var qrRenderer: QrMapRenderer? = null
 
     // Re-read on every access so services always see the latest reloaded config/messages.
     private val configRef = { configManager.config }
@@ -121,6 +122,8 @@ class KingMCDonate : JavaPlugin() {
         expansion?.unregisterIfPresent()
         bossBar?.stop()
         leaderboard?.shutdown()
+        // Gỡ PacketEvents listener trước khi jar bị đóng, nếu không reload sẽ để lại listener treo trên jar đã đóng.
+        qrRenderer?.shutdown()
         if (this::scheduler.isInitialized) scheduler.shutdown()
         database?.close()
         activityLog?.close()
@@ -303,6 +306,7 @@ class KingMCDonate : JavaPlugin() {
 
         val bankPaymentDao = BankPaymentDao(database)
         val qrRenderer: QrMapRenderer = PacketEventsQrMapRenderer(pluginLogger)
+        this.qrRenderer = qrRenderer
 
         val confirmService = BankConfirmService(
             database,

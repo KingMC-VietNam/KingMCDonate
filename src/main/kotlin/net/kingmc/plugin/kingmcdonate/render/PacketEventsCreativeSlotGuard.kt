@@ -17,6 +17,10 @@ class PacketEventsCreativeSlotGuard(
         PacketEvents.getAPI().eventManager.registerListener(this)
     }
 
+    fun unregister() {
+        PacketEvents.getAPI().eventManager.unregisterListener(this)
+    }
+
     override fun onPacketReceive(event: PacketReceiveEvent) {
         if (event.packetType != PacketType.Play.Client.CREATIVE_INVENTORY_ACTION) return
         val player = event.getPlayer() as? Player ?: return
