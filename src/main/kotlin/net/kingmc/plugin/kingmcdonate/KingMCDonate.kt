@@ -99,6 +99,8 @@ class KingMCDonate : JavaPlugin() {
     private var leaderboard: LeaderboardService? = null
     private var activityLog: ActivityLog? = null
     private var qrRenderer: QrMapRenderer? = null
+    // Rebuilds the webhook server from live config/providers; set at the end of bootstrap, invoked by reload.
+    private var webhookReload: (() -> Unit)? = null
 
     // Re-read on every access so services always see the latest reloaded config/messages.
     private val configRef = { configManager.config }
@@ -204,6 +206,18 @@ class KingMCDonate : JavaPlugin() {
         val card = setupCard(http, database, currency, menus, promo, donationSuccess, bedrockForms)
         val bank = setupBank(http, database, currency, promo, donationSuccess)
         startWebhookServer(config, listOfNotNull(card.webhookHandler, bank.webhookHandler))
+        // Reload rebuilds the server so a new secret / host / port / base-path / enabled / mode applies live.
+        webhookReload = {
+            webhookServer?.stop()
+            webhookServer = null
+            startWebhookServer(
+                configManager.config,
+                listOfNotNull(
+                    cardWebhookHandler(card.providers, card.cardPaymentDao, card.service),
+                    bankWebhookHandler(bank.providers, bank.bankPaymentDao, bank.confirmService),
+                ),
+            )
+        }
 
         // Fire the public Bukkit events off the existing hooks (attach, do not replace them).
         val eventPublisher = KmdEventPublisher(scheduler, pluginLogger)
@@ -507,7 +521,7 @@ class KingMCDonate : JavaPlugin() {
         bedrockForms: BedrockForms?,
     ) {
         val router = CommandRouter(messagesRef).apply {
-            register(ReloadCommand(configManager, currency, card.providers, bank.providers, menus.registry, guiManager, bossBar, leaderboard, expansion))
+            register(ReloadCommand(configManager, currency, card.providers, bank.providers, menus.registry, guiManager, bossBar, leaderboard, expansion) { webhookReload?.invoke() })
             register(LichSuSubCommand(card.cardPaymentDao, scheduler, messagesRef))
             register(FakeCardSubCommand(card.service, configRef, messagesRef))
             register(FakeBankSubCommand(bank.service, messagesRef))

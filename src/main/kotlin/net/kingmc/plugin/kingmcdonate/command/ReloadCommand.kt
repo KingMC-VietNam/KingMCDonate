@@ -18,7 +18,9 @@ import org.bukkit.command.CommandSender
  * card and bank providers, reloads the menu definitions, and invalidates open GUIs so
  * stale menus close instead of mis-routing clicks. Also invalidates the leaderboard cache,
  * stops the bossbar (repaints on next tick with new config), and re-registers the PAPI
- * expansion. On a parse failure the previous config is kept (see [ConfigManager.reload])
+ * expansion. It also rebuilds the webhook server via [reloadWebhook] so a changed
+ * webhook-secret / host / port / base-path / enabled / confirmation mode applies without a
+ * restart. On a parse failure the previous config is kept (see [ConfigManager.reload])
  * and a failure message is sent.
  */
 class ReloadCommand(
@@ -31,6 +33,7 @@ class ReloadCommand(
     private val bossBar: MilestoneBossBar?,
     private val leaderboard: LeaderboardService?,
     private val expansion: KmdExpansion?,
+    private val reloadWebhook: () -> Unit,
 ) : SubCommand {
 
     override val name = "reload"
@@ -42,6 +45,8 @@ class ReloadCommand(
             currency.load(configManager.config.currency)
             cardProviders.load(configManager.config.card.provider)
             bankProviders.load(configManager.config.bank.provider)
+            // Rebuild after providers reload so a new webhook-secret / host / port / enabled / mode applies now.
+            reloadWebhook()
             menuRegistry.load()
             guiManager?.invalidate()
             leaderboard?.invalidate(null)
