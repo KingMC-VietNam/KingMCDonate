@@ -19,6 +19,31 @@ class BedrockFormsConfigTest {
         assertTrue(c.leaderboard.enabled)
         assertEquals("Submit to top up", c.card.submitLabel)
         assertEquals("{time} - {label} - {amount} - {status}", c.history.entryFormat)
+        assertEquals("Viewing: {metric} - Period: {period}", c.leaderboard.header)
+    }
+
+    @Test
+    fun `leaderboard header override is read`() {
+        val c = BedrockFormsConfig(
+            yaml(
+                """
+                leaderboard:
+                  header: "Xem: {metric} / {period}"
+                """.trimIndent(),
+            ),
+        )
+        assertEquals("Xem: {metric} / {period}", c.leaderboard.header)
+    }
+
+    @Test
+    fun `bundled bedrock-forms carries Vietnamese diacritics`() {
+        val text = javaClass.getResourceAsStream("/bedrock-forms.yml")!!.bufferedReader().readText()
+        val c = BedrockFormsConfig(yaml(text))
+        assertEquals("Bảng xếp hạng nạp", c.leaderboard.title)
+        assertEquals("Tiền nạp", c.leaderboard.metricLabels["AMOUNT"])
+        assertEquals("Hôm nay", c.leaderboard.periodLabels["DAY"])
+        assertTrue(c.leaderboard.header.contains("Đang xem"), "header must use Vietnamese diacritics")
+        assertTrue(c.card.title.contains("Nạp thẻ"), "card title must use Vietnamese diacritics")
     }
 
     @Test

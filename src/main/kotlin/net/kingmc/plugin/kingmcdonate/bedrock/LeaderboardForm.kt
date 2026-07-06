@@ -40,11 +40,13 @@ class LeaderboardForm(
         val lb = formConfig().leaderboard
         val metricLabel = lb.metricLabels[view.metric.name] ?: view.metric.name
         val periodLabel = lb.periodLabels[view.period.name] ?: view.period.name
-        val content = if (entries.isEmpty()) {
+        val list = if (entries.isEmpty()) {
             lb.empty
         } else {
             entries.mapIndexed { i, e -> formatRow(lb.entryFormat, i + 1, e, view) }.joinToString("\n")
         }
+        val header = lb.header.replace("{metric}", metricLabel).replace("{period}", periodLabel)
+        val content = if (header.isBlank()) list else "$header\n\n$list"
         val form = SimpleForm.builder()
             .title(lb.title)
             .content(content)
