@@ -13,6 +13,7 @@ unknown-command: "&cLệnh không hợp lệ. Gõ &e/kingmcdonate&c để xem tr
 # Quản trị
 reload-success: "&aĐã tải lại cấu hình &#55FFFF(config + messages + provider trả thưởng)&a."
 reload-failed: "&cTải lại thất bại: &e{error}&c. Giữ nguyên cấu hình cũ."
+reload-config-warnings: "&eCó &c{count}&e cảnh báo cấu hình — xem console để biết chi tiết."
 
 # Trả thưởng / provider
 currency-unavailable: "&cHệ thống trả thưởng đang không khả dụng, vui lòng liên hệ quản trị."
