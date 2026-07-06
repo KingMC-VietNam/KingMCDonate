@@ -70,6 +70,40 @@ class LeaderboardServiceTest {
     }
 
     @Test
+    fun `warm makes the async top return data on the first call`() {
+        val a = UUID.randomUUID(); val b = UUID.randomUUID()
+        players.upsert(a, "Alice"); players.upsert(b, "Bob")
+        totals.add(a, "card", 30_000, 300, 0)
+        totals.add(b, "bank", 90_000, 900, 0)
+        val s = service()
+        s.warm()
+        // No priming call: the async top() must already see the warmed snapshot (no cold-start 0).
+        val top = s.top(LeaderboardDao.Metric.AMOUNT, Period.ALL)
+        assertEquals(listOf("Bob", "Alice"), top.map { it.name })
+        assertEquals(listOf(90_000L, 30_000L), top.map { it.value })
+    }
+
+    @Test
+    fun `warm makes the server total available on the first call`() {
+        val a = UUID.randomUUID()
+        players.upsert(a, "Alice")
+        totals.add(a, "card", 30_000, 300, 0)
+        val s = service()
+        s.warm()
+        assertEquals(30_000L, s.serverTotal())
+    }
+
+    @Test
+    fun `warmPlayer makes player stats available on the first call`() {
+        val a = UUID.randomUUID()
+        players.upsert(a, "Alice")
+        totals.add(a, "card", 30_000, 300, 0)
+        val s = service()
+        s.warmPlayer(a)
+        assertEquals(30_000L, s.playerStat(a, LeaderboardDao.Metric.AMOUNT, Period.ALL))
+    }
+
+    @Test
     fun `top point ranks by points`() {
         val a = UUID.randomUUID(); val b = UUID.randomUUID()
         players.upsert(a, "Alice"); players.upsert(b, "Bob")

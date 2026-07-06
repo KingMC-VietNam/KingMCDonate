@@ -16,6 +16,7 @@ import net.kingmc.plugin.kingmcdonate.api.KingMCDonateAPI
 import net.kingmc.plugin.kingmcdonate.api.KingMCDonateAPIImpl
 import net.kingmc.plugin.kingmcdonate.api.KmdEventPublisher
 import net.kingmc.plugin.kingmcdonate.discord.DiscordService
+import net.kingmc.plugin.kingmcdonate.leaderboard.LeaderboardJoinListener
 import net.kingmc.plugin.kingmcdonate.leaderboard.LeaderboardService
 import net.kingmc.plugin.kingmcdonate.milestone.MilestoneBossBar
 import net.kingmc.plugin.kingmcdonate.milestone.MilestoneJoinListener
@@ -479,6 +480,9 @@ class KingMCDonate : JavaPlugin() {
         milestoneService.onServerMilestone = { d, t, p -> discord.notifyServerMilestone(d, t); eventPublisher.fireServerMilestone(d, t, p) }
 
         server.pluginManager.registerEvents(MilestoneJoinListener(bossBarUi, milestoneService, scheduler), this)
+        server.pluginManager.registerEvents(LeaderboardJoinListener(leaderboardService), this)
+        // Warm the boards + server total now so placeholders never cold-start at 0 after a restart.
+        leaderboardService.warmAsync()
         bossBarUi.start()
 
         val expansion = KmdExpansion.create(this, leaderboardService, promo)

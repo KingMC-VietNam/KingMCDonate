@@ -69,6 +69,47 @@ class LeaderboardService(
         }
     }
 
+    /**
+     * Eagerly loads every board (metric × period) and the server total into the cache so the
+     * first placeholder read after startup or `/reload` returns real data instead of a
+     * cold-start 0. Once a snapshot exists the read paths never fall back to empty again.
+     * Blocks on DB reads — call off the main thread (see [warmAsync]).
+     */
+    fun warm() {
+        for (metric in LeaderboardDao.Metric.entries) {
+            for (period in Period.entries) topEager(metric, period)
+        }
+        val now = System.currentTimeMillis()
+        val periodKey = Periods.key(Period.ALL, now)
+        try {
+            val total = dao.serverTotal(Period.ALL, periodKey)
+            serverTotals[Period.ALL] = Snapshot(periodKey, total, System.currentTimeMillis() + ttlMillis())
+        } catch (e: Exception) {
+            logger.error("Leaderboard server-total warm failed", e)
+        }
+    }
+
+    /**
+     * Eagerly loads [uuid]'s per-player stats so their personal placeholders (`%kmd_total%` …)
+     * are ready on join instead of blipping to 0. Blocks — call off the main thread (see
+     * [warmPlayerAsync]). Uses the same DAY-bucket key as [rows] so rollover detection stays consistent.
+     */
+    fun warmPlayer(uuid: UUID) {
+        val now = System.currentTimeMillis()
+        try {
+            val loaded = dao.playerRows(uuid)
+            playerStats[uuid] = Snapshot(Periods.key(Period.DAY, now), loaded, System.currentTimeMillis() + ttlMillis())
+        } catch (e: Exception) {
+            logger.error("Leaderboard player warm failed", e)
+        }
+    }
+
+    /** Warm all boards + server total on an IO thread. */
+    fun warmAsync() = scheduler.runIo { warm() }
+
+    /** Warm [uuid]'s per-player stats on an IO thread. */
+    fun warmPlayerAsync(uuid: UUID) = scheduler.runIo { warmPlayer(uuid) }
+
     fun playerStat(uuid: UUID, metric: LeaderboardDao.Metric, period: Period): Long {
         val now = System.currentTimeMillis()
         val periodKey = Periods.key(period, now)

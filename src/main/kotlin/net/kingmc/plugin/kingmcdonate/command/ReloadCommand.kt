@@ -50,6 +50,8 @@ class ReloadCommand(
             menuRegistry.load()
             guiManager?.invalidate()
             leaderboard?.invalidate(null)
+            // Re-warm off-thread so shared leaderboard/server placeholders don't blip to 0 after reload.
+            leaderboard?.warmAsync()
             bossBar?.stop()
             expansion?.installIfPresent()
             configManager.messages.send(sender, MessageKeys.RELOAD_SUCCESS)
