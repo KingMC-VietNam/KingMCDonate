@@ -162,7 +162,7 @@ class KingMCDonate : JavaPlugin() {
 
         val currency = CurrencyRegistry(
             pluginLogger,
-            CurrencyRegistry.defaultFactory(config.currency, scheduler, pluginLogger),
+            CurrencyRegistry.defaultFactory({ configManager.config.currency }, scheduler, pluginLogger),
         ).apply { load(config.currency) }
 
         KingMCDonateContext.initCore(configManager, database, currency)

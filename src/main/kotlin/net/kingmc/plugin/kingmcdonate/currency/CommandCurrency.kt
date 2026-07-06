@@ -15,7 +15,7 @@ import java.util.UUID
  * `{player}` and `{amount}` are substituted in each command.
  */
 class CommandCurrency(
-    private val commands: List<String>,
+    val commands: List<String>,
     private val scheduler: Scheduler,
     private val logger: PluginLogger,
 ) : CurrencyProvider {

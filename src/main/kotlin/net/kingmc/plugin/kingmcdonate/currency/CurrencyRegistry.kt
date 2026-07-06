@@ -51,9 +51,11 @@ class CurrencyRegistry(
         /**
          * Production factory: constructs an adapter only when its backing plugin
          * is enabled, so referencing a missing plugin's classes never happens.
+         * [currencyConfig] is a supplier so the `command` provider picks up edited
+         * `currency.commands` on `/kingmcdonate reload` (config is replaced, not mutated).
          */
         fun defaultFactory(
-            currencyConfig: PluginConfig.CurrencyConfig,
+            currencyConfig: () -> PluginConfig.CurrencyConfig,
             scheduler: Scheduler,
             logger: PluginLogger,
         ): (String) -> CurrencyProvider? = factory@{ name ->
@@ -63,7 +65,7 @@ class CurrencyRegistry(
                 "vault" ->
                     if (Bukkit.getPluginManager().isPluginEnabled("Vault")) VaultCurrency.create(scheduler) else null
                 "command" ->
-                    CommandCurrency(currencyConfig.commands, scheduler, logger)
+                    CommandCurrency(currencyConfig().commands, scheduler, logger)
                 else -> null
             }
         }
