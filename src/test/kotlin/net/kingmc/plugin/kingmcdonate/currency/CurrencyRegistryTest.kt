@@ -1,6 +1,9 @@
 package net.kingmc.plugin.kingmcdonate.currency
 
+import net.kingmc.plugin.kingmcdonate.config.PluginConfig
+import net.kingmc.plugin.kingmcdonate.payment.TestSchedulers
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger
+import org.bukkit.configuration.file.YamlConfiguration
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Test
@@ -56,6 +59,27 @@ class CurrencyRegistryTest {
         org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException::class.java) {
             UnavailableCurrencyProvider.give(UUID.randomUUID(), 1000)
         }
+    }
+
+    private fun currencyConfig(commands: List<String>): PluginConfig.CurrencyConfig {
+        val y = YamlConfiguration()
+        y.set("currency.provider", "command")
+        y.set("currency.commands", commands)
+        return PluginConfig.CurrencyConfig(y.getConfigurationSection("currency"))
+    }
+
+    @Test
+    fun `default command factory reads live config so reload picks up edited commands`() {
+        var config = currencyConfig(listOf("say A"))
+        val factory = CurrencyRegistry.defaultFactory({ config }, TestSchedulers.direct(), logger)
+
+        val before = factory("command") as CommandCurrency
+        assertEquals(listOf("say A"), before.commands)
+
+        // Simulate /kingmcdonate reload replacing the config object.
+        config = currencyConfig(listOf("say B"))
+        val after = factory("command") as CommandCurrency
+        assertEquals(listOf("say B"), after.commands)
     }
 
     @Test

@@ -80,10 +80,12 @@ class NencerCardProvider(
                 if (isCheck) CardOutcome(PaymentStatus.SUCCESS, ref, recognized, message)
                 else CardOutcome(PaymentStatus.WAITING, ref, recognized, message)
             STATUS_PENDING -> CardOutcome(PaymentStatus.WAITING, ref, recognized, message)
-            // Known terminal failures: wrong denomination (card lost), a hard gateway error, or an
-            // already-used card. Surface the gateway's own (Vietnamese) message; the payment layer
-            // localizes when it is blank.
-            STATUS_WRONG_PRICE, STATUS_ERROR, STATUS_USED -> CardOutcome(PaymentStatus.FAILED, ref, recognized, message)
+            // Wrong denomination (card lost): flag it so the player sees the localized notice, not the
+            // gateway's raw message (which can mention gateway-side penalties like "-50%").
+            STATUS_WRONG_PRICE -> CardOutcome(PaymentStatus.FAILED, ref, recognized, message, wrongDenomination = true)
+            // Other terminal failures (hard gateway error, already-used card): surface the gateway's own
+            // (Vietnamese) message; the payment layer localizes when it is blank.
+            STATUS_ERROR, STATUS_USED -> CardOutcome(PaymentStatus.FAILED, ref, recognized, message)
             // Unrecognized or missing status: do not fail a possibly-charged card. Keep it WAITING so the
             // poll service re-checks (an undocumented "busy"/overload code resolves on a later pass; a truly
             // dead order is closed by the timeout sweep).

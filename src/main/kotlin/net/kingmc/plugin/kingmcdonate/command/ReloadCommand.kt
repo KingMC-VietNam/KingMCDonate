@@ -53,6 +53,10 @@ class ReloadCommand(
             bossBar?.stop()
             expansion?.installIfPresent()
             configManager.messages.send(sender, MessageKeys.RELOAD_SUCCESS)
+            val warnings = configManager.validationIssues.size
+            if (warnings > 0) {
+                configManager.messages.send(sender, MessageKeys.RELOAD_CONFIG_WARNINGS, "count" to warnings.toString())
+            }
         } else {
             configManager.messages.send(sender, MessageKeys.RELOAD_FAILED, "error" to "xem console")
         }

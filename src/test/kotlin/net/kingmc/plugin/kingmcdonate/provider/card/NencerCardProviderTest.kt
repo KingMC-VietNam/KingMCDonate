@@ -3,6 +3,8 @@ package net.kingmc.plugin.kingmcdonate.provider.card
 import net.kingmc.plugin.kingmcdonate.payment.model.PaymentStatus
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.util.UUID
 import java.util.logging.Logger
@@ -39,12 +41,14 @@ class NencerCardProviderTest {
         val outcome = provider("""{"status":2,"value":"5000","message":"sai menh gia"}""").check("REF1", request)
         assertEquals(PaymentStatus.FAILED, outcome.status)
         assertEquals(5_000L, outcome.recognizedAmount)
+        assertTrue(outcome.wrongDenomination, "status 2 must flag wrong denomination so the raw gateway message is hidden")
     }
 
     @Test
-    fun `failed status maps to FAILED`() {
+    fun `failed status maps to FAILED without the wrong-denomination flag`() {
         val outcome = provider("""{"status":3,"message":"that bai"}""").check("REF1", request)
         assertEquals(PaymentStatus.FAILED, outcome.status)
+        assertFalse(outcome.wrongDenomination)
     }
 
     @Test

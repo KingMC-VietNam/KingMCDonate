@@ -7,6 +7,7 @@ object MessageKeys {
     const val UNKNOWN_COMMAND = "unknown-command"
     const val RELOAD_SUCCESS = "reload-success"
     const val RELOAD_FAILED = "reload-failed"
+    const val RELOAD_CONFIG_WARNINGS = "reload-config-warnings"
     const val CURRENCY_UNAVAILABLE = "currency-unavailable"
 
     const val STATUS_SUCCESS = "status-success"

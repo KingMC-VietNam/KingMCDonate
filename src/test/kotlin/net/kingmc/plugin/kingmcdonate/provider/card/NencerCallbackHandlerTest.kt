@@ -79,9 +79,10 @@ class NencerCallbackHandlerTest {
     }
 
     @Test
-    fun `wrong-denomination status maps to FAILED`() {
+    fun `wrong-denomination status maps to FAILED and flags wrong denomination`() {
         handler().handle(request("2"))
         assertEquals(PaymentStatus.FAILED, applied?.outcome?.status)
+        assertEquals(true, applied?.outcome?.wrongDenomination)
     }
 
     @Test

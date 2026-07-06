@@ -13,6 +13,7 @@ unknown-command: "&cLệnh không hợp lệ. Gõ &e/kingmcdonate&c để xem tr
 # Quản trị
 reload-success: "&aĐã tải lại cấu hình &#55FFFF(config + messages + provider trả thưởng)&a."
 reload-failed: "&cTải lại thất bại: &e{error}&c. Giữ nguyên cấu hình cũ."
+reload-config-warnings: "&eCó &c{count}&e cảnh báo cấu hình — xem console để biết chi tiết."
 
 # Trả thưởng / provider
 currency-unavailable: "&cHệ thống trả thưởng đang không khả dụng, vui lòng liên hệ quản trị."
@@ -29,7 +30,7 @@ card-success: "&aNạp thẻ thành công! &f+{amount} &a(&e{point} point&a)."
 card-failed: "&cNạp thẻ thất bại: &e{reason}&c."
 card-reason-generic: "giao dịch không thành công"
 card-reason-timeout: "hết hạn xử lý"
-card-wrong-denomination: "&cSai mệnh giá — thẻ không được cộng thưởng. Liên hệ quản trị để đối soát."
+card-wrong-denomination: "&cThẻ nhập sai mệnh giá nên không được cộng thưởng. Vui lòng liên hệ hỗ trợ nếu cần được giúp đỡ."
 card-invalid-type: "&cLoại thẻ không hợp lệ hoặc chưa được mở."
 card-invalid-denomination: "&cMệnh giá không hợp lệ."
 card-serial-too-long: "&cSeri thẻ không hợp lệ."

@@ -5,8 +5,8 @@ import org.bukkit.configuration.ConfigurationSection
 /**
  * Holder for `bedrock-forms.yml`: a master toggle plus per-form toggles and plain-text
  * strings for the card, history and leaderboard Bedrock forms. Bedrock forms cannot render
- * colour/MiniMessage, so every value here is plain text. Fallback defaults are English; the
- * bundled file carries the shipped (Vietnamese) copy.
+ * colour/MiniMessage, so every value here is plain text — but Unicode (Vietnamese diacritics)
+ * is fine. Fallback defaults are English; the bundled file carries the shipped (Vietnamese) copy.
  */
 class BedrockFormsConfig(root: ConfigurationSection?) {
 
@@ -39,6 +39,8 @@ class BedrockFormsConfig(root: ConfigurationSection?) {
     class LeaderboardFormConfig(s: ConfigurationSection?) {
         val enabled = s?.getBoolean("enabled", true) ?: true
         val title = s?.getString("title") ?: "Top donors"
+        /** Optional header line shown above the list; `{metric}`/`{period}` substituted. Blank = hidden. */
+        val header = s?.getString("header") ?: "Viewing: {metric} - Period: {period}"
         val entryFormat = s?.getString("entry-format") ?: "#{rank} {name} - {value}"
         val empty = s?.getString("empty") ?: "No donations yet"
         val metricButton = s?.getString("metric-button") ?: "Switch metric ({metric})"

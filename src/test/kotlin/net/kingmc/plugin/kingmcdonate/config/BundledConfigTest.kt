@@ -30,6 +30,28 @@ class BundledConfigTest {
     }
 
     @Test
+    fun `a configured promotion is parsed only when the promotions section is passed, not the root`() {
+        // Reproduces the wiring bug: ConfigManager must hand PromoConfig the `promotions`
+        // section (like MilestoneConfig), not the whole document. Passing the root silently
+        // drops every promotion, so promo bonuses never apply.
+        val y = YamlConfiguration().apply {
+            loadFromString(
+                """
+                promotions:
+                  test-x2:
+                    rate: 100
+                    from: "01/07/2026 00:00"
+                    to: "31/07/2026 23:59"
+                """.trimIndent(),
+            )
+        }
+        assertTrue(PromoConfig(y).promotions.isEmpty(), "root document must not be treated as the promotions section")
+        val promos = PromoConfig(y.getConfigurationSection("promotions")).promotions
+        assertEquals(1, promos.size)
+        assertEquals(100.0, promos.single().ratePercent)
+    }
+
+    @Test
     fun `mocnap and mocnaptong periods are keyed sections, not lists`() {
         for (file in listOf("mocnap.yml", "mocnaptong.yml")) {
             val y = load(file)

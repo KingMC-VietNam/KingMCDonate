@@ -1,5 +1,6 @@
 package net.kingmc.plugin.kingmcdonate.milestone
 
+import net.kingmc.plugin.kingmcdonate.KingMCDonateContext
 import net.kingmc.plugin.kingmcdonate.database.dao.MilestoneDao
 import net.kingmc.plugin.kingmcdonate.payment.Donation
 import net.kingmc.plugin.kingmcdonate.payment.reward.RewardCommands
@@ -35,7 +36,7 @@ class MilestoneService(
      */
     var serverRewardRunner: (List<String>, Donation) -> Unit = { commands, d ->
         scheduler.runNextTick {
-            RewardCommands.run(commands, d.uuid, d.name ?: d.uuid.toString(), emptyMap(), scheduler, logger)
+            RewardCommands.run(commands, d.uuid, d.name ?: d.uuid.toString(), emptyMap(), scheduler, logger, source = "milestone-server")
         }
     }
 
@@ -97,6 +98,7 @@ class MilestoneService(
         val commands = entry.commands.map { RewardCommands.format(it, vars) }
         val message = entry.message?.let { applyVars(it, vars) }
         rewardSink.enqueue(uuid, d?.referenceCode ?: "milestone", RewardPayload(message = message, commands = commands))
+        KingMCDonateContext.activityLogOrNull?.log("MILESTONE", "player $name reached ${entry.threshold} (${period.name})")
         if (d != null) onPlayerMilestone(d, entry.threshold, period)
     }
 
@@ -106,6 +108,7 @@ class MilestoneService(
         // Server reward commands are global (not tied to the triggering donor's presence):
         // run on the confirming node via the injectable runner.
         serverRewardRunner(commands, d)
+        KingMCDonateContext.activityLogOrNull?.log("MILESTONE", "server reached ${entry.threshold} (${period.name}) by ${d.name ?: d.uuid}")
         onServerMilestone(d, entry.threshold, period)
     }
 
