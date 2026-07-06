@@ -85,7 +85,7 @@ class ConfigManager(private val plugin: JavaPlugin, private val logger: PluginLo
         val newMessages = Messages(msgYaml, newConfig.prefix, logger)
         val player = MilestoneConfig(loadStrict(File(plugin.dataFolder, "mocnap.yml")).getConfigurationSection("milestones"))
         val server = MilestoneConfig(loadStrict(File(plugin.dataFolder, "mocnaptong.yml")).getConfigurationSection("milestones"))
-        val promo = PromoConfig(loadStrict(File(plugin.dataFolder, "khuyenmai.yml")))
+        val promo = PromoConfig(loadStrict(File(plugin.dataFolder, "khuyenmai.yml")).getConfigurationSection("promotions"))
         val discord = DiscordConfig(loadStrict(File(plugin.dataFolder, "discord.yml")))
         val bedrockForms = BedrockFormsConfig(loadStrict(File(plugin.dataFolder, "bedrock-forms.yml")))
         return Parsed(newConfig, newMessages, player, server, promo, discord, bedrockForms)
