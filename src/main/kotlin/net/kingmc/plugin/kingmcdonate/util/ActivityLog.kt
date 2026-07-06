@@ -14,8 +14,9 @@ import java.util.logging.Logger
 /**
  * Asynchronous, append-only operational activity log written to its own rotating file
  * (`logs/activity.<gen>.log`), kept separate from the server console so admins can
- * review notable actions (webhooks received, admin commands, console rewards, point
- * changes) without gateway/console noise. Call sites record events inline via [log];
+ * review notable actions (order intake/failure, webhooks received, admin commands,
+ * executed reward/currency/milestone commands, milestones reached, point changes)
+ * without gateway/console noise. Call sites record events inline via [log];
  * each write is handed to a single background thread so the caller never blocks on I/O
  * and entries preserve their arrival order. When disabled, [log] is a no-op.
  */

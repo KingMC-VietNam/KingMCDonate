@@ -1,5 +1,6 @@
 package net.kingmc.plugin.kingmcdonate.payment.card
 
+import net.kingmc.plugin.kingmcdonate.KingMCDonateContext
 import net.kingmc.plugin.kingmcdonate.config.MessageKeys
 import net.kingmc.plugin.kingmcdonate.config.Messages
 import net.kingmc.plugin.kingmcdonate.config.PluginConfig
@@ -92,6 +93,9 @@ class CardPaymentService(
         )
         messages().send(player, MessageKeys.CARD_CHARGING)
         logger.debug { "Card submit ref=$referenceCode uuid=$uuid type=$type amount=$declaredAmount provider=${provider.name}" }
+        KingMCDonateContext.activityLogOrNull?.log(
+            "TXN", "card created ref=$referenceCode player=$name type=${type.name} amount=$declaredAmount provider=${provider.name}",
+        )
 
         val request = CardRequest(uuid, type, declaredAmount, serial, pin, referenceCode)
         scheduler.runIo {
@@ -132,6 +136,7 @@ class CardPaymentService(
             PaymentStatus.FAILED -> {
                 cardPaymentDao.resolve(referenceCode, PaymentStatus.FAILED, 0, System.currentTimeMillis())
                 logger.debug { "Card FAILED ref=$referenceCode: ${outcome.message}" }
+                logFailed(referenceCode, if (outcome.wrongDenomination) "wrong-denomination" else outcome.message.ifBlank { "failed" })
                 if (outcome.wrongDenomination) {
                     message(uuid, MessageKeys.CARD_WRONG_DENOMINATION)
                 } else {
@@ -149,6 +154,7 @@ class CardPaymentService(
         val rows = cardPaymentDao.resolve(referenceCode, PaymentStatus.FAILED, 0, System.currentTimeMillis())
         if (rows == 1) {
             logger.warn("Card order $referenceCode timed out while WAITING; marked FAILED.")
+            logFailed(referenceCode, "timeout")
             message(uuid, MessageKeys.CARD_FAILED, "reason" to messages().get(MessageKeys.CARD_REASON_TIMEOUT))
             onFailed(uuid, amountVnd, referenceCode, "timeout")
         }
@@ -160,6 +166,7 @@ class CardPaymentService(
         if (recognized != null && recognized != declaredAmount) {
             cardPaymentDao.resolve(referenceCode, PaymentStatus.FAILED, 0, System.currentTimeMillis())
             logger.warn("Card $referenceCode amount mismatch: declared=$declaredAmount recognized=$recognized; not rewarded.")
+            logFailed(referenceCode, "amount-mismatch declared=$declaredAmount recognized=$recognized")
             message(uuid, MessageKeys.CARD_WRONG_DENOMINATION)
             return
         }
@@ -168,6 +175,7 @@ class CardPaymentService(
         if (basePoint == null) {
             cardPaymentDao.resolve(referenceCode, PaymentStatus.FAILED, 0, System.currentTimeMillis())
             logger.warn("Card $referenceCode: amount $declaredAmount is not a configured denomination; not rewarded.")
+            logFailed(referenceCode, "unconfigured-denomination amount=$declaredAmount")
             message(uuid, MessageKeys.CARD_WRONG_DENOMINATION)
             return
         }
@@ -238,6 +246,9 @@ class CardPaymentService(
         val player = Bukkit.getPlayer(uuid) ?: return
         scheduler.runAtEntity(player) { messages().send(player, key, *vars) }
     }
+
+    private fun logFailed(referenceCode: String, reason: String) =
+        KingMCDonateContext.activityLogOrNull?.log("TXN", "card FAILED ref=$referenceCode reason=$reason")
 
     companion object {
         const val METHOD_CARD = "card"

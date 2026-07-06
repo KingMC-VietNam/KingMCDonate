@@ -1,5 +1,6 @@
 package net.kingmc.plugin.kingmcdonate.payment.bank
 
+import net.kingmc.plugin.kingmcdonate.KingMCDonateContext
 import net.kingmc.plugin.kingmcdonate.config.MessageKeys
 import net.kingmc.plugin.kingmcdonate.config.Messages
 import net.kingmc.plugin.kingmcdonate.config.PluginConfig
@@ -65,6 +66,7 @@ class BankPollService(
         for (order in expired) {
             if (bankPaymentDao.markFailed(order.referenceCode, now) == 1) {
                 logger.warn("Bank order ${order.referenceCode} timed out; marked FAILED.")
+                KingMCDonateContext.activityLogOrNull?.log("TXN", "bank FAILED ref=${order.referenceCode} reason=timeout")
                 notifyExpired(order.playerUuid)
                 onFailed(order.playerUuid, order.amount, order.referenceCode, "expired")
             }

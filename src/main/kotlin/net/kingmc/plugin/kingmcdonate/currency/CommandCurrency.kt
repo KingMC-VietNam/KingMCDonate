@@ -28,7 +28,7 @@ class CommandCurrency(
         val playerName = Bukkit.getOfflinePlayer(uuid).name ?: uuid.toString()
         val replacements = mapOf("player" to playerName, "amount" to amount.toString())
         scheduler.runNextTick {
-            RewardCommands.run(commands, uuid, playerName, replacements, scheduler, logger)
+            RewardCommands.run(commands, uuid, playerName, replacements, scheduler, logger, source = "currency")
         }
     }
 

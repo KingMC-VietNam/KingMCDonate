@@ -1,5 +1,6 @@
 package net.kingmc.plugin.kingmcdonate.payment.bank
 
+import net.kingmc.plugin.kingmcdonate.KingMCDonateContext
 import net.kingmc.plugin.kingmcdonate.config.MessageKeys
 import net.kingmc.plugin.kingmcdonate.config.Messages
 import net.kingmc.plugin.kingmcdonate.config.PluginConfig
@@ -69,6 +70,9 @@ class BankPaymentService(
 
         playerDao.upsert(uuid, player.name)
         val referenceCode = bankPaymentDao.insertPending(uuid, amount, provider.name, serverId, now, bank.prefix)
+        KingMCDonateContext.activityLogOrNull?.log(
+            "TXN", "bank created ref=$referenceCode player=${player.name} amount=$amount provider=${provider.name}",
+        )
         messages().send(
             player,
             MessageKeys.BANK_CREATED,

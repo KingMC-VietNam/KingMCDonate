@@ -15,7 +15,8 @@ import java.util.UUID
  * Shared by every donation method so a card and a bank top-up of the same amount run
  * the same rewards. Call from a region/main thread: `console:` lines dispatch inline,
  * while `player:` lines are re-scheduled onto the player's own region thread to stay
- * Folia-safe.
+ * Folia-safe. [run]'s `source` labels the activity-log line (e.g. `currency`, `milestone`)
+ * so operators can tell which subsystem executed each command.
  */
 object RewardCommands {
 
@@ -30,6 +31,7 @@ object RewardCommands {
         replacements: Map<String, String>,
         scheduler: Scheduler,
         logger: PluginLogger,
+        source: String = "reward",
     ) {
         if (commands.isEmpty()) return
         val console = Bukkit.getConsoleSender()
@@ -43,7 +45,7 @@ object RewardCommands {
             when (parsed.context) {
                 // Console commands are server-global and safe to dispatch on the current region thread.
                 Context.CONSOLE -> {
-                    KingMCDonateContext.activityLogOrNull?.log("CONSOLE", "reward for $playerName: $command")
+                    KingMCDonateContext.activityLogOrNull?.log("CONSOLE", "$source for $playerName: $command")
                     Bukkit.dispatchCommand(console, command)
                 }
                 // Player commands touch region-bound player state: run them on the player's own
@@ -54,7 +56,7 @@ object RewardCommands {
                         logger.debug { "Reward command skipped (player $playerName offline): $command" }
                         continue
                     }
-                    KingMCDonateContext.activityLogOrNull?.log("PLAYER", "reward as $playerName: $command")
+                    KingMCDonateContext.activityLogOrNull?.log("PLAYER", "$source as $playerName: $command")
                     scheduler.runAtEntity(player) { player.performCommand(command) }
                 }
             }
