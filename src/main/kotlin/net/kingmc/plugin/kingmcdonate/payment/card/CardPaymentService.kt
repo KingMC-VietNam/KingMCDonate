@@ -132,8 +132,12 @@ class CardPaymentService(
             PaymentStatus.FAILED -> {
                 cardPaymentDao.resolve(referenceCode, PaymentStatus.FAILED, 0, System.currentTimeMillis())
                 logger.debug { "Card FAILED ref=$referenceCode: ${outcome.message}" }
-                val reason = outcome.message.ifBlank { messages().get(MessageKeys.CARD_REASON_GENERIC) }
-                message(uuid, MessageKeys.CARD_FAILED, "reason" to reason)
+                if (outcome.wrongDenomination) {
+                    message(uuid, MessageKeys.CARD_WRONG_DENOMINATION)
+                } else {
+                    val reason = outcome.message.ifBlank { messages().get(MessageKeys.CARD_REASON_GENERIC) }
+                    message(uuid, MessageKeys.CARD_FAILED, "reason" to reason)
+                }
                 onFailed(uuid, declaredAmount, referenceCode, outcome.message.ifBlank { "failed" })
             }
             PaymentStatus.PENDING -> Unit

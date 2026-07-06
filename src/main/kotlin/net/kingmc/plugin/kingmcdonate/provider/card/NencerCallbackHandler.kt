@@ -48,7 +48,7 @@ class NencerCallbackHandler(
         val recognized = q["value"]?.toLongOrNull()
         val message = q["message"].orEmpty()
         val transactionId = q["trans_id"]
-        val outcome = CardOutcome(mapStatus(status), transactionId, recognized, message)
+        val outcome = CardOutcome(mapStatus(status), transactionId, recognized, message, wrongDenomination = status == STATUS_WRONG_PRICE)
 
         deps.logger.debug { "$providerKey callback ref=$reference status=$status -> ${outcome.status}" }
         KingMCDonateContext.activityLogOrNull?.log(

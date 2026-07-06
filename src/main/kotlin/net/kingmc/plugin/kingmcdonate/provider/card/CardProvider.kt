@@ -33,12 +33,15 @@ data class CardRequest(
  * Uniform result of a submit or poll. [status] is always WAITING, SUCCESS or
  * FAILED; [recognizedAmount] is the value the gateway actually recognised (null
  * when the gateway returns none) so the payment layer can enforce amount matching.
+ * [wrongDenomination] marks a wrong-denomination failure so the player sees the
+ * localized "wrong denomination" notice instead of the gateway's raw message.
  */
 data class CardOutcome(
     val status: PaymentStatus,
     val transactionId: String?,
     val recognizedAmount: Long?,
     val message: String,
+    val wrongDenomination: Boolean = false,
 )
 
 /**
