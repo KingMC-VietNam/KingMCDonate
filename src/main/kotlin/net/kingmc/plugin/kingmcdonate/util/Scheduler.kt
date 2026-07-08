@@ -25,11 +25,6 @@ open class Scheduler(private val foliaLib: FoliaLib?) {
         ioExecutor.execute(task)
     }
 
-    /** Short off-main async work via the platform scheduler. */
-    open fun runAsync(task: Runnable) {
-        impl.runAsync { task.run() }
-    }
-
     /** Global, non-player-bound work on the next tick (GlobalRegionScheduler on Folia). */
     open fun runNextTick(task: Runnable) {
         impl.runNextTick { task.run() }

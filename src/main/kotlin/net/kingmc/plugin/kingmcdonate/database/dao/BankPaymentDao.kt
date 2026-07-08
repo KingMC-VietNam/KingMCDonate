@@ -13,9 +13,10 @@ import java.util.UUID
  * update run inside the confirmation transaction (so it shares one transaction
  * with the processed-tx insert and the totals upsert), and the external point
  * credit is gated by a separate conditional `reward_applied` flip so a reconcile
- * pass can credit at most once.
+ * pass can credit at most once. Reference/history/reconcile/claim queries are
+ * shared via [PaymentDao].
  */
-class BankPaymentDao(database: Database) : Dao(database) {
+class BankPaymentDao(database: Database) : PaymentDao<BankPayment>(database, "bank_payments") {
 
     /** Insert a fresh PENDING order and return its network-unique reference code. */
     fun insertPending(
@@ -48,14 +49,6 @@ class BankPaymentDao(database: Database) : Dao(database) {
             }
         }
 
-    /** Load an order by reference, whatever its status (the confirmation path branches on it). */
-    fun findByReference(referenceCode: String): BankPayment? = withConnection { conn ->
-        conn.prepareStatement("SELECT * FROM bank_payments WHERE reference_code = ?").use { ps ->
-            ps.setString(1, referenceCode)
-            ps.executeQuery().use { rs -> if (rs.next()) rs.toBankPayment() else null }
-        }
-    }
-
     /** PENDING orders owned by [serverId], oldest first, for polling/timeout. */
     fun findPendingByServer(serverId: String): List<BankPayment> =
         findByServerAndStatus(serverId, PaymentStatus.PENDING)
@@ -70,31 +63,7 @@ class BankPaymentDao(database: Database) : Dao(database) {
             ps.setString(2, PaymentStatus.FAILED.storageValue)
             ps.setLong(3, since)
             ps.setInt(4, MAX_BATCH)
-            ps.executeQuery().use { rs -> rs.mapAll { toBankPayment() } }
-        }
-    }
-
-    /** Most recent [limit] orders for a player, newest first (history). */
-    fun findByPlayer(playerUuid: UUID, limit: Int): List<BankPayment> = withConnection { conn ->
-        conn.prepareStatement(
-            "SELECT * FROM bank_payments WHERE player_uuid = ? ORDER BY created_at DESC LIMIT ?",
-        ).use { ps ->
-            ps.setString(1, playerUuid.toString())
-            ps.setInt(2, limit)
-            ps.executeQuery().use { rs -> rs.mapAll { toBankPayment() } }
-        }
-    }
-
-    /** SUCCESS orders owned by [serverId] whose external credit has not been applied yet (reconcile). */
-    fun findSuccessUnrewardedByServer(serverId: String): List<BankPayment> = withConnection { conn ->
-        conn.prepareStatement(
-            "SELECT * FROM bank_payments WHERE owner_server = ? AND status = ? AND reward_applied = 0 " +
-                "ORDER BY created_at LIMIT ?",
-        ).use { ps ->
-            ps.setString(1, serverId)
-            ps.setString(2, PaymentStatus.SUCCESS.storageValue)
-            ps.setInt(3, MAX_BATCH)
-            ps.executeQuery().use { rs -> rs.mapAll { toBankPayment() } }
+            ps.executeQuery().use { rs -> rs.mapAll { toModel() } }
         }
     }
 
@@ -128,21 +97,6 @@ class BankPaymentDao(database: Database) : Dao(database) {
         }
     }
 
-    /**
-     * Conditionally claim the external-reward right: flip `reward_applied` 0 -> 1.
-     * Returns 1 for the single winner, 0 for everyone else, so the point credit
-     * runs at most once across the confirm and any reconcile pass.
-     */
-    fun claimRewardApplied(referenceCode: String, now: Long): Int = withConnection { conn ->
-        conn.prepareStatement(
-            "UPDATE bank_payments SET reward_applied = 1, updated_at = ? WHERE reference_code = ? AND reward_applied = 0",
-        ).use { ps ->
-            ps.setLong(1, now)
-            ps.setString(2, referenceCode)
-            ps.executeUpdate()
-        }
-    }
-
     private fun findByServerAndStatus(serverId: String, status: PaymentStatus): List<BankPayment> =
         withConnection { conn ->
             conn.prepareStatement(
@@ -151,11 +105,11 @@ class BankPaymentDao(database: Database) : Dao(database) {
                 ps.setString(1, serverId)
                 ps.setString(2, status.storageValue)
                 ps.setInt(3, MAX_BATCH)
-                ps.executeQuery().use { rs -> rs.mapAll { toBankPayment() } }
+                ps.executeQuery().use { rs -> rs.mapAll { toModel() } }
             }
         }
 
-    private fun ResultSet.toBankPayment() = BankPayment(
+    override fun ResultSet.toModel() = BankPayment(
         id = getLong("id"),
         playerUuid = UUID.fromString(getString("player_uuid")),
         amount = getLong("amount"),
@@ -169,9 +123,4 @@ class BankPaymentDao(database: Database) : Dao(database) {
         createdAt = getLong("created_at"),
         updatedAt = getLong("updated_at"),
     )
-
-    companion object {
-        private const val REFERENCE_RETRIES = 5
-        private const val MAX_BATCH = 200
-    }
 }

@@ -13,6 +13,7 @@ import net.kingmc.plugin.kingmcdonate.payment.Donation
 import net.kingmc.plugin.kingmcdonate.payment.DonationSuccessService
 import net.kingmc.plugin.kingmcdonate.payment.model.CardPayment
 import net.kingmc.plugin.kingmcdonate.payment.model.PaymentStatus
+import net.kingmc.plugin.kingmcdonate.payment.reward.RewardGate
 import net.kingmc.plugin.kingmcdonate.provider.card.CardOutcome
 import net.kingmc.plugin.kingmcdonate.provider.card.CardProviderRegistry
 import net.kingmc.plugin.kingmcdonate.provider.card.CardRequest
@@ -46,6 +47,8 @@ class CardPaymentService(
 ) {
 
     private class NotResolvableException : RuntimeException()
+
+    private val rewardGate = RewardGate(currency, donationSuccess, logger)
 
     /** Called when an order is closed as failed (gateway rejection or timeout). Notification only. */
     var onFailed: (uuid: UUID, amountVnd: Long, referenceCode: String, reason: String) -> Unit = { _, _, _, _ -> }
@@ -228,18 +231,12 @@ class CardPaymentService(
      * (success message + reward commands via the outbox, milestones, first-topup, broadcast, Discord).
      */
     private fun applyReward(referenceCode: String, uuid: UUID, name: String?, declaredAmount: Long, point: Long, provider: String) {
-        if (cardPaymentDao.claimRewardApplied(referenceCode, System.currentTimeMillis()) != 1) {
-            logger.debug { "Card $referenceCode: reward already applied; skipping credit." }
-            return
+        rewardGate.applyOnce(
+            "Card $referenceCode", uuid, point,
+            claim = { cardPaymentDao.claimRewardApplied(referenceCode, System.currentTimeMillis()) },
+        ) {
+            Donation(uuid, name, METHOD_CARD, declaredAmount, point, referenceCode, MessageKeys.CARD_SUCCESS, provider)
         }
-        try {
-            currency.active.give(uuid, point)
-        } catch (e: Exception) {
-            logger.error("Card $referenceCode: reward credit failed uuid=$uuid point=$point; reconcile manually.", e)
-        }
-        donationSuccess.onSuccess(
-            Donation(uuid, name, METHOD_CARD, declaredAmount, point, referenceCode, MessageKeys.CARD_SUCCESS, provider),
-        )
     }
 
     private fun message(uuid: UUID, key: String, vararg vars: Pair<String, String>) {

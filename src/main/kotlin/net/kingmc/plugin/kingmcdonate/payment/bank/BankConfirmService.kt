@@ -13,6 +13,7 @@ import net.kingmc.plugin.kingmcdonate.payment.Donation
 import net.kingmc.plugin.kingmcdonate.payment.DonationSuccessService
 import net.kingmc.plugin.kingmcdonate.payment.model.BankPayment
 import net.kingmc.plugin.kingmcdonate.payment.model.PaymentStatus
+import net.kingmc.plugin.kingmcdonate.payment.reward.RewardGate
 import net.kingmc.plugin.kingmcdonate.provider.bank.BankConfirmation
 import net.kingmc.plugin.kingmcdonate.promo.PromoService
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger
@@ -42,6 +43,8 @@ class BankConfirmService(
 ) {
 
     private class NotPendingException : RuntimeException()
+
+    private val rewardGate = RewardGate(currency, donationSuccess, logger)
 
     /** Route a confirmed transfer: branch on the order's current status. */
     fun confirm(confirmation: BankConfirmation) {
@@ -107,19 +110,13 @@ class BankConfirmService(
 
     /** Gate the external reward so confirm and any reconcile pass together apply it at most once. */
     private fun applyReward(order: BankPayment, point: Long) {
-        if (bankPaymentDao.claimRewardApplied(order.referenceCode, System.currentTimeMillis()) != 1) {
-            logger.debug { "Bank ${order.referenceCode}: reward already applied; skipping credit." }
-            return
+        rewardGate.applyOnce(
+            "Bank ${order.referenceCode}", order.playerUuid, point,
+            claim = { bankPaymentDao.claimRewardApplied(order.referenceCode, System.currentTimeMillis()) },
+        ) {
+            val name = playerDao.findName(order.playerUuid)
+            Donation(order.playerUuid, name, METHOD_BANK, order.amount, point, order.referenceCode, MessageKeys.BANK_SUCCESS, order.provider)
         }
-        try {
-            currency.active.give(order.playerUuid, point)
-        } catch (e: Exception) {
-            logger.error("Bank ${order.referenceCode}: point credit failed uuid=${order.playerUuid}; reconcile manually.", e)
-        }
-        val name = playerDao.findName(order.playerUuid)
-        donationSuccess.onSuccess(
-            Donation(order.playerUuid, name, METHOD_BANK, order.amount, point, order.referenceCode, MessageKeys.BANK_SUCCESS, order.provider),
-        )
     }
 
     private fun lateTransfer(order: BankPayment, confirmation: BankConfirmation) {

@@ -145,6 +145,58 @@ class KingMCDonate : JavaPlugin() {
             pluginLogger.warn("server-id is 'default'; set a unique server-id per node before running multi-server.")
         }
 
+        val infra = buildInfrastructure(config)
+
+        PlaceholderApiHook.install(pluginLogger)
+        val guiManager = GuiManager(scheduler)
+        val menuRegistry = MenuRegistry(this, pluginLogger).apply { load() }
+        val menus = MenuService(menuRegistry, guiManager, pluginLogger)
+        this.menuRegistry = menuRegistry
+        this.guiManager = guiManager
+
+        val bedrockForms = createBedrockForms()
+
+        val card = setupCard(infra.http, infra.database, infra.currency, menus, infra.promo, donationSuccess, bedrockForms)
+        val bank = setupBank(infra.http, infra.database, infra.currency, infra.promo, donationSuccess)
+        startWebhookServer(config, listOfNotNull(card.webhookHandler, bank.webhookHandler))
+        // Reload rebuilds the server so a new secret / host / port / base-path / enabled / mode applies live.
+        webhookReload = {
+            webhookServer?.stop()
+            webhookServer = null
+            startWebhookServer(
+                configManager.config,
+                listOfNotNull(
+                    cardWebhookHandler(card.providers, card.cardPaymentDao, card.service),
+                    bankWebhookHandler(bank.providers, bank.bankPaymentDao, bank.confirmService),
+                ),
+            )
+        }
+
+        val eventPublisher = wireFailureEvents(card, bank)
+        val manualCredit = ManualCreditService(
+            infra.database, card.cardPaymentDao, bank.bankPaymentDao, PlayerTotalsDao(infra.database), PlayerDao(infra.database),
+            infra.currency, donationSuccess, scheduler, pluginLogger, configRef,
+        )
+
+        setupEngagement(infra.http, infra.database, infra.rewardDelivery, infra.promo, donationSuccess, card.cardPaymentDao, eventPublisher, manualCredit, menus, bedrockForms)
+        registerCommands(infra.currency, card, bank, menus, infra.database, manualCredit, bedrockForms)
+        registerListenersAndStart(guiManager, card, bank, infra.rewardDelivery)
+
+        pluginLogger.info("KingMCDonate enabled (platform: ${platformName()}).")
+        pluginLogger.debug { "Bootstrap complete; config + database + currency + card + bank ready." }
+    }
+
+    /** Shared infrastructure built once and threaded into the subsystem setup steps. */
+    private class Infrastructure(
+        val database: Database,
+        val currency: CurrencyRegistry,
+        val http: Http,
+        val rewardDelivery: RewardDeliveryService,
+        val promo: PromoService,
+    )
+
+    /** Build the activity log, database, currency, HTTP client and the post-success service. */
+    private fun buildInfrastructure(config: PluginConfig): Infrastructure {
         val activityLog = ActivityLog.create(
             dataFolder,
             config.activityLog.enabled,
@@ -177,7 +229,6 @@ class KingMCDonate : JavaPlugin() {
         val rewardDelivery = RewardDeliveryService(
             PendingRewardDao(database), scheduler, pluginLogger, configRef, messagesRef,
         )
-
         val promo = PromoService { configManager.promo }
         val broadcaster = SuccessBroadcaster(scheduler, configRef)
         // Hooks default to no-ops; setupEngagement attaches the real ones once milestone/discord/leaderboard exist.
@@ -188,49 +239,35 @@ class KingMCDonate : JavaPlugin() {
             config = configRef,
             broadcaster = broadcaster::broadcast,
         )
+        return Infrastructure(database, currency, http, rewardDelivery, promo)
+    }
 
-        PlaceholderApiHook.install(pluginLogger)
-        val guiManager = GuiManager(scheduler)
-        val menuRegistry = MenuRegistry(this, pluginLogger).apply { load() }
-        val menus = MenuService(menuRegistry, guiManager, pluginLogger)
-        this.menuRegistry = menuRegistry
-        this.guiManager = guiManager
-
-        // Bedrock forms are optional: only touch the Floodgate-backed code when the plugin is present,
-        // so a server without Floodgate never loads the Floodgate/Cumulus classes (no NoClassDefFoundError).
-        val bedrockForms: BedrockForms? = if (server.pluginManager.getPlugin("floodgate") != null) {
+    /**
+     * Bedrock forms are optional: only touch the Floodgate-backed code when the plugin is present,
+     * so a server without Floodgate never loads the Floodgate/Cumulus classes (no NoClassDefFoundError).
+     */
+    private fun createBedrockForms(): BedrockForms? =
+        if (server.pluginManager.getPlugin("floodgate") != null) {
             BedrockForms.create().also { if (it.isAvailable) pluginLogger.info("Floodgate detected; Bedrock forms enabled.") }
         } else {
             null
         }
 
-        val card = setupCard(http, database, currency, menus, promo, donationSuccess, bedrockForms)
-        val bank = setupBank(http, database, currency, promo, donationSuccess)
-        startWebhookServer(config, listOfNotNull(card.webhookHandler, bank.webhookHandler))
-        // Reload rebuilds the server so a new secret / host / port / base-path / enabled / mode applies live.
-        webhookReload = {
-            webhookServer?.stop()
-            webhookServer = null
-            startWebhookServer(
-                configManager.config,
-                listOfNotNull(
-                    cardWebhookHandler(card.providers, card.cardPaymentDao, card.service),
-                    bankWebhookHandler(bank.providers, bank.bankPaymentDao, bank.confirmService),
-                ),
-            )
-        }
-
-        // Fire the public Bukkit events off the existing hooks (attach, do not replace them).
+    /** Fire the public Bukkit failure events off the existing hooks (attach, do not replace them). */
+    private fun wireFailureEvents(card: CardSubsystem, bank: BankSubsystem): KmdEventPublisher {
         val eventPublisher = KmdEventPublisher(scheduler, pluginLogger)
         card.service.onFailed = { uuid, amount, ref, reason -> eventPublisher.fireFailed(uuid, "card", amount, ref, reason) }
         bank.pollService.onFailed = { uuid, amount, ref, reason -> eventPublisher.fireFailed(uuid, "bank", amount, ref, reason) }
-        val manualCredit = ManualCreditService(
-            database, card.cardPaymentDao, bank.bankPaymentDao, PlayerTotalsDao(database), PlayerDao(database),
-            currency, donationSuccess, scheduler, pluginLogger, configRef,
-        )
+        return eventPublisher
+    }
 
-        setupEngagement(http, database, rewardDelivery, promo, donationSuccess, card.cardPaymentDao, eventPublisher, manualCredit, menus, bedrockForms)
-        registerCommands(currency, card, bank, menus, database, manualCredit, bedrockForms)
+    /** Register the Bukkit listeners and start the reward/poll loops (the last bootstrap step). */
+    private fun registerListenersAndStart(
+        guiManager: GuiManager,
+        card: CardSubsystem,
+        bank: BankSubsystem,
+        rewardDelivery: RewardDeliveryService,
+    ) {
         server.pluginManager.registerEvents(guiManager, this)
         server.pluginManager.registerEvents(card.chatInput, this)
         server.pluginManager.registerEvents(RewardDeliveryListener(rewardDelivery), this)
@@ -239,9 +276,6 @@ class KingMCDonate : JavaPlugin() {
         rewardDelivery.start()
         card.pollService.start()
         bank.pollService.start()
-
-        pluginLogger.info("KingMCDonate enabled (platform: ${platformName()}).")
-        pluginLogger.debug { "Bootstrap complete; config + database + currency + card + bank ready." }
     }
 
     /** Builds the card top-up subsystem: provider registry, DAOs, services and UI. */

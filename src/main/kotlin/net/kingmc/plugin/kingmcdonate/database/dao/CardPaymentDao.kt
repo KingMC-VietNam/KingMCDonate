@@ -12,8 +12,9 @@ import java.util.UUID
  * Persistence for `card_payments`. Resolution is done with a conditional update
  * guarded by the current status so a charge can never be rewarded twice; inserts
  * regenerate the reference code on a uniqueness collision rather than reusing one.
+ * Reference/history/reconcile/claim queries are shared via [PaymentDao].
  */
-class CardPaymentDao(database: Database) : Dao(database) {
+class CardPaymentDao(database: Database) : PaymentDao<CardPayment>(database, "card_payments") {
 
     /**
      * Insert a fresh PENDING record and return its unique reference code. Retries
@@ -109,34 +110,6 @@ class CardPaymentDao(database: Database) : Dao(database) {
             ps.executeUpdate()
         }
 
-    /**
-     * Conditionally claim the external-reward right: flip `reward_applied` 0 -> 1.
-     * Returns 1 for the single winner, 0 otherwise, so the point credit runs at most
-     * once across the resolving caller and any reconcile pass.
-     */
-    fun claimRewardApplied(referenceCode: String, now: Long): Int = withConnection { conn ->
-        conn.prepareStatement(
-            "UPDATE card_payments SET reward_applied = 1, updated_at = ? WHERE reference_code = ? AND reward_applied = 0",
-        ).use { ps ->
-            ps.setLong(1, now)
-            ps.setString(2, referenceCode)
-            ps.executeUpdate()
-        }
-    }
-
-    /** SUCCESS orders owned by [serverId] whose external credit has not been applied yet (reconcile). */
-    fun findSuccessUnrewardedByServer(serverId: String): List<CardPayment> = withConnection { conn ->
-        conn.prepareStatement(
-            "SELECT * FROM card_payments WHERE owner_server = ? AND status = ? AND reward_applied = 0 " +
-                "ORDER BY created_at LIMIT ?",
-        ).use { ps ->
-            ps.setString(1, serverId)
-            ps.setString(2, PaymentStatus.SUCCESS.storageValue)
-            ps.setInt(3, MAX_POLL_BATCH)
-            ps.executeQuery().use { rs -> rs.mapAll { toCardPayment() } }
-        }
-    }
-
     /** Oldest WAITING orders owned by [serverId], capped per pass, for poll/resume. */
     fun findWaitingByServer(serverId: String): List<CardPayment> = withConnection { conn ->
         conn.prepareStatement(
@@ -144,31 +117,12 @@ class CardPaymentDao(database: Database) : Dao(database) {
         ).use { ps ->
             ps.setString(1, serverId)
             ps.setString(2, PaymentStatus.WAITING.storageValue)
-            ps.setInt(3, MAX_POLL_BATCH)
-            ps.executeQuery().use { rs -> rs.mapAll { toCardPayment() } }
+            ps.setInt(3, MAX_BATCH)
+            ps.executeQuery().use { rs -> rs.mapAll { toModel() } }
         }
     }
 
-    /** Load a single order by its reference code, regardless of status (webhook lookup). */
-    fun findByReference(referenceCode: String): CardPayment? = withConnection { conn ->
-        conn.prepareStatement("SELECT * FROM card_payments WHERE reference_code = ?").use { ps ->
-            ps.setString(1, referenceCode)
-            ps.executeQuery().use { rs -> if (rs.next()) rs.toCardPayment() else null }
-        }
-    }
-
-    /** Most recent [limit] orders for a player, newest first (history). */
-    fun findByPlayer(playerUuid: UUID, limit: Int): List<CardPayment> = withConnection { conn ->
-        conn.prepareStatement(
-            "SELECT * FROM card_payments WHERE player_uuid = ? ORDER BY created_at DESC LIMIT ?",
-        ).use { ps ->
-            ps.setString(1, playerUuid.toString())
-            ps.setInt(2, limit)
-            ps.executeQuery().use { rs -> rs.mapAll { toCardPayment() } }
-        }
-    }
-
-    private fun ResultSet.toCardPayment() = CardPayment(
+    override fun ResultSet.toModel() = CardPayment(
         id = getLong("id"),
         playerUuid = UUID.fromString(getString("player_uuid")),
         playerName = getString("player_name"),
@@ -185,9 +139,4 @@ class CardPaymentDao(database: Database) : Dao(database) {
         createdAt = getLong("created_at"),
         updatedAt = getLong("updated_at"),
     )
-
-    companion object {
-        private const val REFERENCE_RETRIES = 5
-        private const val MAX_POLL_BATCH = 200
-    }
 }

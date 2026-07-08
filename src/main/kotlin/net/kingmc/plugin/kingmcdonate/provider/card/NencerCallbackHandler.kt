@@ -48,7 +48,7 @@ class NencerCallbackHandler(
         val recognized = q["value"]?.toLongOrNull()
         val message = q["message"].orEmpty()
         val transactionId = q["trans_id"]
-        val outcome = CardOutcome(mapStatus(status), transactionId, recognized, message, wrongDenomination = status == STATUS_WRONG_PRICE)
+        val outcome = CardOutcome(mapStatus(status), transactionId, recognized, message, wrongDenomination = status == NencerStatus.WRONG_PRICE)
 
         deps.logger.debug { "$providerKey callback ref=$reference status=$status -> ${outcome.status}" }
         KingMCDonateContext.activityLogOrNull?.log(
@@ -66,18 +66,9 @@ class NencerCallbackHandler(
      * failing a card that may have been charged.
      */
     private fun mapStatus(status: Int?): PaymentStatus = when (status) {
-        STATUS_SUCCESS -> PaymentStatus.SUCCESS
-        STATUS_WRONG_PRICE, STATUS_ERROR, STATUS_USED -> PaymentStatus.FAILED
-        STATUS_MAINTENANCE, STATUS_PENDING -> PaymentStatus.WAITING
+        NencerStatus.SUCCESS -> PaymentStatus.SUCCESS
+        NencerStatus.WRONG_PRICE, NencerStatus.ERROR, NencerStatus.USED -> PaymentStatus.FAILED
+        NencerStatus.MAINTENANCE, NencerStatus.PENDING -> PaymentStatus.WAITING
         else -> PaymentStatus.WAITING
-    }
-
-    companion object {
-        private const val STATUS_SUCCESS = 1
-        private const val STATUS_WRONG_PRICE = 2
-        private const val STATUS_ERROR = 3
-        private const val STATUS_MAINTENANCE = 4
-        private const val STATUS_PENDING = 99
-        private const val STATUS_USED = 100
     }
 }

@@ -8,6 +8,7 @@ import net.kingmc.plugin.kingmcdonate.database.dao.BankPaymentDao
 import net.kingmc.plugin.kingmcdonate.database.dao.CardPaymentDao
 import net.kingmc.plugin.kingmcdonate.database.dao.PlayerDao
 import net.kingmc.plugin.kingmcdonate.database.dao.PlayerTotalsDao
+import net.kingmc.plugin.kingmcdonate.payment.reward.RewardGate
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger
 import net.kingmc.plugin.kingmcdonate.util.Scheduler
 import java.util.UUID
@@ -37,6 +38,8 @@ class ManualCreditService(
     enum class Bucket(val method: String) { CARD("card"), BANK("bank") }
 
     private class NotResolvableException : RuntimeException()
+
+    private val rewardGate = RewardGate(currency, donationSuccess, logger)
 
     /**
      * Record a SUCCESS manual credit for [uuid] and run the full reward path off-thread.
@@ -90,22 +93,17 @@ class ManualCreditService(
         point: Long,
         actor: String,
     ) {
-        val claimed = when (bucket) {
-            Bucket.CARD -> cardPaymentDao.claimRewardApplied(referenceCode, System.currentTimeMillis())
-            Bucket.BANK -> bankPaymentDao.claimRewardApplied(referenceCode, System.currentTimeMillis())
+        rewardGate.applyOnce(
+            "Manual credit $referenceCode", uuid, point,
+            claim = {
+                when (bucket) {
+                    Bucket.CARD -> cardPaymentDao.claimRewardApplied(referenceCode, System.currentTimeMillis())
+                    Bucket.BANK -> bankPaymentDao.claimRewardApplied(referenceCode, System.currentTimeMillis())
+                }
+            },
+        ) {
+            Donation(uuid, name, bucket.method, amount, point, referenceCode, MessageKeys.MANUAL_SUCCESS, MANUAL_PROVIDER, actor)
         }
-        if (claimed != 1) {
-            logger.debug { "Manual credit $referenceCode: reward already applied; skipping credit." }
-            return
-        }
-        try {
-            currency.active.give(uuid, point)
-        } catch (e: Exception) {
-            logger.error("Manual credit $referenceCode: reward credit failed uuid=$uuid point=$point; reconcile manually.", e)
-        }
-        donationSuccess.onSuccess(
-            Donation(uuid, name, bucket.method, amount, point, referenceCode, MessageKeys.MANUAL_SUCCESS, MANUAL_PROVIDER, actor),
-        )
     }
 
     companion object {

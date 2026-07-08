@@ -43,11 +43,6 @@ class Http(
     fun getBytes(url: String): ByteArray =
         execute(baseRequest(url).GET().build(), HttpResponse.BodyHandlers.ofByteArray())
 
-    /**
-     * Form POST. [retry] defaults true (safe for idempotent calls such as a status check);
-     * pass false for a charge-creating POST so a lost response is never re-sent (which could
-     * double-charge) — the caller reconciles such a request by polling instead.
-     */
     /** JSON POST (e.g. a Discord webhook). Retries IO/5xx like other calls. */
     fun postJson(url: String, json: String): String =
         execute(
@@ -58,6 +53,11 @@ class Http(
             HttpResponse.BodyHandlers.ofString(),
         )
 
+    /**
+     * Form POST. [retry] defaults true (safe for idempotent calls such as a status check);
+     * pass false for a charge-creating POST so a lost response is never re-sent (which could
+     * double-charge) — the caller reconciles such a request by polling instead.
+     */
     fun postForm(url: String, params: Map<String, String>, retry: Boolean = true): String =
         execute(
             baseRequest(url)

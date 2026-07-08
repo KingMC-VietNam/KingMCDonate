@@ -76,16 +76,16 @@ class NencerCardProvider(
         logger.debug { "$name $label ref=$ref status=$status value=$recognized" }
         return when (status) {
             // Confirm success only from a poll; on a submit, status 1 just acknowledges intake.
-            STATUS_SUCCESS ->
+            NencerStatus.SUCCESS ->
                 if (isCheck) CardOutcome(PaymentStatus.SUCCESS, ref, recognized, message)
                 else CardOutcome(PaymentStatus.WAITING, ref, recognized, message)
-            STATUS_PENDING -> CardOutcome(PaymentStatus.WAITING, ref, recognized, message)
+            NencerStatus.PENDING -> CardOutcome(PaymentStatus.WAITING, ref, recognized, message)
             // Wrong denomination (card lost): flag it so the player sees the localized notice, not the
             // gateway's raw message (which can mention gateway-side penalties like "-50%").
-            STATUS_WRONG_PRICE -> CardOutcome(PaymentStatus.FAILED, ref, recognized, message, wrongDenomination = true)
+            NencerStatus.WRONG_PRICE -> CardOutcome(PaymentStatus.FAILED, ref, recognized, message, wrongDenomination = true)
             // Other terminal failures (hard gateway error, already-used card): surface the gateway's own
             // (Vietnamese) message; the payment layer localizes when it is blank.
-            STATUS_ERROR, STATUS_USED -> CardOutcome(PaymentStatus.FAILED, ref, recognized, message)
+            NencerStatus.ERROR, NencerStatus.USED -> CardOutcome(PaymentStatus.FAILED, ref, recognized, message)
             // Unrecognized or missing status: do not fail a possibly-charged card. Keep it WAITING so the
             // poll service re-checks (an undocumented "busy"/overload code resolves on a later pass; a truly
             // dead order is closed by the timeout sweep).
@@ -105,11 +105,5 @@ class NencerCardProvider(
 
         private const val COMMAND_CHARGE = "charging"
         private const val COMMAND_CHECK = "check"
-
-        private const val STATUS_SUCCESS = 1
-        private const val STATUS_WRONG_PRICE = 2
-        private const val STATUS_ERROR = 3
-        private const val STATUS_PENDING = 99
-        private const val STATUS_USED = 100
     }
 }

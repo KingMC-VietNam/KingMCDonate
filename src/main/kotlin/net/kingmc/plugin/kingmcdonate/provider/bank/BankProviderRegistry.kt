@@ -1,41 +1,24 @@
 package net.kingmc.plugin.kingmcdonate.provider.bank
 
+import net.kingmc.plugin.kingmcdonate.provider.ProviderRegistry
 import net.kingmc.plugin.kingmcdonate.util.Http
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger
-import org.bukkit.configuration.file.YamlConfiguration
 import java.io.File
 
 /**
- * Selects the active [BankProvider] from config and rebuilds it on reload, mirroring
- * the card and currency registries. The [factory] returns null when credentials are
- * missing or placeholder; selection is fail-loud — an unusable provider yields
- * [UnavailableBankProvider], so the payment layer blocks bank intake instead of
- * issuing QR codes against a misconfigured gateway.
+ * Selects the active [BankProvider] from config and rebuilds it on reload. Selection is
+ * fail-loud — an unusable provider yields [UnavailableBankProvider], so the payment layer
+ * blocks bank intake instead of issuing QR codes against a misconfigured gateway.
  */
 class BankProviderRegistry(
-    private val logger: PluginLogger,
-    private val factory: (String) -> BankProvider?,
-) {
+    logger: PluginLogger,
+    factory: (String) -> BankProvider?,
+) : ProviderRegistry<BankProvider>(logger, factory, UnavailableBankProvider) {
 
-    @Volatile
-    lateinit var active: BankProvider
-        private set
+    override fun activeLog(provider: BankProvider) = "Bank provider active: ${provider.name}"
 
-    val isAvailable: Boolean get() = active !== UnavailableBankProvider
-
-    fun load(providerName: String) {
-        active = resolve(providerName)
-    }
-
-    /** Pure selection: build the requested provider or fall back to the unavailable sentinel. */
-    fun resolve(providerName: String): BankProvider {
-        factory(providerName)?.let {
-            logger.debug { "Bank provider active: ${it.name}" }
-            return it
-        }
-        logger.warn("Bank provider '$providerName' is unavailable — bank top-up is blocked until this is fixed.")
-        return UnavailableBankProvider
-    }
+    override fun unavailableLog(providerName: String) =
+        "Bank provider '$providerName' is unavailable — bank top-up is blocked until this is fixed."
 
     companion object {
         private const val SEPAY_ACCOUNT_PLACEHOLDER = "YOUR_BANK_ACCOUNT_NUMBER"
@@ -44,7 +27,7 @@ class BankProviderRegistry(
         /** Production factory: reads `providers/<name>.yml` and builds the adapter only with real credentials. */
         fun defaultFactory(http: Http, dataFolder: File, logger: PluginLogger): (String) -> BankProvider? =
             factory@{ name ->
-                val yml = providerConfig(dataFolder, name) ?: return@factory null
+                val yml = ProviderRegistry.providerConfig(dataFolder, name) ?: return@factory null
                 when (name) {
                     SePayBankProvider.NAME -> {
                         val account = yml.getString("account-number").orEmpty()
@@ -69,10 +52,5 @@ class BankProviderRegistry(
                     else -> null
                 }
             }
-
-        private fun providerConfig(dataFolder: File, name: String): YamlConfiguration? {
-            val file = File(dataFolder, "providers/$name.yml")
-            return if (file.exists()) YamlConfiguration.loadConfiguration(file) else null
-        }
     }
 }
