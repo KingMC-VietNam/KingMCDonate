@@ -41,7 +41,7 @@ class GiveSubCommand(
         }
     }
 
-    /** Resolve the target off-thread: KMD-known players first, else fall back to a (possibly blocking) offline lookup. */
+    /** Resolve the target: KMD-known players first, else the Paper usercache (never a blocking web lookup). */
     private fun resolveAndGive(sender: CommandSender, a: GiveParse.Ok) {
         val known = playerDao.findUuid(a.name)
         if (known != null) {
@@ -49,8 +49,8 @@ class GiveSubCommand(
             finish(sender, a, known, online?.name ?: playerDao.findName(known) ?: a.name, online != null)
             return
         }
-        val target = Bukkit.getOfflinePlayer(a.name)
-        if (target.name == null || (!target.isOnline && !target.hasPlayedBefore())) {
+        val target = Bukkit.getOfflinePlayerIfCached(a.name)
+        if (target == null || (!target.isOnline && !target.hasPlayedBefore())) {
             feedback(sender, MessageKeys.GIVE_NEVER_JOINED, "player" to a.name)
             return
         }

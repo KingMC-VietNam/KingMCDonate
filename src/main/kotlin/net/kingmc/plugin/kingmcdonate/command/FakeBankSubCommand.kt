@@ -21,12 +21,12 @@ class FakeBankSubCommand(
             messages().send(sender, MessageKeys.FAKEBANK_USAGE)
             return
         }
-        val target = Bukkit.getOfflinePlayer(args[0])
-        val name = target.name
-        if (name == null || (!target.isOnline && !target.hasPlayedBefore())) {
+        val target = Bukkit.getOfflinePlayerIfCached(args[0])
+        if (target == null || (!target.isOnline && !target.hasPlayedBefore())) {
             messages().send(sender, MessageKeys.FAKECARD_PLAYER_NOT_FOUND, "player" to args[0])
             return
         }
+        val name = target.name ?: args[0]
         val amount = args[1].toLongOrNull()
         if (amount == null || amount <= 0) {
             messages().send(sender, MessageKeys.FAKEBANK_USAGE)

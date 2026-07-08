@@ -17,7 +17,7 @@ object CardHistoryChat {
 
     private const val LIMIT = 10
 
-    /** Resolve [targetName] (online first, else an offline lookup off-thread) then show their history. */
+    /** Resolve [targetName] (online first, else the Paper usercache) then show their history. */
     fun showByName(
         sender: CommandSender,
         targetName: String,
@@ -30,11 +30,12 @@ object CardHistoryChat {
             show(sender, online.uniqueId, cardPaymentDao, scheduler, messages)
             return
         }
-        scheduler.runIo {
-            @Suppress("DEPRECATION")
-            val uuid = Bukkit.getOfflinePlayer(targetName).uniqueId
-            show(sender, uuid, cardPaymentDao, scheduler, messages)
+        val cached = Bukkit.getOfflinePlayerIfCached(targetName)
+        if (cached == null) {
+            emit(sender, emptyList(), messages)
+            return
         }
+        show(sender, cached.uniqueId, cardPaymentDao, scheduler, messages)
     }
 
     fun show(
