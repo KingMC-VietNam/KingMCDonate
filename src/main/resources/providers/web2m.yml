@@ -1,0 +1,27 @@
+# ============================================================
+#  Web2M — cổng QR ngân hàng (API Bank V3, api.web2m.com)
+# ============================================================
+# Xác nhận giao dịch bằng cách poll lịch sử giao dịch V3 (outbound), và/hoặc webhook Web2M.
+# Lấy Token tại web2m.com. QR dùng bộ sinh ảnh VietQR công khai (qr.sepay.vn/img), không cần tài khoản SePay.
+
+# Số tài khoản ngân hàng nhận tiền — dùng cho cả URL API V3 lẫn ảnh QR.
+account-number: "YOUR_BANK_ACCOUNT_NUMBER"
+
+# Tên chủ tài khoản, hiển thị trong tin nhắn chuyển khoản thủ công (để trống thì ẩn dòng này).
+account-holder: ""
+
+# Ngân hàng: VCB | BIDV | BIDV_OPENAPI | MBBANK_OPENAPI | ACB | TECHCOMBANK | MBBANK_LSGD | MBBANK_NOTI | TPBANK
+bank-type: "ACB"
+
+# Mật khẩu ngân hàng cấu hình trên Web2M. Để trống với bank one-param (BIDV_OPENAPI, MBBANK_OPENAPI).
+password: ""
+
+# Token Web2M để gọi API Bank V3. KHÔNG commit token thật lên source code.
+token: "YOUR_WEB2M_TOKEN"
+
+# ----- Webhook (chỉ dùng khi bank.confirmation = "webhook" hoặc "both") -----
+# Cách xác thực webhook Web2M gửi tới: "bearer" (Authorization: Bearer <token>) | "none" (chỉ test).
+# Lưu ý: payload Web2M không có số tài khoản nhận nên không cross-check được — tính xác thực dựa hoàn toàn vào token này.
+webhook-auth: "bearer"
+# Access Token khớp cấu hình webhook trên Web2M.
+webhook-token: ""

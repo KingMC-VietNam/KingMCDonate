@@ -1,6 +1,7 @@
 package net.kingmc.plugin.kingmcdonate.config
 
 import net.kingmc.plugin.kingmcdonate.provider.bank.SePayBankProvider
+import net.kingmc.plugin.kingmcdonate.provider.bank.Web2MBankProvider
 import net.kingmc.plugin.kingmcdonate.provider.card.NencerCardProvider
 import org.bukkit.boss.BarColor
 import org.bukkit.boss.BarStyle
@@ -33,7 +34,7 @@ object ConfigValidator {
     private val DB_TYPES = setOf("sqlite", "mysql")
     private val CURRENCY_PROVIDERS = setOf("playerpoints", "command", "vault")
     private val CARD_PROVIDERS = setOf(NencerCardProvider.CARD2K, NencerCardProvider.THESIEURE)
-    private val BANK_PROVIDERS = setOf(SePayBankProvider.NAME)
+    private val BANK_PROVIDERS = setOf(SePayBankProvider.NAME, Web2MBankProvider.NAME)
     private val BAR_COLORS = BarColor.values().map { it.name }.toSet()
     private val BAR_STYLES = BarStyle.values().map { it.name }.toSet()
 

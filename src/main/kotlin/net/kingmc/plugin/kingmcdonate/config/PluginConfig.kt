@@ -85,7 +85,7 @@ class PluginConfig(root: ConfigurationSection) {
     }
 
     class BankConfig(section: ConfigurationSection?) {
-        /** Active bank gateway: `sepay`. Credentials live in `providers/<name>.yml`. */
+        /** Active bank gateway: `sepay` or `web2m`. Credentials live in `providers/<name>.yml`. */
         val provider: String = section?.getString("provider", "sepay")?.lowercase() ?: "sepay"
         /**
          * Transfer-content prefix shown to players, glued before the plain reference

@@ -23,6 +23,8 @@ class BankProviderRegistry(
     companion object {
         private const val SEPAY_ACCOUNT_PLACEHOLDER = "YOUR_BANK_ACCOUNT_NUMBER"
         private const val SEPAY_TOKEN_PLACEHOLDER = "YOUR_API_TOKEN"
+        private const val WEB2M_ACCOUNT_PLACEHOLDER = "YOUR_BANK_ACCOUNT_NUMBER"
+        private const val WEB2M_TOKEN_PLACEHOLDER = "YOUR_WEB2M_TOKEN"
 
         /** Production factory: reads `providers/<name>.yml` and builds the adapter only with real credentials. */
         fun defaultFactory(http: Http, dataFolder: File, logger: PluginLogger): (String) -> BankProvider? =
@@ -46,6 +48,26 @@ class BankProviderRegistry(
                             SePayBankProvider(
                                 http::get, account, bank, token, sandbox, logger,
                                 webhookAuth, webhookSecret, webhookApiKey, accountHolder,
+                            )
+                        }
+                    }
+                    Web2MBankProvider.NAME -> {
+                        val account = yml.getString("account-number").orEmpty()
+                        val bankType = BankType.parse(yml.getString("bank-type"))
+                        val password = yml.getString("password").orEmpty()
+                        val token = yml.getString("token").orEmpty()
+                        val accountHolder = yml.getString("account-holder").orEmpty()
+                        val webhookAuth = yml.getString("webhook-auth", "none").orEmpty()
+                        val webhookToken = yml.getString("webhook-token").orEmpty()
+                        if (account.isBlank() || account == WEB2M_ACCOUNT_PLACEHOLDER ||
+                            token.isBlank() || token == WEB2M_TOKEN_PLACEHOLDER ||
+                            bankType == null || (!bankType.oneParam && password.isBlank())
+                        ) {
+                            null
+                        } else {
+                            Web2MBankProvider(
+                                http::get, account, bankType, password, token, logger,
+                                accountHolder, webhookAuth, webhookToken,
                             )
                         }
                     }

@@ -57,6 +57,7 @@ class ConfigManager(private val plugin: JavaPlugin, private val logger: PluginLo
         saveDefault("providers/card2k.yml")
         saveDefault("providers/thesieure.yml")
         saveDefault("providers/sepay.yml")
+        saveDefault("providers/web2m.yml")
         saveDefault("mocnap.yml")
         saveDefault("mocnaptong.yml")
         saveDefault("khuyenmai.yml")
