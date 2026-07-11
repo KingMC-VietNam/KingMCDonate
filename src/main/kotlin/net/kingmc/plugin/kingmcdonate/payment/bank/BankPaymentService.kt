@@ -69,7 +69,10 @@ class BankPaymentService(
         val now = System.currentTimeMillis()
 
         playerDao.upsert(uuid, player.name)
-        val referenceCode = bankPaymentDao.insertPending(uuid, amount, provider.name, serverId, now, bank.prefix)
+        val referenceCode = bankPaymentDao.insertPending(uuid, amount, provider.name, serverId, now)
+        // What the player transfers as the content: the customizable prefix glued before the plain
+        // reference. The order stores only the plain ref; matching finds it by containment.
+        val content = bank.prefix + referenceCode
         KingMCDonateContext.activityLogOrNull?.log(
             "TXN", "bank created ref=$referenceCode player=${player.name} amount=$amount provider=${provider.name}",
         )
@@ -77,14 +80,14 @@ class BankPaymentService(
             player,
             MessageKeys.BANK_CREATED,
             "amount" to Text.formatMoney(amount),
-            "ref" to referenceCode,
+            "ref" to content,
         )
         logger.debug { "Bank open ref=$referenceCode uuid=$uuid amount=$amount provider=${provider.name}" }
 
         scheduler.runIo {
             try {
-                val qr = provider.createQr(amount, referenceCode)
-                sendManualTransfer(player, qr, amount, referenceCode)
+                val qr = provider.createQr(amount, content)
+                sendManualTransfer(player, qr, amount, content)
                 val mapBytes = QrImage.fetchMapBytes(http, qr.imageUrl, logger)
                 if (mapBytes != null) {
                     scheduler.runAtEntity(player) { qrRenderer.show(player, mapBytes) }
@@ -112,7 +115,7 @@ class BankPaymentService(
             val now = System.currentTimeMillis()
             playerDao.upsert(uuid, name)
             val referenceCode =
-                bankPaymentDao.insertPending(uuid, amount, FAKE_PROVIDER, config().serverId, now, config().bank.prefix)
+                bankPaymentDao.insertPending(uuid, amount, FAKE_PROVIDER, config().serverId, now)
             logger.debug { "fakebank ref=$referenceCode uuid=$uuid amount=$amount" }
             confirmService.confirm(BankConfirmation(referenceCode, "$FAKE_TX_PREFIX$referenceCode", amount))
         }

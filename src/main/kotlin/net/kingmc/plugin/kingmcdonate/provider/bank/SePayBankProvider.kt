@@ -17,10 +17,10 @@ import java.time.format.DateTimeFormatter
  * SePay gateway. The QR is a SePay-hosted VietQR image (`qr.sepay.vn/img`) pointing
  * at the receiving account with the reference carried as the transfer description.
  * Confirmation is by polling SePay API v2 (`GET {base}/transactions`, Bearer token):
- * each incoming transfer is matched to an order by SePay's extracted `code` when
- * present, otherwise by an exact `[A-Z0-9]` token in the content, plus an exact
- * amount. Matching never uses a loose substring, so a reference cannot match inside
- * a longer token.
+ * each incoming transfer is matched to an order when the transfer text (SePay's
+ * extracted `code` plus the content) contains the order's plain reference and the
+ * amount matches exactly. Fixed-length references keep one order from being a
+ * substring of another; the exact amount is the second guard.
  */
 class SePayBankProvider(
     private val httpGet: (String, Map<String, String>) -> String,
@@ -72,25 +72,18 @@ class SePayBankProvider(
     private fun formatDate(epochMillis: Long): String =
         DATE_FORMAT.format(Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()))
 
-    /** Pure matching: each incoming transfer maps to at most one order by code/token + exact amount. */
+    /** Pure matching: an incoming transfer confirms an order whose plain reference the transfer text contains, at the exact amount. */
     fun match(orders: List<BankPayment>, transactions: List<SePayTransaction>): List<BankConfirmation> {
-        val byReference = orders.associateBy { it.referenceCode }
         val confirmations = ArrayList<BankConfirmation>()
         for (tx in transactions) {
             if (!tx.transferType.equals("in", ignoreCase = true)) continue
             val txId = tx.id ?: continue
-            val candidates = referenceCandidates(tx)
-            val matched = candidates.firstNotNullOfOrNull { ref ->
-                byReference[ref]?.takeIf { it.amount == tx.amountIn }
-            } ?: continue
+            val haystack = SePayReference.searchText(tx.code, tx.content)
+            val matched = orders.firstOrNull { it.amount == tx.amountIn && haystack.contains(it.referenceCode) } ?: continue
             confirmations.add(BankConfirmation(matched.referenceCode, txId, tx.amountIn))
         }
         return confirmations
     }
-
-    /** Reference candidates from a transfer: the extracted code when present, else exact content tokens. */
-    private fun referenceCandidates(tx: SePayTransaction): List<String> =
-        SePayReference.candidates(tx.code, tx.content)
 
     private fun enc(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8)
 

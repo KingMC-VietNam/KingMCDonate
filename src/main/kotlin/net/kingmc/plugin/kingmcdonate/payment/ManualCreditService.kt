@@ -56,7 +56,7 @@ class ManualCreditService(
                     uuid, name, MANUAL_TYPE, amount, MANUAL_TYPE, MANUAL_TYPE, MANUAL_PROVIDER, config().serverId, now,
                 )
                 Bucket.BANK -> bankPaymentDao.insertPending(
-                    uuid, amount, MANUAL_PROVIDER, config().serverId, now, config().bank.prefix,
+                    uuid, amount, MANUAL_PROVIDER, config().serverId, now,
                 )
             }
             logger.debug { "Manual credit ref=$referenceCode uuid=$uuid bucket=${bucket.method} amount=$amount point=$point" }

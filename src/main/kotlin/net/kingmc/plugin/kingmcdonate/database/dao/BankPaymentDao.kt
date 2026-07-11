@@ -25,11 +25,10 @@ class BankPaymentDao(database: Database) : PaymentDao<BankPayment>(database, "ba
         provider: String,
         ownerServer: String,
         now: Long,
-        prefix: String = "",
     ): String =
         withConnection { conn ->
             retryOnCollision(REFERENCE_RETRIES) {
-                val code = prefix + ReferenceCode.generate()
+                val code = ReferenceCode.generate()
                 conn.prepareStatement(
                     "INSERT INTO bank_payments " +
                         "(player_uuid, amount, reference_code, status, provider, owner_server, " +
@@ -52,6 +51,24 @@ class BankPaymentDao(database: Database) : PaymentDao<BankPayment>(database, "ba
     /** PENDING orders owned by [serverId], oldest first, for polling/timeout. */
     fun findPendingByServer(serverId: String): List<BankPayment> =
         findByServerAndStatus(serverId, PaymentStatus.PENDING)
+
+    /**
+     * The oldest PENDING order whose plain reference is contained in [haystack] and whose
+     * amount equals [amount] — the webhook lookup, mirroring the poll match rule. `INSTR`
+     * is used (not `LIKE`/`||`) so the containment test is portable across SQLite and MySQL;
+     * both [haystack] and stored references are upper-case `[A-Z0-9]`, so case is moot.
+     */
+    fun findPendingByContainedReference(haystack: String, amount: Long): BankPayment? = withConnection { conn ->
+        conn.prepareStatement(
+            "SELECT * FROM bank_payments WHERE status = ? AND amount = ? AND INSTR(?, reference_code) > 0 " +
+                "ORDER BY created_at LIMIT 1",
+        ).use { ps ->
+            ps.setString(1, PaymentStatus.PENDING.storageValue)
+            ps.setLong(2, amount)
+            ps.setString(3, haystack)
+            ps.executeQuery().use { rs -> rs.mapAll { toModel() }.firstOrNull() }
+        }
+    }
 
     /** FAILED orders owned by [serverId] updated at or after [since] — matched so a late transfer is surfaced, not dropped. */
     fun findFailedByServerSince(serverId: String, since: Long): List<BankPayment> = withConnection { conn ->

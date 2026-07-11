@@ -63,48 +63,51 @@ class SePayBankProviderTest {
     }
 
     @Test
-    fun `exact token in content matches`() {
-        val orders = listOf(order("KMD7X9A2QP", 50_000))
-        val matches = provider().match(orders, listOf(tx("T1", content = "CK KMD7X9A2QP MUA POINT")))
+    fun `reference in content matches`() {
+        val orders = listOf(order("A1B2C3D4", 50_000))
+        val matches = provider().match(orders, listOf(tx("T1", content = "CK A1B2C3D4 MUA POINT")))
         assertEquals(1, matches.size)
-        assertEquals("KMD7X9A2QP", matches.first().referenceCode)
+        assertEquals("A1B2C3D4", matches.first().referenceCode)
         assertEquals("T1", matches.first().transactionId)
     }
 
     @Test
-    fun `prefixed reference matches whole via code field and content token`() {
-        val orders = listOf(order("KMDK8V2PK2WD9", 50_000))
-        val byCode = provider().match(orders, listOf(tx("T1", content = "noise", code = "KMDK8V2PK2WD9")))
-        val byContent = provider().match(orders, listOf(tx("T2", content = "CK KMDK8V2PK2WD9 NAP")))
-        assertEquals("KMDK8V2PK2WD9", byCode.first().referenceCode)
-        assertEquals("KMDK8V2PK2WD9", byContent.first().referenceCode)
+    fun `reference in code field or content both match`() {
+        val orders = listOf(order("A1B2C3D4", 50_000))
+        val byCode = provider().match(orders, listOf(tx("T1", content = "noise", code = "A1B2C3D4")))
+        val byContent = provider().match(orders, listOf(tx("T2", content = "CK A1B2C3D4 NAP")))
+        assertEquals("A1B2C3D4", byCode.first().referenceCode)
+        assertEquals("A1B2C3D4", byContent.first().referenceCode)
     }
 
     @Test
-    fun `extracted code matches when present`() {
-        val orders = listOf(order("KMD7X9A2QP", 50_000))
-        val matches = provider().match(orders, listOf(tx("T1", content = "noise", code = "KMD7X9A2QP")))
+    fun `a different order reference is not matched`() {
+        val orders = listOf(order("A1B2C3D4", 50_000), order("E5F6G7H8", 50_000))
+        val matches = provider().match(orders, listOf(tx("T1", content = "CK A1B2C3D4 NAP")))
         assertEquals(1, matches.size)
+        assertEquals("A1B2C3D4", matches.first().referenceCode)
     }
 
     @Test
-    fun `substring of a longer token does not match`() {
-        val orders = listOf(order("KMD1", 50_000))
-        val matches = provider().match(orders, listOf(tx("T1", content = "CK KMD12 abc")))
-        assertTrue(matches.isEmpty())
+    fun `reference matches even when the bank strips the space before it`() {
+        // Player content "UNG HO TT" + "A1B2C3D4"; the bank app dropped the space between them.
+        val orders = listOf(order("A1B2C3D4", 50_000))
+        val matches = provider().match(orders, listOf(tx("T1", content = "UNG HO TTA1B2C3D4")))
+        assertEquals(1, matches.size)
+        assertEquals("A1B2C3D4", matches.first().referenceCode)
     }
 
     @Test
     fun `outgoing transfer is ignored`() {
-        val orders = listOf(order("KMD7X9A2QP", 50_000))
-        val matches = provider().match(orders, listOf(tx("T1", transferType = "out", content = "KMD7X9A2QP")))
+        val orders = listOf(order("A1B2C3D4", 50_000))
+        val matches = provider().match(orders, listOf(tx("T1", transferType = "out", content = "A1B2C3D4")))
         assertTrue(matches.isEmpty())
     }
 
     @Test
     fun `amount mismatch is not matched`() {
-        val orders = listOf(order("KMD7X9A2QP", 50_000))
-        val matches = provider().match(orders, listOf(tx("T1", amountIn = 20_000, content = "KMD7X9A2QP")))
+        val orders = listOf(order("A1B2C3D4", 50_000))
+        val matches = provider().match(orders, listOf(tx("T1", amountIn = 20_000, content = "A1B2C3D4")))
         assertTrue(matches.isEmpty())
     }
 

@@ -116,9 +116,11 @@ bank:
   #   both    = vừa poll vừa nhận webhook (webhook cho nhanh, poll làm lưới an toàn) — không trao trùng.
   confirmation: "poll"
 
-  # Prefix đứng đầu MÃ GIAO DỊCH chuyển khoản (chỉ A-Z 0-9, viết HOA, không dấu/cách).
-  # PHẢI trùng với "mã thanh toán" (prefix) cấu hình trong dashboard SePay để SePay tự nhận
-  # diện giao dịch. Mã đầy đủ = prefix + 10 ký tự ngẫu nhiên (vd "KMD" -> "KMDK8V2PK2WD9").
+  # Nội dung chuyển khoản đứng TRƯỚC mã tham chiếu, tuỳ biến được (vd "UNG HO TT").
+  # Tự chuẩn hoá: viết HOA, chỉ giữ A-Z 0-9 và khoảng trắng (bỏ dấu tiếng Việt & ký tự lạ),
+  # gộp khoảng trắng, tối đa 11 ký tự. Người chơi thấy = prefix + mã 8 ký tự dính liền
+  # (vd "UNG HO TT" -> "UNG HO TTA1B2C3D4"). KHÔNG cần trùng "mã thanh toán" trên dashboard SePay;
+  # đối soát chỉ cần nội dung chuyển khoản CHỨA mã tham chiếu.
   prefix: "KMD"
 
   # Số point trao thưởng cho mỗi 1000đ chuyển khoản (point bank = số tiền/1000 × point-rate, làm tròn).

@@ -26,7 +26,9 @@ class SePayWebhookHandlerTest {
     private var confirmed: net.kingmc.plugin.kingmcdonate.provider.bank.BankConfirmation? = null
 
     private fun deps(found: BankPayment? = order) = BankWebhookDeps(
-        findByReference = { if (it == order.referenceCode) found else null },
+        findPendingByContainedReference = { haystack, amount ->
+            found?.takeIf { haystack.contains(it.referenceCode) && amount == it.amount }
+        },
         confirm = { confirmed = it },
         logger = logger,
     )
@@ -78,21 +80,17 @@ class SePayWebhookHandlerTest {
     }
 
     @Test
-    fun `prefers the candidate whose order amount matches the transfer`() {
+    fun `the amount selects the order when several references appear`() {
         val stale = order.copy(referenceCode = "KMDSTALE01", amount = 99_000)
         val correct = order.copy(referenceCode = "KMD7X9A2QP", amount = 50_000)
         val deps = BankWebhookDeps(
-            findByReference = { ref ->
-                when (ref) {
-                    "KMDSTALE01" -> stale
-                    "KMD7X9A2QP" -> correct
-                    else -> null
-                }
+            findPendingByContainedReference = { haystack, amount ->
+                listOf(stale, correct).firstOrNull { haystack.contains(it.referenceCode) && amount == it.amount }
             },
             confirm = { confirmed = it },
             logger = logger,
         )
-        // The stale token appears first in the content, but only the second matches the amount.
+        // Both references appear in the content, but only the second matches the transferred amount.
         val raw = body(amount = 50_000, content = "CK KMDSTALE01 KMD7X9A2QP NAP")
         SePayWebhookHandler("hmac", secret, "", "", deps).handle(hmacRequest(raw))
         assertEquals("KMD7X9A2QP", confirmed?.referenceCode)

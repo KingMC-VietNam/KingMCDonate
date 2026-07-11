@@ -15,6 +15,32 @@ class PluginConfigEngagementTest {
     }
 
     @Test
+    fun `bank prefix defaults to KMD`() {
+        assertEquals("KMD", config("prefix: \"\"\n").bank.prefix)
+    }
+
+    @Test
+    fun `bank prefix is uppercased and keeps single spaces`() {
+        assertEquals("UNG HO TT", config("bank:\n  prefix: \"ung ho tt\"\n").bank.prefix)
+    }
+
+    @Test
+    fun `bank prefix strips diacritics and special characters`() {
+        // "Nạp!" -> uppercase "NẠP!" -> drop everything outside [A-Z0-9 ] -> "NP"
+        assertEquals("NP", config("bank:\n  prefix: \"Nạp!\"\n").bank.prefix)
+    }
+
+    @Test
+    fun `bank prefix collapses and trims whitespace`() {
+        assertEquals("A B", config("bank:\n  prefix: \"  A   B  \"\n").bank.prefix)
+    }
+
+    @Test
+    fun `bank prefix is capped at eleven characters`() {
+        assertEquals("ABCDEFGHIJK", config("bank:\n  prefix: \"ABCDEFGHIJKLMNOP\"\n").bank.prefix)
+    }
+
+    @Test
     fun `defaults are applied when sections are absent`() {
         val c = config("prefix: \"\"\n")
         assertEquals("point", c.pointUnit)

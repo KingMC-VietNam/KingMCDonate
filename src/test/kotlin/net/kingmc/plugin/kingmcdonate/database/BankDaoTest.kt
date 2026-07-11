@@ -52,11 +52,21 @@ class BankDaoTest {
     }
 
     @Test
-    fun `reference code carries the configured prefix and is looked up whole`() {
-        val ref = bank.insertPending(UUID.randomUUID(), 50_000, "sepay", "node-a", 1_000, prefix = "KMD")
-        assertTrue(ref.startsWith("KMD"))
-        assertEquals(13, ref.length)
+    fun `reference code is a plain eight-char token and is looked up whole`() {
+        val ref = bank.insertPending(UUID.randomUUID(), 50_000, "sepay", "node-a", 1_000)
+        assertTrue(ref.matches(Regex("[A-Z0-9]{8}")))
         assertEquals(ref, bank.findByReference(ref)?.referenceCode)
+    }
+
+    @Test
+    fun `pending order is found when the haystack contains its reference at the exact amount`() {
+        val ref = bank.insertPending(UUID.randomUUID(), 50_000, "sepay", "node-a", 1_000)
+        // Contained (even glued to a prefix) at the right amount -> found.
+        assertEquals(ref, bank.findPendingByContainedReference("UNG HO TT$ref NAP", 50_000)?.referenceCode)
+        // Wrong amount -> not found.
+        assertNull(bank.findPendingByContainedReference("UNG HO TT$ref NAP", 20_000))
+        // Reference absent from the haystack -> not found.
+        assertNull(bank.findPendingByContainedReference("CK OTHER NAP", 50_000))
     }
 
     @Test

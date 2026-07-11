@@ -6,9 +6,9 @@ import org.junit.jupiter.api.Test
 class ReferenceCodeTest {
 
     @Test
-    fun `generated code is ten upper-case alphanumerics`() {
+    fun `generated code is eight upper-case alphanumerics`() {
         repeat(100) {
-            assertTrue(ReferenceCode.generate().matches(Regex("[A-Z0-9]{10}")))
+            assertTrue(ReferenceCode.generate().matches(Regex("[A-Z0-9]{8}")))
         }
     }
 

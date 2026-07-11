@@ -85,6 +85,24 @@ class DonationSuccessServiceTest {
     }
 
     @Test
+    fun `bank donation prepends configured prefix to ref in reward vars`() {
+        val cfg = config(
+            """
+            bank:
+              prefix: "KMD"
+            rewards:
+              commands:
+                "0":
+                  - "console: say {ref}"
+            """.trimIndent(),
+        )
+        val uuid = UUID.randomUUID()
+        val bankDonation = Donation(uuid, "Alice", "bank", 100_000, 1000, "REF1", MessageKeys.BANK_SUCCESS, "sepay")
+        service(cfg).onSuccess(bankDonation)
+        assertEquals(listOf("console: say KMDREF1"), enqueued[0].commands)
+    }
+
+    @Test
     fun `first-topup runs once for the first successful donation`() {
         val cfg = config(
             """

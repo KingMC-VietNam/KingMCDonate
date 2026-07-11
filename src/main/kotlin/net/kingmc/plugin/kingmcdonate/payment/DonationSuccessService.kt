@@ -2,6 +2,7 @@ package net.kingmc.plugin.kingmcdonate.payment
 
 import net.kingmc.plugin.kingmcdonate.config.PluginConfig
 import net.kingmc.plugin.kingmcdonate.database.dao.PlayerDao
+import net.kingmc.plugin.kingmcdonate.payment.bank.BankConfirmService
 import net.kingmc.plugin.kingmcdonate.payment.reward.RewardCommands
 import net.kingmc.plugin.kingmcdonate.payment.reward.RewardPayload
 import net.kingmc.plugin.kingmcdonate.payment.reward.RewardSink
@@ -91,7 +92,9 @@ class DonationSuccessService(
         "player" to name,
         "amount" to d.amountVnd.toString(),
         "point" to d.point.toString(),
-        "ref" to d.referenceCode,
+        // Bank receipts show the same transfer content the player used: prefix glued before the ref.
+        // Card refs carry no prefix.
+        "ref" to (if (d.method == BankConfirmService.METHOD_BANK) config().bank.prefix + d.referenceCode else d.referenceCode),
     )
 
     private fun resolveName(d: Donation): String =

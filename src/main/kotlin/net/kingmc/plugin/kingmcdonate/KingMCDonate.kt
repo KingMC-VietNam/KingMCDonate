@@ -436,7 +436,7 @@ class KingMCDonate : JavaPlugin() {
         if (!WebhookActivation.webhookEnabledForMode(mode, configRef().webhook.enabled)) return null
         val active = providers.active
         return if (active is BankWebhookCapable) {
-            active.webhookHandler(BankWebhookDeps(bankPaymentDao::findByReference, confirmService::confirm, pluginLogger))
+            active.webhookHandler(BankWebhookDeps(bankPaymentDao::findPendingByContainedReference, confirmService::confirm, pluginLogger))
         } else {
             pluginLogger.warn(
                 "bank.confirmation='${mode.name.lowercase()}' but provider '${active.name}' has no webhook " +

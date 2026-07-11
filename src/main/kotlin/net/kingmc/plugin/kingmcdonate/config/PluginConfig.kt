@@ -87,7 +87,12 @@ class PluginConfig(root: ConfigurationSection) {
     class BankConfig(section: ConfigurationSection?) {
         /** Active bank gateway: `sepay`. Credentials live in `providers/<name>.yml`. */
         val provider: String = section?.getString("provider", "sepay")?.lowercase() ?: "sepay"
-        /** Reference-code prefix; sanitized to uppercase [A-Z0-9] and trimmed to fit the column (prefix + 10 <= 32). */
+        /**
+         * Transfer-content prefix shown to players, glued before the plain reference
+         * (`"UNG HO TT" + "A1B2C3D4"`). Sanitized to uppercase `[A-Z0-9 ]` (diacritics
+         * and other characters dropped), whitespace collapsed and trimmed, capped at
+         * [MAX_PREFIX_LENGTH]. Not part of the reference itself; matching uses the plain ref.
+         */
         val prefix: String = sanitizePrefix(section?.getString("prefix", "KMD") ?: "KMD")
         /** Points granted per 1000 VND transferred; bank points are computed `amount / 1000 * point-rate`. */
         val pointRate: Double = section?.getDouble("point-rate", 1.0) ?: 1.0
@@ -107,11 +112,16 @@ class PluginConfig(root: ConfigurationSection) {
         val manualTransfer = ManualTransferConfig(section?.getConfigurationSection("manual-transfer"))
 
         companion object {
-            private const val MAX_PREFIX_LENGTH = 22
-            private val NON_ALPHANUMERIC = Regex("[^A-Z0-9]")
+            private const val MAX_PREFIX_LENGTH = 11
+            private val DISALLOWED = Regex("[^A-Z0-9 ]")
+            private val WHITESPACE = Regex(" +")
 
             private fun sanitizePrefix(raw: String): String =
-                raw.uppercase().replace(NON_ALPHANUMERIC, "").take(MAX_PREFIX_LENGTH)
+                raw.uppercase()
+                    .replace(DISALLOWED, "")
+                    .replace(WHITESPACE, " ")
+                    .trim()
+                    .take(MAX_PREFIX_LENGTH)
         }
     }
 

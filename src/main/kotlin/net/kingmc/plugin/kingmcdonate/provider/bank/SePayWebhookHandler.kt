@@ -55,11 +55,10 @@ class SePayWebhookHandler(
         }
 
         val txId = payload.id.toString()
-        val candidates = SePayReference.candidates(payload.code, payload.content)
-        val orders = candidates.mapNotNull { deps.findByReference(it) }
-        // Prefer the order whose amount matches the transfer (mirrors the polling match rule) so a
-        // stray second token in the content can't lock onto the wrong order; fall back to the first.
-        val order = orders.firstOrNull { it.amount == payload.transferAmount } ?: orders.firstOrNull()
+        // Resolve by containment + exact amount (mirrors the polling match rule), so a stray second
+        // token in the content can't lock onto the wrong order.
+        val haystack = SePayReference.searchText(payload.code, payload.content)
+        val order = deps.findPendingByContainedReference(haystack, payload.transferAmount)
         if (order != null) {
             deps.logger.debug { "SePay webhook tx=$txId matched ref=${order.referenceCode}; confirming." }
             KingMCDonateContext.activityLogOrNull?.log(
