@@ -4,6 +4,9 @@ import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 import net.kingmc.plugin.kingmcdonate.payment.model.BankPayment
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger
+import net.kingmc.plugin.kingmcdonate.webhook.BankWebhookCapable
+import net.kingmc.plugin.kingmcdonate.webhook.BankWebhookDeps
+import net.kingmc.plugin.kingmcdonate.webhook.WebhookHandler
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
@@ -24,9 +27,14 @@ class Web2MBankProvider(
     private val token: String,
     private val logger: PluginLogger,
     private val accountHolder: String = "",
-) : BankProvider {
+    private val webhookAuth: String = "none",
+    private val webhookToken: String = "",
+) : BankProvider, BankWebhookCapable {
 
     override val name = NAME
+
+    override fun webhookHandler(deps: BankWebhookDeps): WebhookHandler =
+        Web2MWebhookHandler(webhookAuth, webhookToken, deps)
 
     override fun createQr(amountVnd: Long, referenceCode: String): BankQr {
         val url = buildString {
