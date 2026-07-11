@@ -78,7 +78,7 @@ class SePayBankProvider(
         for (tx in transactions) {
             if (!tx.transferType.equals("in", ignoreCase = true)) continue
             val txId = tx.id ?: continue
-            val haystack = SePayReference.searchText(tx.code, tx.content)
+            val haystack = BankReference.searchText(tx.code, tx.content)
             val matched = orders.firstOrNull { it.amount == tx.amountIn && haystack.contains(it.referenceCode) } ?: continue
             confirmations.add(BankConfirmation(matched.referenceCode, txId, tx.amountIn))
         }
