@@ -12,7 +12,7 @@ import java.util.UUID
  */
 class CardWebhookDeps(
     val findByReference: (String) -> CardPayment?,
-    val applyOutcome: (referenceCode: String, uuid: UUID, name: String?, declaredAmount: Long, outcome: CardOutcome) -> Unit,
+    val applyOutcome: (referenceCode: String, uuid: UUID, name: String?, declaredAmount: Long, outcome: CardOutcome, ownerServer: String) -> Unit,
     val logger: PluginLogger,
 )
 

@@ -35,7 +35,7 @@ class NencerCallbackHandlerTest {
         partnerKey,
         CardWebhookDeps(
             findByReference = { if (it == order.referenceCode) found else null },
-            applyOutcome = { ref, u, n, amt, o -> applied = Applied(ref, u, n, amt, o) },
+            applyOutcome = { ref, u, n, amt, o, _ -> applied = Applied(ref, u, n, amt, o) },
             logger = logger,
         ),
     )
@@ -56,7 +56,7 @@ class NencerCallbackHandlerTest {
 
     @Test
     fun `providerKey is the active gateway name (route segment)`() {
-        val deps = CardWebhookDeps({ null }, { _, _, _, _, _ -> }, logger)
+        val deps = CardWebhookDeps({ null }, { _, _, _, _, _, _ -> }, logger)
         assertEquals("thesieure", NencerCallbackHandler("thesieure", partnerKey, deps).providerKey)
     }
 

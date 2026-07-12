@@ -57,14 +57,14 @@ class CardPaymentServiceTest {
         override fun check(transactionId: String, request: CardRequest) = CardOutcome(PaymentStatus.WAITING, null, null, "")
     }
 
-    private fun config(pointRate: Double = 1.0): PluginConfig {
+    private fun config(pointRate: Double = 1.0, serverId: String = "node-a"): PluginConfig {
         val yaml = YamlConfiguration()
-        yaml.loadFromString("server-id: \"node-a\"\ncard:\n  denominations:\n    50000: 50\n")
+        yaml.loadFromString("server-id: \"$serverId\"\ncard:\n  denominations:\n    50000: 50\n")
         return PluginConfig(yaml)
     }
 
-    private fun buildService(promoCfg: PromoConfig = PromoConfig(emptyList())): CardPaymentService {
-        val cfg = config()
+    private fun buildService(promoCfg: PromoConfig = PromoConfig(emptyList()), serverId: String = "node-a"): CardPaymentService {
+        val cfg = config(serverId = serverId)
         fakeCurrency = FakeCurrencyProvider(available = true)
         val currency = CurrencyRegistry(logger) { fakeCurrency }.apply { load(cfg.currency) }
         val providers = CardProviderRegistry(logger) { FakeCardProvider }.apply { load("fakecard") }
@@ -115,7 +115,7 @@ class CardPaymentServiceTest {
     fun `success awards points, totals and reward exactly once`() {
         val uuid = UUID.randomUUID()
         val ref = pending(uuid)
-        service.award(ref, uuid, "Alice", 50_000, CardOutcome(PaymentStatus.SUCCESS, null, null, ""))
+        service.award(ref, uuid, "Alice", 50_000, CardOutcome(PaymentStatus.SUCCESS, null, null, ""), "node-a")
         assertEquals(50L, fakeCurrency.balance(uuid))
         assertEquals(50_000L, totalAll(uuid))
         assertEquals(1, enqueued.size)
@@ -127,8 +127,8 @@ class CardPaymentServiceTest {
         val uuid = UUID.randomUUID()
         val ref = pending(uuid)
         val outcome = CardOutcome(PaymentStatus.SUCCESS, null, null, "")
-        service.award(ref, uuid, "Alice", 50_000, outcome)
-        service.award(ref, uuid, "Alice", 50_000, outcome)
+        service.award(ref, uuid, "Alice", 50_000, outcome, "node-a")
+        service.award(ref, uuid, "Alice", 50_000, outcome, "node-a")
         assertEquals(50L, fakeCurrency.balance(uuid))
         assertEquals(50_000L, totalAll(uuid))
         assertEquals(1, enqueued.size)
@@ -138,11 +138,30 @@ class CardPaymentServiceTest {
     fun `applyOutcome WAITING stores the transaction handle without crediting`() {
         val uuid = UUID.randomUUID()
         val ref = pending(uuid)
-        service.applyOutcome(ref, uuid, "Alice", 50_000, CardOutcome(PaymentStatus.WAITING, "TX9", null, ""))
+        service.applyOutcome(ref, uuid, "Alice", 50_000, CardOutcome(PaymentStatus.WAITING, "TX9", null, ""), "node-a")
         val order = card.findByReference(ref)!!
         assertEquals(PaymentStatus.WAITING, order.status)
         assertEquals("TX9", order.transactionId)
         assertEquals(0L, fakeCurrency.balance(uuid))
+    }
+
+    @Test
+    fun `a confirmer resolving another node's order only flips it and defers the reward`() {
+        val uuid = UUID.randomUUID()
+        PlayerDao(database).upsert(uuid, "Alice")
+        val ref = card.insertPending(uuid, "Alice", "VIETTEL", 50_000, "s", "p", "fakecard", "node-b", 1_000)
+
+        // service is node-a: the confirmer resolves node-b's order.
+        service.applyOutcome(ref, uuid, "Alice", 50_000, CardOutcome(PaymentStatus.SUCCESS, null, null, ""), "node-b")
+        assertEquals(PaymentStatus.SUCCESS, card.findByReference(ref)!!.status) // financial flip runs on any node
+        assertEquals(0L, fakeCurrency.balance(uuid))                            // reward not delivered by the confirmer
+        assertEquals(0, enqueued.size)
+        assertEquals(1, card.findSuccessUnrewardedByServer("node-b").size)      // still owed to the owner
+
+        // The owning node (node-b) reconciles and delivers.
+        buildService(serverId = "node-b").reapplyReward(card.findByReference(ref)!!)
+        assertEquals(50L, fakeCurrency.balance(uuid))
+        assertEquals(0, card.findSuccessUnrewardedByServer("node-b").size)
     }
 
     @Test
@@ -167,7 +186,7 @@ class CardPaymentServiceTest {
         service = buildService(promoCfg = PromoConfig(listOf(PromoConfig.Promo("x", 100.0, now - 1000, now + 60_000))))
         val uuid = UUID.randomUUID()
         val ref = pending(uuid)
-        service.award(ref, uuid, "Alice", 50_000, CardOutcome(PaymentStatus.SUCCESS, null, null, ""))
+        service.award(ref, uuid, "Alice", 50_000, CardOutcome(PaymentStatus.SUCCESS, null, null, ""), "node-a")
         assertEquals(100L, fakeCurrency.balance(uuid)) // 50 base * (1 + 100/100)
         assertEquals(50_000L, totalAll(uuid))          // face amount unaffected by promo
         assertEquals(100L, card.findByReference(ref)!!.point)

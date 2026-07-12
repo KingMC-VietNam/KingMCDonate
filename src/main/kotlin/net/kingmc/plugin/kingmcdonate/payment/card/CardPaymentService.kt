@@ -104,7 +104,7 @@ class CardPaymentService(
         scheduler.runIo {
             try {
                 val outcome = provider.submit(request)
-                applyOutcome(referenceCode, uuid, name, declaredAmount, outcome)
+                applyOutcome(referenceCode, uuid, name, declaredAmount, outcome, serverId)
             } catch (e: Exception) {
                 // The card may already be charged (response lost); keep it WAITING so the poll service reconciles it.
                 logger.error("Card submit failed ref=$referenceCode uuid=$uuid; left WAITING for the poll service.", e)
@@ -121,21 +121,22 @@ class CardPaymentService(
                 uuid, name, FAKE_TYPE, amount, FAKE_TYPE, FAKE_TYPE, FAKE_PROVIDER, config().serverId, now,
             )
             logger.debug { "fakecard ref=$referenceCode uuid=$uuid amount=$amount" }
-            award(referenceCode, uuid, name, amount, CardOutcome(PaymentStatus.SUCCESS, null, null, "fakecard"))
+            award(referenceCode, uuid, name, amount, CardOutcome(PaymentStatus.SUCCESS, null, null, "fakecard"), config().serverId)
         }
     }
 
     /**
      * Apply a gateway outcome to the record. Shared by submit and the poll service:
-     * WAITING stores the handle, SUCCESS awards once, FAILED closes the order.
+     * WAITING stores the handle, SUCCESS awards once, FAILED closes the order. [ownerServer] is the
+     * order's owning node — the confirmer may resolve another node's order, but only the owner credits.
      */
-    fun applyOutcome(referenceCode: String, uuid: UUID, name: String?, declaredAmount: Long, outcome: CardOutcome) {
+    fun applyOutcome(referenceCode: String, uuid: UUID, name: String?, declaredAmount: Long, outcome: CardOutcome, ownerServer: String) {
         when (outcome.status) {
             PaymentStatus.WAITING -> {
                 cardPaymentDao.markWaiting(referenceCode, outcome.transactionId, System.currentTimeMillis())
                 logger.debug { "Card WAITING ref=$referenceCode tx=${outcome.transactionId}" }
             }
-            PaymentStatus.SUCCESS -> award(referenceCode, uuid, name, declaredAmount, outcome)
+            PaymentStatus.SUCCESS -> award(referenceCode, uuid, name, declaredAmount, outcome, ownerServer)
             PaymentStatus.FAILED -> {
                 cardPaymentDao.resolve(referenceCode, PaymentStatus.FAILED, 0, System.currentTimeMillis())
                 logger.debug { "Card FAILED ref=$referenceCode: ${outcome.message}" }
@@ -164,7 +165,7 @@ class CardPaymentService(
     }
 
     /** Idempotent, amount-matched success: reward and accumulate totals exactly once. */
-    fun award(referenceCode: String, uuid: UUID, name: String?, declaredAmount: Long, outcome: CardOutcome) {
+    fun award(referenceCode: String, uuid: UUID, name: String?, declaredAmount: Long, outcome: CardOutcome, ownerServer: String) {
         val recognized = outcome.recognizedAmount
         if (recognized != null && recognized != declaredAmount) {
             cardPaymentDao.resolve(referenceCode, PaymentStatus.FAILED, 0, System.currentTimeMillis())
@@ -216,7 +217,13 @@ class CardPaymentService(
         if (!committed) return
 
         logger.debug { "Card SUCCESS ref=$referenceCode uuid=$uuid +${point}pt amount=$declaredAmount" }
-        applyReward(referenceCode, uuid, name, declaredAmount, point, providers.active.name)
+        // The flip + totals above are exactly-once network-wide, but the external credit is node-local:
+        // when a confirmer resolved another node's order, leave reward_applied = 0 for the owner's reconcile.
+        if (ownerServer == config().serverId) {
+            applyReward(referenceCode, uuid, name, declaredAmount, point, providers.active.name)
+        } else {
+            logger.debug { "Card $referenceCode confirmed cross-server; reward deferred to owner '$ownerServer'." }
+        }
     }
 
     /** Re-apply the gated external credit for a SUCCESS order whose credit was not applied (reconcile). */

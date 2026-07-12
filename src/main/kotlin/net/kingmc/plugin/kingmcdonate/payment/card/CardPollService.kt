@@ -112,7 +112,9 @@ class CardPollService(
                 checkedAny = true
                 val outcome = provider.check(payment.transactionId ?: payment.referenceCode, request)
                 backoff.remove(payment.referenceCode)
-                service.applyOutcome(payment.referenceCode, payment.playerUuid, payment.playerName, payment.amount, outcome)
+                service.applyOutcome(
+                    payment.referenceCode, payment.playerUuid, payment.playerName, payment.amount, outcome, payment.ownerServer,
+                )
             } catch (e: Exception) {
                 val delay = registerBackoff(payment.referenceCode)
                 logger.warn("Failed to poll card order ${payment.referenceCode}: ${e.message}; backing off ${delay}ms")
@@ -128,7 +130,9 @@ class CardPollService(
         )
         try {
             val outcome = provider.check(payment.transactionId ?: payment.referenceCode, request)
-            service.applyOutcome(payment.referenceCode, payment.playerUuid, payment.playerName, payment.amount, outcome)
+            service.applyOutcome(
+                payment.referenceCode, payment.playerUuid, payment.playerName, payment.amount, outcome, payment.ownerServer,
+            )
         } catch (e: Exception) {
             logger.warn("Final pre-timeout check failed for ${payment.referenceCode}: ${e.message}")
         }
