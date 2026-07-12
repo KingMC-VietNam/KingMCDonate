@@ -110,7 +110,7 @@ class CardPaymentDao(database: Database) : PaymentDao<CardPayment>(database, "ca
             ps.executeUpdate()
         }
 
-    /** Oldest WAITING orders owned by [serverId], capped per pass, for poll/resume. */
+    /** Oldest WAITING orders owned by [serverId], capped per pass, for timeout/resume. */
     fun findWaitingByServer(serverId: String): List<CardPayment> = withConnection { conn ->
         conn.prepareStatement(
             "SELECT * FROM card_payments WHERE owner_server = ? AND status = ? ORDER BY created_at LIMIT ?",
@@ -118,6 +118,19 @@ class CardPaymentDao(database: Database) : PaymentDao<CardPayment>(database, "ca
             ps.setString(1, serverId)
             ps.setString(2, PaymentStatus.WAITING.storageValue)
             ps.setInt(3, MAX_BATCH)
+            ps.executeQuery().use { rs -> rs.mapAll { toModel() } }
+        }
+    }
+
+    /**
+     * All WAITING orders network-wide, oldest first — the confirmer's gateway-check set. Unlike
+     * [findWaitingByServer] this ignores `owner_server`, so a single confirmer resolves charges started
+     * on any node; timeout/resume stay owner-scoped via [findWaitingByServer].
+     */
+    fun findWaitingAllServers(): List<CardPayment> = withConnection { conn ->
+        conn.prepareStatement("SELECT * FROM card_payments WHERE status = ? ORDER BY created_at LIMIT ?").use { ps ->
+            ps.setString(1, PaymentStatus.WAITING.storageValue)
+            ps.setInt(2, MAX_BATCH)
             ps.executeQuery().use { rs -> rs.mapAll { toModel() } }
         }
     }
