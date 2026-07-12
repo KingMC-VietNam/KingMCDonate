@@ -18,6 +18,7 @@ import net.kingmc.plugin.kingmcdonate.util.PluginLogger
 import org.bukkit.configuration.file.YamlConfiguration
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -36,26 +37,29 @@ class BankConfirmServiceTest {
     private lateinit var totals: PlayerTotalsDao
     private lateinit var fakeCurrency: FakeCurrencyProvider
     private lateinit var enqueued: MutableList<UUID>
+    private lateinit var cleared: MutableList<UUID>
     private lateinit var service: BankConfirmService
 
     private val config = config(pointRate = 1.0)
 
-    private fun config(pointRate: Double): PluginConfig {
+    private fun config(pointRate: Double, serverId: String = "node-a"): PluginConfig {
         val yaml = YamlConfiguration()
-        yaml.loadFromString("server-id: \"node-a\"\nbank:\n  point-rate: $pointRate\n")
+        yaml.loadFromString("server-id: \"$serverId\"\nbank:\n  point-rate: $pointRate\n")
         return PluginConfig(yaml)
     }
 
-    private fun buildService(currencyAvailable: Boolean = true): BankConfirmService =
-        buildServiceWithPromo(net.kingmc.plugin.kingmcdonate.promo.PromoConfig(emptyList()), currencyAvailable)
+    private fun buildService(currencyAvailable: Boolean = true, serverId: String = "node-a"): BankConfirmService =
+        buildServiceWithPromo(net.kingmc.plugin.kingmcdonate.promo.PromoConfig(emptyList()), currencyAvailable, serverId)
 
     private fun buildServiceWithPromo(
         promoCfg: net.kingmc.plugin.kingmcdonate.promo.PromoConfig,
         currencyAvailable: Boolean = true,
+        serverId: String = "node-a",
     ): BankConfirmService {
         fakeCurrency = FakeCurrencyProvider(available = currencyAvailable)
         val currency = CurrencyRegistry(logger) { fakeCurrency }.apply { load(config.currency) }
         enqueued = mutableListOf()
+        cleared = mutableListOf()
         val sink = object : RewardSink {
             override fun enqueue(playerUuid: UUID, referenceCode: String, payload: RewardPayload) { enqueued.add(playerUuid) }
         }
@@ -64,12 +68,13 @@ class BankConfirmServiceTest {
             rewardSink = sink,
             playerDao = PlayerDao(database),
             logger = logger,
-            config = { config(1.0) },
+            config = { config(1.0, serverId) },
             broadcaster = {},
         )
         return BankConfirmService(
             database, bank, ProcessedBankTxDao(database), totals, PlayerDao(database),
-            currency, promo, success, clearQr = {}, logger = logger, config = { config(1.0) },
+            currency, promo, success, clearQr = { cleared.add(it) }, logger = logger,
+            config = { config(1.0, serverId) },
         )
     }
 
@@ -87,9 +92,9 @@ class BankConfirmServiceTest {
     @AfterEach
     fun tearDown() = database.close()
 
-    private fun newOrder(uuid: UUID = UUID.randomUUID(), amount: Long = 50_000): Pair<UUID, String> {
+    private fun newOrder(uuid: UUID = UUID.randomUUID(), amount: Long = 50_000, owner: String = "node-a"): Pair<UUID, String> {
         PlayerDao(database).upsert(uuid, "Alice")
-        return uuid to bank.insertPending(uuid, amount, "sepay", "node-a", 1_000)
+        return uuid to bank.insertPending(uuid, amount, "sepay", owner, 1_000)
     }
 
     private fun totalAll(uuid: UUID): Long = database.withConnection { conn ->
@@ -162,6 +167,34 @@ class BankConfirmServiceTest {
         assertEquals(100L, fakeCurrency.balance(uuid)) // 50 * (1 + 100/100)
         assertEquals(50_000L, totalAll(uuid))          // amount_vnd is face, unaffected by promo
         assertEquals(100L, bank.findByReference(ref)!!.point) // persisted point matches credited amount
+    }
+
+    @Test
+    fun `owner confirming its own order rewards and clears the qr immediately`() {
+        val (uuid, ref) = newOrder(owner = "node-a") // service is node-a
+        service.confirm(BankConfirmation(ref, "TX1", 50_000))
+        assertEquals(PaymentStatus.SUCCESS, bank.findByReference(ref)!!.status)
+        assertEquals(50L, fakeCurrency.balance(uuid))
+        assertEquals(listOf(uuid), cleared)
+    }
+
+    @Test
+    fun `a confirmer resolving another node's order only flips it and defers the reward`() {
+        val (uuid, ref) = newOrder(owner = "node-b") // service is node-a: not the owner
+        service.confirm(BankConfirmation(ref, "TX1", 50_000))
+
+        val order = bank.findByReference(ref)!!
+        assertEquals(PaymentStatus.SUCCESS, order.status) // financial flip runs on any node
+        assertEquals(false, order.rewardApplied)          // reward left for the owner
+        assertEquals(0L, fakeCurrency.balance(uuid))
+        assertTrue(enqueued.isEmpty())
+        assertTrue(cleared.isEmpty())
+
+        // The owning node (node-b) reconciles and delivers the reward, clearing its QR.
+        val ownerService = buildService(serverId = "node-b")
+        ownerService.reapplyReward(order)
+        assertEquals(50L, fakeCurrency.balance(uuid))
+        assertEquals(listOf(uuid), cleared)
     }
 
     @Test

@@ -61,10 +61,15 @@ class BankConfirmService(
         }
     }
 
-    /** Re-apply the gated external credit for a SUCCESS order whose credit was not applied (reconcile). */
+    /**
+     * Re-apply the gated external credit for a SUCCESS order whose credit was not applied (reconcile).
+     * This is also the delivery path when a *different* node (the confirmer) flipped the order: the
+     * owning node credits the reward and clears the payer's QR here, which [resolvePending] deferred.
+     */
     fun reapplyReward(order: BankPayment) {
         if (order.status != PaymentStatus.SUCCESS) return
         applyReward(order, order.point)
+        clearQr(order.playerUuid)
     }
 
     private fun resolvePending(order: BankPayment, confirmation: BankConfirmation) {
@@ -104,8 +109,15 @@ class BankConfirmService(
         if (!committed) return
 
         logger.debug { "Bank SUCCESS ref=${order.referenceCode} uuid=${order.playerUuid} amount=${order.amount} +${point}pt" }
-        applyReward(order, point)
-        clearQr(order.playerUuid)
+        // The financial flip above is exactly-once network-wide, but the external reward + QR clear are
+        // node-local: only the owning node can credit/clear for a player connected to it. When a confirmer
+        // resolved another node's order, leave reward_applied = 0 so the owner delivers it on reconcile.
+        if (order.ownerServer == config().serverId) {
+            applyReward(order, point)
+            clearQr(order.playerUuid)
+        } else {
+            logger.debug { "Bank ${order.referenceCode} confirmed cross-server; reward deferred to owner '${order.ownerServer}'." }
+        }
     }
 
     /** Gate the external reward so confirm and any reconcile pass together apply it at most once. */
