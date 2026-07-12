@@ -48,9 +48,22 @@ class BankPaymentDao(database: Database) : PaymentDao<BankPayment>(database, "ba
             }
         }
 
-    /** PENDING orders owned by [serverId], oldest first, for polling/timeout. */
+    /** PENDING orders owned by [serverId], oldest first, for timeout. */
     fun findPendingByServer(serverId: String): List<BankPayment> =
         findByServerAndStatus(serverId, PaymentStatus.PENDING)
+
+    /**
+     * All PENDING orders network-wide, oldest first — the confirmer's gateway-match set. Unlike
+     * [findPendingByServer] this ignores `owner_server`, so a single confirmer node resolves orders
+     * created on any node; timeout stays owner-scoped via [findPendingByServer].
+     */
+    fun findPendingAllServers(): List<BankPayment> = withConnection { conn ->
+        conn.prepareStatement("SELECT * FROM bank_payments WHERE status = ? ORDER BY created_at LIMIT ?").use { ps ->
+            ps.setString(1, PaymentStatus.PENDING.storageValue)
+            ps.setInt(2, MAX_BATCH)
+            ps.executeQuery().use { rs -> rs.mapAll { toModel() } }
+        }
+    }
 
     /**
      * The oldest PENDING order whose plain reference is contained in [haystack] and whose
@@ -70,16 +83,17 @@ class BankPaymentDao(database: Database) : PaymentDao<BankPayment>(database, "ba
         }
     }
 
-    /** FAILED orders owned by [serverId] updated at or after [since] — matched so a late transfer is surfaced, not dropped. */
-    fun findFailedByServerSince(serverId: String, since: Long): List<BankPayment> = withConnection { conn ->
+    /**
+     * FAILED orders network-wide updated at or after [since] — added to the confirmer's match set so a
+     * late transfer for a just-expired order is still surfaced, not dropped, whichever node owns it.
+     */
+    fun findFailedSinceAllServers(since: Long): List<BankPayment> = withConnection { conn ->
         conn.prepareStatement(
-            "SELECT * FROM bank_payments WHERE owner_server = ? AND status = ? AND updated_at >= ? " +
-                "ORDER BY updated_at DESC LIMIT ?",
+            "SELECT * FROM bank_payments WHERE status = ? AND updated_at >= ? ORDER BY updated_at DESC LIMIT ?",
         ).use { ps ->
-            ps.setString(1, serverId)
-            ps.setString(2, PaymentStatus.FAILED.storageValue)
-            ps.setLong(3, since)
-            ps.setInt(4, MAX_BATCH)
+            ps.setString(1, PaymentStatus.FAILED.storageValue)
+            ps.setLong(2, since)
+            ps.setInt(3, MAX_BATCH)
             ps.executeQuery().use { rs -> rs.mapAll { toModel() } }
         }
     }

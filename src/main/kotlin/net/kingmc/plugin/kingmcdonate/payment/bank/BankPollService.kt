@@ -15,15 +15,16 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Polls this node's PENDING bank orders (outbound, no bound port): once on startup
- * then on a recurring timer, with an overlap guard. Each pass fails orders past the
- * timeout and reconciles any SUCCESS order whose external credit has not been applied
- * (housekeeping, always run). When [queryGateway] returns true it also asks the gateway to
- * match the live (and recently-failed) orders against its incoming transfers and routes
- * confirmations to [BankConfirmService]. In webhook-only confirmation [queryGateway] returns
- * false: the gateway is not polled, but timeout, late-transfer reconcile and startup
- * resume still run. It is read each pass so a reloaded confirmation mode / webhook toggle takes
- * effect on the next sweep. Owner-server scoping keeps two nodes from polling each other's orders.
+ * Drives bank confirmation for this node (outbound, no bound port): once on startup then on a
+ * recurring timer, with an overlap guard. Two concerns split by scope: **timeout and reconcile stay
+ * owner-scoped** (each node fails only its own stale orders and delivers rewards only to its own
+ * players, housekeeping always run), while the **gateway match is network-wide** — when [queryGateway]
+ * returns true this node acts as the confirmer and matches every node's PENDING (and recently-failed)
+ * orders against its incoming transfers in one call, routing confirmations to [BankConfirmService].
+ * In webhook-only or passive confirmation [queryGateway] returns false: the gateway is not polled, but
+ * timeout, late-transfer reconcile and startup resume still run. It is read each pass so a reloaded
+ * confirmation mode / webhook toggle takes effect on the next sweep. A confirmer resolving another
+ * node's order only flips it SUCCESS; the owning node delivers the reward (see [BankConfirmService]).
  */
 class BankPollService(
     private val bankPaymentDao: BankPaymentDao,
@@ -61,8 +62,8 @@ class BankPollService(
         val now = System.currentTimeMillis()
         val timeoutMillis = config().bank.timeoutMinutes.coerceAtLeast(1) * 60_000L
 
-        val pending = bankPaymentDao.findPendingByServer(serverId)
-        val (expired, live) = pending.partition { now - it.createdAt > timeoutMillis }
+        // Timeout stays owner-scoped: each node closes only its own stale orders.
+        val expired = bankPaymentDao.findPendingByServer(serverId).filter { now - it.createdAt > timeoutMillis }
         for (order in expired) {
             if (bankPaymentDao.markFailed(order.referenceCode, now) == 1) {
                 logger.warn("Bank order ${order.referenceCode} timed out; marked FAILED.")
@@ -73,11 +74,14 @@ class BankPollService(
         }
 
         if (queryGateway() && providers.isAvailable) {
-            // Match against live orders plus recently-failed ones so a late transfer is surfaced, not dropped.
-            val recentFailed = bankPaymentDao.findFailedByServerSince(serverId, now - timeoutMillis * LATE_WINDOW_FACTOR)
-            val orders = live + recentFailed
+            // The confirmer matches the whole network's PENDING orders (plus recently-failed ones so a
+            // late transfer is surfaced, not dropped) in a single gateway call — own-expired orders were
+            // just failed above, so re-reading pending excludes them and the failed-since set catches them.
+            val pending = bankPaymentDao.findPendingAllServers()
+            val recentFailed = bankPaymentDao.findFailedSinceAllServers(now - timeoutMillis * LATE_WINDOW_FACTOR)
+            val orders = pending + recentFailed
             if (orders.isNotEmpty()) {
-                logger.debug { "Polling ${live.size} live + ${recentFailed.size} recent-failed order(s) on '$serverId'" }
+                logger.debug { "Polling ${pending.size} pending + ${recentFailed.size} recent-failed order(s) network-wide" }
                 providers.active.poll(orders).forEach(confirmService::confirm)
             }
         }

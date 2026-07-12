@@ -99,6 +99,20 @@ class BankDaoTest {
     }
 
     @Test
+    fun `cross-server finders return orders from every owner (the confirmer's match set)`() {
+        val a = bank.insertPending(UUID.randomUUID(), 50_000, "sepay", "node-a", 1_000)
+        val b = bank.insertPending(UUID.randomUUID(), 50_000, "sepay", "node-b", 1_000)
+
+        // PENDING across all servers, unlike the owner-scoped findPendingByServer.
+        assertEquals(setOf(a, b), bank.findPendingAllServers().map { it.referenceCode }.toSet())
+
+        bank.markFailed(a, 5_000)
+        bank.markFailed(b, 5_000)
+        assertEquals(setOf(a, b), bank.findFailedSinceAllServers(4_000).map { it.referenceCode }.toSet())
+        assertTrue(bank.findFailedSinceAllServers(6_000).isEmpty())
+    }
+
+    @Test
     fun `timeout marks only pending orders failed`() {
         val ref = insert()
         assertEquals(1, bank.markFailed(ref, 9_000))
