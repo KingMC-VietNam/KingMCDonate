@@ -23,6 +23,7 @@ import net.kingmc.plugin.kingmcdonate.milestone.MilestoneJoinListener
 import net.kingmc.plugin.kingmcdonate.milestone.MilestoneService
 import net.kingmc.plugin.kingmcdonate.placeholder.KmdExpansion
 import net.kingmc.plugin.kingmcdonate.config.ConfigManager
+import net.kingmc.plugin.kingmcdonate.config.ConfirmationMode
 import net.kingmc.plugin.kingmcdonate.currency.CurrencyRegistry
 import net.kingmc.plugin.kingmcdonate.database.Database
 import net.kingmc.plugin.kingmcdonate.database.dao.BankPaymentDao
@@ -330,6 +331,7 @@ class KingMCDonate : JavaPlugin() {
             "Card confirmation: mode=${configRef().card.confirmation.name.lowercase()} " +
                 "queryGateway=${queryGateway()} webhook=${webhookHandler != null}"
         }
+        warnIfPassive("card", configRef().card.confirmation)
         return CardSubsystem(providers, cardPaymentDao, service, chatInput, menu, pollService, webhookHandler)
     }
 
@@ -386,7 +388,21 @@ class KingMCDonate : JavaPlugin() {
             "Bank confirmation: mode=${configRef().bank.confirmation.name.lowercase()} " +
                 "queryGateway=${queryGateway()} webhook=${webhookHandler != null}"
         }
+        warnIfPassive("bank", configRef().bank.confirmation)
         return BankSubsystem(providers, bankPaymentDao, service, confirmService, pollService, qrRenderer, webhookHandler)
+    }
+
+    /**
+     * Passive means this node neither polls nor binds a webhook — it relies on another node being the
+     * confirmer. Warn so an operator who set every node passive (leaving orders to expire) sees why.
+     */
+    private fun warnIfPassive(subsystem: String, mode: ConfirmationMode) {
+        if (mode == ConfirmationMode.PASSIVE) {
+            pluginLogger.warn(
+                "$subsystem.confirmation=passive: this node will not confirm $subsystem payments. Ensure exactly one " +
+                    "other node runs as the confirmer (poll/webhook/both) on this shared database, or orders will expire.",
+            )
+        }
     }
 
     /** Start the single shared webhook server when any subsystem registered a handler. */

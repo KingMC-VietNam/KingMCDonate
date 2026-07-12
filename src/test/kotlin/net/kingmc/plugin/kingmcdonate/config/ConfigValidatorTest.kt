@@ -53,6 +53,15 @@ class ConfigValidatorTest {
     }
 
     @Test
+    fun `passive is a valid confirmation mode`() {
+        val issues = validateConfig("""bank: { confirmation: passive }""" + "\n" + """card: { confirmation: passive }""")
+        assertTrue(
+            issues.none { it.path == "config.yml:bank.confirmation" || it.path == "config.yml:card.confirmation" },
+            "passive must be accepted, got $issues",
+        )
+    }
+
+    @Test
     fun `unknown providers and db type warn`() {
         val issues = validateConfig(
             """

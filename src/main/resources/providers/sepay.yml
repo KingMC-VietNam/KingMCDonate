@@ -3,6 +3,8 @@
 # ============================================================
 # Xác nhận giao dịch bằng cách poll SePay API v2 (outbound, KHÔNG cần webhook / IP public).
 # Tạo API Token tại my.sepay.vn -> Cấu hình Công ty -> API Access.
+# Nhiều node chung 1 database: chỉ node confirmer (bank.confirmation = poll/webhook/both) cần token/webhook
+# này; các node bank.confirmation = "passive" chỉ nhận kết quả từ DB (xem chú thích bank.confirmation trong config.yml).
 
 # Số tài khoản ngân hàng nhận tiền.
 account-number: "YOUR_BANK_ACCOUNT_NUMBER"

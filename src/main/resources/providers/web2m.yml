@@ -3,6 +3,8 @@
 # ============================================================
 # Xác nhận giao dịch bằng cách poll lịch sử giao dịch V3 (outbound), và/hoặc webhook Web2M.
 # Lấy Token tại web2m.com. QR dùng bộ sinh ảnh VietQR công khai (qr.sepay.vn/img), không cần tài khoản SePay.
+# Nhiều node chung 1 database: chỉ node confirmer (bank.confirmation = poll/webhook/both) cần token/webhook
+# này; các node bank.confirmation = "passive" chỉ nhận kết quả từ DB (xem chú thích bank.confirmation trong config.yml).
 
 # Số tài khoản ngân hàng nhận tiền — dùng cho cả URL API V3 lẫn ảnh QR.
 account-number: "YOUR_BANK_ACCOUNT_NUMBER"
