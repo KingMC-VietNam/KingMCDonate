@@ -11,6 +11,7 @@ class ConfirmationModeTest {
     fun `parse is case-insensitive and falls back to poll`() {
         assertEquals(ConfirmationMode.WEBHOOK, ConfirmationMode.parse("WeBhOoK"))
         assertEquals(ConfirmationMode.BOTH, ConfirmationMode.parse("both"))
+        assertEquals(ConfirmationMode.PASSIVE, ConfirmationMode.parse("PaSsIvE"))
         assertEquals(ConfirmationMode.POLL, ConfirmationMode.parse("nonsense"))
         assertEquals(ConfirmationMode.POLL, ConfirmationMode.parse(null))
     }
@@ -31,5 +32,11 @@ class ConfirmationModeTest {
     fun `both polls and uses webhook`() {
         assertTrue(ConfirmationMode.BOTH.pollsGateway)
         assertTrue(ConfirmationMode.BOTH.usesWebhook)
+    }
+
+    @Test
+    fun `passive neither polls nor uses webhook`() {
+        assertFalse(ConfirmationMode.PASSIVE.pollsGateway)
+        assertFalse(ConfirmationMode.PASSIVE.usesWebhook)
     }
 }

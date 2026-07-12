@@ -18,8 +18,10 @@ object WebhookActivation {
     /**
      * The poller must query the gateway when the mode polls (POLL/BOTH), or when webhook delivery
      * is not actually active (disabled, wrong mode, or the provider has no webhook support) — so a
-     * missing callback never strands an order.
+     * missing callback never strands an order. [ConfirmationMode.PASSIVE] deliberately opts out of
+     * that fallback: it never queries the gateway even with no local webhook, because the operator
+     * has designated another node as the confirmer.
      */
     fun gatewayQueryNeeded(mode: ConfirmationMode, webhookActive: Boolean): Boolean =
-        mode.pollsGateway || !webhookActive
+        if (mode == ConfirmationMode.PASSIVE) false else mode.pollsGateway || !webhookActive
 }

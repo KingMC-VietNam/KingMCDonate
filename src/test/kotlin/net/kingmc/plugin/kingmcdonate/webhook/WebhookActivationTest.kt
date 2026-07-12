@@ -27,4 +27,16 @@ class WebhookActivationTest {
         assertFalse(WebhookActivation.gatewayQueryNeeded(ConfirmationMode.WEBHOOK, webhookActive = true))
         assertTrue(WebhookActivation.gatewayQueryNeeded(ConfirmationMode.WEBHOOK, webhookActive = false))
     }
+
+    @Test
+    fun `passive never queries the gateway even when webhook is not active locally`() {
+        // Passive deliberately forgoes the poll fallback: another node is the confirmer.
+        assertFalse(WebhookActivation.gatewayQueryNeeded(ConfirmationMode.PASSIVE, webhookActive = false))
+        assertFalse(WebhookActivation.gatewayQueryNeeded(ConfirmationMode.PASSIVE, webhookActive = true))
+    }
+
+    @Test
+    fun `passive never wants a webhook handler`() {
+        assertFalse(WebhookActivation.webhookEnabledForMode(ConfirmationMode.PASSIVE, true))
+    }
 }
