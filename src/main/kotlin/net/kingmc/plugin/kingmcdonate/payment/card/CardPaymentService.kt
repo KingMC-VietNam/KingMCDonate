@@ -14,6 +14,8 @@ import net.kingmc.plugin.kingmcdonate.payment.DonationSuccessService
 import net.kingmc.plugin.kingmcdonate.payment.model.CardPayment
 import net.kingmc.plugin.kingmcdonate.payment.model.PaymentStatus
 import net.kingmc.plugin.kingmcdonate.payment.reward.RewardGate
+import net.kingmc.plugin.kingmcdonate.payment.reward.RewardPayload
+import net.kingmc.plugin.kingmcdonate.payment.reward.RewardSink
 import net.kingmc.plugin.kingmcdonate.provider.card.CardOutcome
 import net.kingmc.plugin.kingmcdonate.provider.card.CardProviderRegistry
 import net.kingmc.plugin.kingmcdonate.provider.card.CardRequest
@@ -44,6 +46,9 @@ class CardPaymentService(
     private val logger: PluginLogger,
     private val config: () -> PluginConfig,
     private val messages: () -> Messages,
+    private val rewardSink: RewardSink,
+    // Seam: is the player online on THIS node right now? Injected so the durable-notice branch is testable.
+    private val onlineHere: (UUID) -> Boolean = { Bukkit.getPlayer(it) != null },
 ) {
 
     private class NotResolvableException : RuntimeException()
@@ -141,10 +146,10 @@ class CardPaymentService(
                 logger.debug { "Card FAILED ref=$referenceCode: ${outcome.message}" }
                 logFailed(referenceCode, if (outcome.wrongDenomination) "wrong-denomination" else outcome.message.ifBlank { "failed" })
                 if (outcome.wrongDenomination) {
-                    message(uuid, MessageKeys.CARD_WRONG_DENOMINATION)
+                    notifyFailure(referenceCode, uuid, MessageKeys.CARD_WRONG_DENOMINATION)
                 } else {
                     val reason = outcome.message.ifBlank { messages().get(MessageKeys.CARD_REASON_GENERIC) }
-                    message(uuid, MessageKeys.CARD_FAILED, "reason" to reason)
+                    notifyFailure(referenceCode, uuid, MessageKeys.CARD_FAILED, "reason" to reason)
                 }
                 onFailed(uuid, declaredAmount, referenceCode, outcome.message.ifBlank { "failed" })
             }
@@ -158,7 +163,7 @@ class CardPaymentService(
         if (rows == 1) {
             logger.warn("Card order $referenceCode timed out while WAITING; marked FAILED.")
             logFailed(referenceCode, "timeout")
-            message(uuid, MessageKeys.CARD_FAILED, "reason" to messages().get(MessageKeys.CARD_REASON_TIMEOUT))
+            notifyFailure(referenceCode, uuid, MessageKeys.CARD_FAILED, "reason" to messages().get(MessageKeys.CARD_REASON_TIMEOUT))
             onFailed(uuid, amountVnd, referenceCode, "timeout")
         }
     }
@@ -170,7 +175,7 @@ class CardPaymentService(
             cardPaymentDao.resolve(referenceCode, PaymentStatus.FAILED, 0, System.currentTimeMillis())
             logger.warn("Card $referenceCode amount mismatch: declared=$declaredAmount recognized=$recognized; not rewarded.")
             logFailed(referenceCode, "amount-mismatch declared=$declaredAmount recognized=$recognized")
-            message(uuid, MessageKeys.CARD_WRONG_DENOMINATION)
+            notifyFailure(referenceCode, uuid, MessageKeys.CARD_WRONG_DENOMINATION)
             return
         }
 
@@ -179,7 +184,7 @@ class CardPaymentService(
             cardPaymentDao.resolve(referenceCode, PaymentStatus.FAILED, 0, System.currentTimeMillis())
             logger.warn("Card $referenceCode: amount $declaredAmount is not a configured denomination; not rewarded.")
             logFailed(referenceCode, "unconfigured-denomination amount=$declaredAmount")
-            message(uuid, MessageKeys.CARD_WRONG_DENOMINATION)
+            notifyFailure(referenceCode, uuid, MessageKeys.CARD_WRONG_DENOMINATION)
             return
         }
 
@@ -242,6 +247,19 @@ class CardPaymentService(
     private fun message(uuid: UUID, key: String, vararg vars: Pair<String, String>) {
         val player = Bukkit.getPlayer(uuid) ?: return
         scheduler.runAtEntity(player) { messages().send(player, key, *vars) }
+    }
+
+    /**
+     * Notify the player of a failed card durably: an immediate toast when they are online on this node,
+     * otherwise a message-only entry in the reward outbox so it reaches them on rejoin / on whatever node
+     * they are online (a card can fail asynchronously — via poll/timeout — after the player has left).
+     */
+    private fun notifyFailure(referenceCode: String, uuid: UUID, key: String, vararg vars: Pair<String, String>) {
+        if (onlineHere(uuid)) {
+            message(uuid, key, *vars)
+        } else {
+            rewardSink.enqueue(uuid, referenceCode, RewardPayload(messageKey = key, messageVars = vars.toMap()))
+        }
     }
 
     private fun logFailed(referenceCode: String, reason: String) =

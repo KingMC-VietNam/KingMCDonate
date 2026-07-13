@@ -157,7 +157,7 @@ class KingMCDonate : JavaPlugin() {
 
         val bedrockForms = createBedrockForms()
 
-        val card = setupCard(infra.http, infra.database, infra.currency, menus, infra.promo, donationSuccess, bedrockForms)
+        val card = setupCard(infra.http, infra.database, infra.currency, menus, infra.promo, donationSuccess, infra.rewardDelivery, bedrockForms)
         val bank = setupBank(infra.http, infra.database, infra.currency, infra.promo, donationSuccess)
         startWebhookServer(config, listOfNotNull(card.webhookHandler, bank.webhookHandler))
         // Reload rebuilds the server so a new secret / host / port / base-path / enabled / mode applies live.
@@ -287,6 +287,7 @@ class KingMCDonate : JavaPlugin() {
         menus: MenuService,
         promo: PromoService,
         donationSuccess: DonationSuccessService,
+        rewardDelivery: RewardDeliveryService,
         bedrockForms: BedrockForms?,
     ): CardSubsystem {
         val providers = CardProviderRegistry(
@@ -308,6 +309,7 @@ class KingMCDonate : JavaPlugin() {
             pluginLogger,
             configRef,
             messagesRef,
+            rewardDelivery,
         )
         val chatInput = ChatInputListener(scheduler, messagesRef)
         val cardInput = CardInput(this, chatInput, messagesRef)

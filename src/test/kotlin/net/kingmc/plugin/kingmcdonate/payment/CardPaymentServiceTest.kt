@@ -1,5 +1,6 @@
 package net.kingmc.plugin.kingmcdonate.payment
 
+import net.kingmc.plugin.kingmcdonate.config.MessageKeys
 import net.kingmc.plugin.kingmcdonate.config.Messages
 import net.kingmc.plugin.kingmcdonate.config.PluginConfig
 import net.kingmc.plugin.kingmcdonate.currency.CurrencyRegistry
@@ -23,6 +24,7 @@ import net.kingmc.plugin.kingmcdonate.util.PluginLogger
 import org.bukkit.configuration.file.YamlConfiguration
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -47,6 +49,7 @@ class CardPaymentServiceTest {
     private lateinit var totals: PlayerTotalsDao
     private lateinit var fakeCurrency: FakeCurrencyProvider
     private lateinit var enqueued: MutableList<UUID>
+    private lateinit var payloads: MutableList<RewardPayload>
     private lateinit var service: CardPaymentService
 
     /** Never contacted in these tests; award/applyOutcome operate on a supplied outcome. */
@@ -69,8 +72,12 @@ class CardPaymentServiceTest {
         val currency = CurrencyRegistry(logger) { fakeCurrency }.apply { load(cfg.currency) }
         val providers = CardProviderRegistry(logger) { FakeCardProvider }.apply { load("fakecard") }
         enqueued = mutableListOf()
+        payloads = mutableListOf()
         val sink = object : RewardSink {
-            override fun enqueue(playerUuid: UUID, referenceCode: String, payload: RewardPayload) { enqueued.add(playerUuid) }
+            override fun enqueue(playerUuid: UUID, referenceCode: String, payload: RewardPayload) {
+                enqueued.add(playerUuid)
+                payloads.add(payload)
+            }
         }
         val success = DonationSuccessService(
             rewardSink = sink,
@@ -83,6 +90,7 @@ class CardPaymentServiceTest {
             database, card, totals, PlayerDao(database), currency, providers,
             PromoService { promoCfg }, success, TestSchedulers.direct(), logger,
             config = { cfg }, messages = { Messages(null, "", logger) },
+            rewardSink = sink, onlineHere = { false },
         )
     }
 
@@ -143,6 +151,20 @@ class CardPaymentServiceTest {
         assertEquals(PaymentStatus.WAITING, order.status)
         assertEquals("TX9", order.transactionId)
         assertEquals(0L, fakeCurrency.balance(uuid))
+    }
+
+    @Test
+    fun `a card that fails while the player is offline is enqueued to the outbox as a message-only notice`() {
+        val uuid = UUID.randomUUID()
+        val ref = pending(uuid)
+        card.markWaiting(ref, "TX", 2_000) // async path: WAITING then FAILED via poll
+        // onlineHere = false in the test service → the failure notice must be made durable via the outbox.
+        service.applyOutcome(ref, uuid, "Alice", 50_000, CardOutcome(PaymentStatus.FAILED, null, null, "used card"))
+
+        assertEquals(PaymentStatus.FAILED, card.findByReference(ref)!!.status)
+        assertEquals(1, payloads.size)
+        assertEquals(MessageKeys.CARD_FAILED, payloads[0].messageKey)
+        assertTrue(payloads[0].commands.isEmpty()) // message-only, no reward commands
     }
 
     @Test
