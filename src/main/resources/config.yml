@@ -55,15 +55,12 @@ card:
   # (Cả hai cùng giao thức Nencer; thesieure cần thêm "base-url" trong providers/thesieure.yml.)
   provider: "card2k"
 
-  # Cách xác nhận đơn thẻ: "poll" | "webhook" | "both" | "passive".
+  # Cách xác nhận đơn thẻ: "poll" | "webhook" | "both".
   #   poll    = tự hỏi cổng theo chu kỳ (mặc định; chạy sau NAT, không cần IP public).
   #   webhook = nhận callback GET của card2k (cần webhook.* bật + URL public cấu hình ở dashboard card2k).
   #   both    = vừa poll vừa nhận callback (callback cho nhanh, poll làm lưới an toàn) — không trao trùng.
-  #   passive = KHÔNG hỏi cổng, KHÔNG mở webhook — chỉ nhận kết quả từ database. Dùng khi chạy NHIỀU
-  #             node chung 1 database: đặt ĐÚNG MỘT node là confirmer (poll/webhook/both), các node còn
-  #             lại "passive" để khỏi cùng gọi API (tránh rate-limit). Confirmer xác nhận cho cả mạng;
-  #             mỗi node vẫn tự trao thưởng cho người chơi của mình. CẢNH BÁO: nếu MỌI node đều passive
-  #             thì không ai xác nhận và đơn sẽ hết hạn.
+  # Lưu ý: "passive" là mode CHỈ DÀNH CHO BANK (đơn thẻ luôn được gạch tại node người chơi, per-order,
+  # không có nút cổ chai chung để passive giúp). Nếu đặt "passive" cho card, plugin sẽ tự dùng "poll".
   # Dù chọn mode nào, đơn quá hạn vẫn tự huỷ và đơn còn dở vẫn được resume khi khởi động lại.
   confirmation: "poll"
 

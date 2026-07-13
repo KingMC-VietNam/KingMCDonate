@@ -320,7 +320,7 @@ class KingMCDonate : JavaPlugin() {
         // Webhook resolves WAITING orders; fall back to gateway polling when webhook delivery is not active.
         // Read live so a reloaded confirmation mode / webhook toggle takes effect without a restart.
         val queryGateway = {
-            val mode = configRef().card.confirmation
+            val mode = cardConfirmation()
             val webhookActive = WebhookActivation.webhookEnabledForMode(mode, configRef().webhook.enabled) &&
                 providers.active is CardWebhookCapable
             WebhookActivation.gatewayQueryNeeded(mode, webhookActive)
@@ -328,12 +328,25 @@ class KingMCDonate : JavaPlugin() {
         val pollService =
             CardPollService(cardPaymentDao, service, providers, scheduler, pluginLogger, configRef, queryGateway)
         pluginLogger.debug {
-            "Card confirmation: mode=${configRef().card.confirmation.name.lowercase()} " +
+            "Card confirmation: mode=${cardConfirmation().name.lowercase()} " +
                 "queryGateway=${queryGateway()} webhook=${webhookHandler != null}"
         }
-        warnIfPassive("card", configRef().card.confirmation)
+        if (configRef().card.confirmation == ConfirmationMode.PASSIVE) {
+            pluginLogger.warn(
+                "card.confirmation=passive is not supported for card (card charging is per-order and node-local); " +
+                    "using 'poll'. Passive is a bank-only mode.",
+            )
+        }
         return CardSubsystem(providers, cardPaymentDao, service, chatInput, menu, pollService, webhookHandler)
     }
+
+    /**
+     * The effective card confirmation mode. `passive` is a bank-only concept — for card it coerces to
+     * [ConfirmationMode.POLL] so a card node always self-polls its own WAITING orders (card has no
+     * shared poll bottleneck, so passive would only strand a possibly-charged order). Read live.
+     */
+    private fun cardConfirmation(): ConfirmationMode =
+        configRef().card.confirmation.let { if (it == ConfirmationMode.PASSIVE) ConfirmationMode.POLL else it }
 
     private fun enabledCardTypes(): Set<CardType> =
         configRef().card.cardTypes.mapNotNull { CardType.parse(it) }.toSet()
@@ -428,7 +441,7 @@ class KingMCDonate : JavaPlugin() {
         cardPaymentDao: CardPaymentDao,
         service: CardPaymentService,
     ): WebhookHandler? {
-        val mode = configRef().card.confirmation
+        val mode = cardConfirmation()
         if (!WebhookActivation.webhookEnabledForMode(mode, configRef().webhook.enabled)) return null
         val active = providers.active
         return if (active is CardWebhookCapable) {
