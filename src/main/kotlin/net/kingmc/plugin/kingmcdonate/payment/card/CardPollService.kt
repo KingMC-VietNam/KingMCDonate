@@ -14,16 +14,15 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Drives card confirmation for this node: once on startup and then on a recurring timer. Two
- * concerns split by scope: **timeout stays owner-scoped** (each node fails only its own stale
- * orders, and reconcile delivers rewards only to its own players — housekeeping, always run),
- * while the **gateway re-check is network-wide** — when [queryGateway] returns true this node acts
- * as the confirmer and re-checks every node's live WAITING orders against the active gateway,
- * resolving them through [CardPaymentService]. In webhook-only or passive confirmation [queryGateway]
- * returns false: the gateway is not polled, but the timeout sweep and startup resume still run so a
- * missing callback never strands an order. It is read once per pass so a reloaded confirmation mode /
- * webhook toggle takes effect on the next sweep. Working from the database (not an online-player set)
- * means a restart or a logout does not lose the resolution.
+ * Re-polls WAITING card orders owned by this node: once on startup and then on a
+ * recurring timer. Each pass fails orders older than the timeout (housekeeping, always
+ * run) and, when [queryGateway] returns true, also re-checks each order against the active
+ * gateway and resolves it through [CardPaymentService]. In webhook-only confirmation
+ * [queryGateway] returns false: the gateway is not polled, but the timeout sweep and startup
+ * resume still run so a missing callback never strands an order. It is read once per pass so a
+ * reloaded confirmation mode / webhook toggle takes effect on the next sweep. Working from the
+ * database (not an online-player set) means a restart or a logout does not lose the
+ * resolution.
  *
  * To stay under gateway rate limits the gateway checks are spaced by `pollSpacingMillis`
  * within a sweep, and an order whose check fails (e.g. the gateway is rate-limiting after
@@ -58,44 +57,36 @@ class CardPollService(
     private fun pollOnce() {
         val serverId = config().serverId
         reconcileUnrewarded(serverId)
+        val waiting = cardPaymentDao.findWaitingByServer(serverId)
+        if (waiting.isEmpty()) {
+            backoff.clear()
+            return
+        }
+        // Forget backoff for orders that are no longer WAITING (resolved or timed out elsewhere).
+        backoff.keys.retainAll(waiting.mapTo(HashSet()) { it.referenceCode })
 
         val provider = providers.active
         val timeoutMillis = config().card.timeoutMinutes.coerceAtLeast(1) * 60_000L
+        val spacingMillis = config().card.pollSpacingMillis
         val now = System.currentTimeMillis()
         // Read the gateway-query decision once per pass so a reload's mode/toggle change takes effect next sweep.
         val shouldQueryGateway = queryGateway()
-
-        // Owner-scoped timeout: each node fails only its own stale orders (a final gateway check first when
-        // this node polls, so a charged-but-slow card isn't failed unchecked). Passive nodes do only this.
-        val expired = HashSet<String>()
-        for (payment in cardPaymentDao.findWaitingByServer(serverId)) {
-            if (now - payment.createdAt > timeoutMillis) {
-                if (shouldQueryGateway && payment.cardProvider == provider.name) forceFinalCheck(payment, provider)
-                service.timeout(payment.referenceCode, payment.playerUuid, payment.amount)
-                expired.add(payment.referenceCode)
-            }
+        logger.debug {
+            "Sweeping ${waiting.size} WAITING card order(s) on '$serverId' (queryGateway=$shouldQueryGateway)"
         }
 
-        // Gateway check is network-wide: the confirmer resolves live WAITING orders started on any node.
-        // Passive / webhook-only nodes stop here (housekeeping only).
-        if (!shouldQueryGateway) {
-            backoff.clear()
-            return
-        }
-        val toCheck = cardPaymentDao.findWaitingAllServers()
-            .filter { it.referenceCode !in expired && now - it.createdAt <= timeoutMillis }
-        if (toCheck.isEmpty()) {
-            backoff.clear()
-            return
-        }
-        // Forget backoff for orders that are no longer in the check set (resolved or timed out).
-        backoff.keys.retainAll(toCheck.mapTo(HashSet()) { it.referenceCode })
-        logger.debug { "Sweeping ${toCheck.size} WAITING card order(s) network-wide (confirmer '$serverId')" }
-
-        val spacingMillis = config().card.pollSpacingMillis
         var checkedAny = false
-        for (payment in toCheck) {
+        for (payment in waiting) {
             try {
+                if (now - payment.createdAt > timeoutMillis) {
+                    // Force one final check (ignoring backoff) before failing so a charged-but-slow card
+                    // that the backoff starved isn't failed unchecked; timeout() no-ops if it resolved.
+                    if (shouldQueryGateway && payment.cardProvider == provider.name) forceFinalCheck(payment, provider)
+                    service.timeout(payment.referenceCode, payment.playerUuid, payment.amount)
+                    continue
+                }
+                // Webhook-only: housekeeping (timeout above) runs, but the gateway is not polled.
+                if (!shouldQueryGateway) continue
                 if (payment.cardProvider != provider.name) {
                     logger.debug { "Skipping ${payment.referenceCode}: provider '${payment.cardProvider}' is not active." }
                     continue
@@ -112,9 +103,7 @@ class CardPollService(
                 checkedAny = true
                 val outcome = provider.check(payment.transactionId ?: payment.referenceCode, request)
                 backoff.remove(payment.referenceCode)
-                service.applyOutcome(
-                    payment.referenceCode, payment.playerUuid, payment.playerName, payment.amount, outcome, payment.ownerServer,
-                )
+                service.applyOutcome(payment.referenceCode, payment.playerUuid, payment.playerName, payment.amount, outcome)
             } catch (e: Exception) {
                 val delay = registerBackoff(payment.referenceCode)
                 logger.warn("Failed to poll card order ${payment.referenceCode}: ${e.message}; backing off ${delay}ms")
@@ -130,9 +119,7 @@ class CardPollService(
         )
         try {
             val outcome = provider.check(payment.transactionId ?: payment.referenceCode, request)
-            service.applyOutcome(
-                payment.referenceCode, payment.playerUuid, payment.playerName, payment.amount, outcome, payment.ownerServer,
-            )
+            service.applyOutcome(payment.referenceCode, payment.playerUuid, payment.playerName, payment.amount, outcome)
         } catch (e: Exception) {
             logger.warn("Final pre-timeout check failed for ${payment.referenceCode}: ${e.message}")
         }

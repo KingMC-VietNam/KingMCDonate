@@ -54,7 +54,7 @@ class NencerCallbackHandler(
         KingMCDonateContext.activityLogOrNull?.log(
             "WEBHOOK", "$providerKey callback ref=$reference status=$status -> ${outcome.status}",
         )
-        deps.applyOutcome(reference, order.playerUuid, order.playerName, order.amount, outcome, order.ownerServer)
+        deps.applyOutcome(reference, order.playerUuid, order.playerName, order.amount, outcome)
         return WebhookResponse.ok()
     }
 

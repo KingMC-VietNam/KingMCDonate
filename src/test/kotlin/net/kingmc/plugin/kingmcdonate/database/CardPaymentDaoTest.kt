@@ -63,18 +63,6 @@ class CardPaymentDaoTest {
     }
 
     @Test
-    fun `findWaitingAllServers returns waiting orders from every owner (the confirmer's check set)`() {
-        val a = dao.insertPending(UUID.randomUUID(), "Alice", "VIETTEL", 10_000, "s", "p", "card2k", "node-a", 1_000)
-        val b = dao.insertPending(UUID.randomUUID(), "Bob", "VIETTEL", 10_000, "s", "p", "card2k", "node-b", 1_000)
-        dao.markWaiting(a, "TA", 2_000)
-        dao.markWaiting(b, "TB", 2_000)
-
-        // Owner-scoped view sees only its own; the confirmer's cross-server view sees both.
-        assertEquals(setOf(a), dao.findWaitingByServer("node-a").map { it.referenceCode }.toSet())
-        assertEquals(setOf(a, b), dao.findWaitingAllServers().map { it.referenceCode }.toSet())
-    }
-
-    @Test
     fun `reference codes are unique across inserts`() {
         assertNotEquals(insert(), insert())
     }
