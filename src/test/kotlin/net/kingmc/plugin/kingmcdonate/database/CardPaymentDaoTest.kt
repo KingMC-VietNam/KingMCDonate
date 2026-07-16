@@ -41,6 +41,24 @@ class CardPaymentDaoTest {
         dao.insertPending(uuid, "Alice", "VIETTEL", 10_000, "seri", "pin", "card2k", "node-a", 1_000)
 
     @Test
+    fun `the resolvable set covers PENDING as well as WAITING for the owner server`() {
+        // PENDING must be in the set: a node that died before its charge completed leaves the order
+        // there, and only the poll can reconcile it.
+        val stillPending = insert()
+        val waiting = insert()
+        dao.markWaiting(waiting, "T1", 2_000)
+        val done = insert()
+        dao.resolve(done, PaymentStatus.SUCCESS, 100, 2_000)
+        val otherNode = dao.insertPending(UUID.randomUUID(), "Bob", "VIETTEL", 10_000, "s", "p", "card2k", "node-b", 1_000)
+
+        val refs = dao.findResolvableByServer("node-a").map { it.referenceCode }
+
+        assertEquals(setOf(stillPending, waiting), refs.toSet())
+        assertEquals(false, refs.contains(done), "a resolved order is not resolvable again")
+        assertEquals(false, refs.contains(otherNode), "polling stays owner-scoped")
+    }
+
+    @Test
     fun `resolve rewards exactly once`() {
         val ref = insert()
         assertEquals(1, dao.resolve(ref, PaymentStatus.SUCCESS, 100, 2_000))
@@ -53,13 +71,13 @@ class CardPaymentDaoTest {
         val ref = insert()
         assertEquals(1, dao.markWaiting(ref, "T1", 2_000))
 
-        val waiting = dao.findWaitingByServer("node-a")
+        val waiting = dao.findResolvableByServer("node-a")
         assertEquals(1, waiting.size)
         assertEquals("T1", waiting.first().transactionId)
         assertEquals(PaymentStatus.WAITING, waiting.first().status)
 
         assertEquals(1, dao.resolve(ref, PaymentStatus.SUCCESS, 100, 3_000))
-        assertEquals(0, dao.findWaitingByServer("node-a").size)
+        assertEquals(0, dao.findResolvableByServer("node-a").size)
     }
 
     @Test

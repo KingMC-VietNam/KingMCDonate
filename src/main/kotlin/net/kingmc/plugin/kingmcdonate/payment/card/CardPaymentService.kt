@@ -157,11 +157,11 @@ class CardPaymentService(
         }
     }
 
-    /** Mark an expired WAITING order FAILED (called by the poll service on timeout). */
+    /** Mark an expired open order FAILED (called by the poll service on timeout). */
     fun timeout(referenceCode: String, uuid: UUID, amountVnd: Long) {
         val rows = cardPaymentDao.resolve(referenceCode, PaymentStatus.FAILED, 0, System.currentTimeMillis())
         if (rows == 1) {
-            logger.warn("Card order $referenceCode timed out while WAITING; marked FAILED.")
+            logger.warn("Card order $referenceCode timed out unresolved; marked FAILED.")
             logFailed(referenceCode, "timeout")
             notifyFailure(referenceCode, uuid, MessageKeys.CARD_FAILED, "reason" to messages().get(MessageKeys.CARD_REASON_TIMEOUT))
             onFailed(uuid, amountVnd, referenceCode, "timeout")
@@ -191,15 +191,6 @@ class CardPaymentService(
         val now0 = System.currentTimeMillis()
         val point = promo.applyBonus(basePoint, now0)
 
-        if (!currency.active.isAvailable()) {
-            // Reward backend is down: keep the order open instead of flipping it SUCCESS so points
-            // are never credited silently and the poll service can settle it once currency returns.
-            cardPaymentDao.markWaiting(referenceCode, outcome.transactionId, System.currentTimeMillis())
-            logger.error("Card $referenceCode: currency provider unavailable; left WAITING, reward not credited.")
-            message(uuid, MessageKeys.CURRENCY_UNAVAILABLE)
-            return
-        }
-
         // Flip status and accumulate totals in one transaction so they commit together (exactly once);
         // the external point credit is then applied under a separate gate so a reconcile pass can
         // re-credit a SUCCESS order whose credit never landed (e.g. a crash before grantReward).
@@ -221,6 +212,15 @@ class CardPaymentService(
         if (!committed) return
 
         logger.debug { "Card SUCCESS ref=$referenceCode uuid=$uuid +${point}pt amount=$declaredAmount" }
+        if (!currency.active.isAvailable()) {
+            // The charge is real and now banked (status + totals), but `reward_applied` stays 0 so the
+            // owner-scoped reconcile pass credits it once the backend returns. Leaving the order open
+            // instead would strand it: in webhook-only mode nothing ever re-checks a WAITING order, so
+            // it would simply time out FAILED with the card already charged.
+            logger.error("Card $referenceCode: currency provider unavailable; SUCCESS recorded, credit deferred to reconcile.")
+            message(uuid, MessageKeys.CURRENCY_UNAVAILABLE)
+            return
+        }
         applyReward(referenceCode, uuid, name, declaredAmount, point, providers.active.name)
     }
 
@@ -245,6 +245,7 @@ class CardPaymentService(
     }
 
     private fun message(uuid: UUID, key: String, vararg vars: Pair<String, String>) {
+        if (!onlineHere(uuid)) return
         val player = Bukkit.getPlayer(uuid) ?: return
         scheduler.runAtEntity(player) { messages().send(player, key, *vars) }
     }

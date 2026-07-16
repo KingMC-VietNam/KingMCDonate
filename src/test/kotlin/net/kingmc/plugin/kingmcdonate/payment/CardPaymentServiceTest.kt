@@ -184,6 +184,43 @@ class CardPaymentServiceTest {
     }
 
     @Test
+    fun `a charged card with the currency backend down is recorded SUCCESS with the credit deferred`() {
+        val uuid = UUID.randomUUID()
+        val ref = pending(uuid)
+        fakeCurrency.available = false // the backend goes down after startup, mid-flight
+
+        service.award(ref, uuid, "Alice", 50_000, CardOutcome(PaymentStatus.SUCCESS, null, null, ""))
+
+        // The charge is banked (status + totals) but reward_applied stays 0, so the order is not
+        // left WAITING to be timed out — in webhook-only mode nothing would ever re-check it.
+        assertEquals(PaymentStatus.SUCCESS, card.findByReference(ref)!!.status)
+        assertEquals(50_000L, totalAll(uuid))
+        assertEquals(0L, fakeCurrency.balance(uuid), "points must not be credited while the backend is down")
+        assertEquals(
+            listOf(ref),
+            card.findSuccessUnrewardedByServer("node-a").map { it.referenceCode },
+            "the reconcile pass must be able to find it",
+        )
+    }
+
+    @Test
+    fun `the deferred credit lands exactly once once the currency backend returns`() {
+        val uuid = UUID.randomUUID()
+        val ref = pending(uuid)
+        fakeCurrency.available = false
+        service.award(ref, uuid, "Alice", 50_000, CardOutcome(PaymentStatus.SUCCESS, null, null, ""))
+
+        fakeCurrency.available = true
+        val order = card.findByReference(ref)!!
+        service.reapplyReward(order)
+        service.reapplyReward(order) // a second pass must not credit again
+
+        assertEquals(50L, fakeCurrency.balance(uuid))
+        assertEquals(50_000L, totalAll(uuid), "totals were committed once, at award time")
+        assertTrue(card.findSuccessUnrewardedByServer("node-a").isEmpty(), "the order is no longer unrewarded")
+    }
+
+    @Test
     fun `active promo increases credited points and persisted point`() {
         val now = System.currentTimeMillis()
         service = buildService(promoCfg = PromoConfig(listOf(PromoConfig.Promo("x", 100.0, now - 1000, now + 60_000))))

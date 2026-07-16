@@ -110,14 +110,22 @@ class CardPaymentDao(database: Database) : PaymentDao<CardPayment>(database, "ca
             ps.executeUpdate()
         }
 
-    /** Oldest WAITING orders owned by [serverId], capped per pass, for poll/resume. */
-    fun findWaitingByServer(serverId: String): List<CardPayment> = withConnection { conn ->
+    /**
+     * Oldest non-terminal orders owned by [serverId], capped per pass, for poll/resume.
+     *
+     * PENDING is included as well as WAITING: a node that died between the synchronous PENDING
+     * insert and the charge completing leaves the order there, and the poll is the only thing that
+     * can reconcile it. The caller decides what to do with each status — a PENDING order still
+     * inside its timeout may have a charge POST in flight and must not be touched.
+     */
+    fun findResolvableByServer(serverId: String): List<CardPayment> = withConnection { conn ->
         conn.prepareStatement(
-            "SELECT * FROM card_payments WHERE owner_server = ? AND status = ? ORDER BY created_at LIMIT ?",
+            "SELECT * FROM card_payments WHERE owner_server = ? AND status IN (?, ?) ORDER BY created_at LIMIT ?",
         ).use { ps ->
             ps.setString(1, serverId)
-            ps.setString(2, PaymentStatus.WAITING.storageValue)
-            ps.setInt(3, MAX_BATCH)
+            ps.setString(2, PaymentStatus.PENDING.storageValue)
+            ps.setString(3, PaymentStatus.WAITING.storageValue)
+            ps.setInt(4, MAX_BATCH)
             ps.executeQuery().use { rs -> rs.mapAll { toModel() } }
         }
     }

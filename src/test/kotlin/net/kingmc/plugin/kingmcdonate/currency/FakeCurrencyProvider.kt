@@ -2,10 +2,10 @@ package net.kingmc.plugin.kingmcdonate.currency
 
 import java.util.UUID
 
-/** In-memory [CurrencyProvider] for tests. */
+/** In-memory [CurrencyProvider] for tests; [available] is settable so a test can bring the backend back. */
 class FakeCurrencyProvider(
     override val name: String = "fake",
-    private val available: Boolean = true,
+    var available: Boolean = true,
 ) : CurrencyProvider {
 
     private val balances = HashMap<UUID, Long>()

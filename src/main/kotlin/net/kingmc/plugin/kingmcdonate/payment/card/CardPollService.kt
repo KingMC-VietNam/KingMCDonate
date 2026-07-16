@@ -3,6 +3,7 @@ package net.kingmc.plugin.kingmcdonate.payment.card
 import net.kingmc.plugin.kingmcdonate.config.PluginConfig
 import net.kingmc.plugin.kingmcdonate.database.dao.CardPaymentDao
 import net.kingmc.plugin.kingmcdonate.payment.model.CardPayment
+import net.kingmc.plugin.kingmcdonate.payment.model.PaymentStatus
 import net.kingmc.plugin.kingmcdonate.payment.runExclusively
 import net.kingmc.plugin.kingmcdonate.provider.card.CardProvider
 import net.kingmc.plugin.kingmcdonate.provider.card.CardProviderRegistry
@@ -14,9 +15,18 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Re-polls WAITING card orders owned by this node: once on startup and then on a
- * recurring timer. Each pass fails orders older than the timeout (housekeeping, always
- * run) and, when [queryGateway] returns true, also re-checks each order against the active
+ * Re-polls the open card orders owned by this node — PENDING as well as WAITING — once on
+ * startup and then on a recurring timer.
+ *
+ * A PENDING order still inside its timeout is skipped entirely: its charge POST may be in
+ * flight on this node, and checking it would race that submit into a FAILED order that the
+ * landing charge could never be awarded against. Past the timeout no submit can still be
+ * running (a charge is bounded by the HTTP timeouts, minutes below `card.timeout`), so the
+ * order is either an orphan from a dead node or a stale WAITING — both are reconciled by one
+ * final idempotent gateway check and then closed.
+ *
+ * Each pass fails orders older than the timeout (housekeeping, always
+ * run) and, when [queryGateway] returns true, also re-checks each WAITING order against the active
  * gateway and resolves it through [CardPaymentService]. In webhook-only confirmation
  * [queryGateway] returns false: the gateway is not polled, but the timeout sweep and startup
  * resume still run so a missing callback never strands an order. It is read once per pass so a
@@ -54,16 +64,16 @@ class CardPollService(
 
     private fun poll() = polling.runExclusively(logger, "card") { pollOnce() }
 
-    private fun pollOnce() {
+    internal fun pollOnce() {
         val serverId = config().serverId
         reconcileUnrewarded(serverId)
-        val waiting = cardPaymentDao.findWaitingByServer(serverId)
-        if (waiting.isEmpty()) {
+        val resolvable = cardPaymentDao.findResolvableByServer(serverId)
+        if (resolvable.isEmpty()) {
             backoff.clear()
             return
         }
-        // Forget backoff for orders that are no longer WAITING (resolved or timed out elsewhere).
-        backoff.keys.retainAll(waiting.mapTo(HashSet()) { it.referenceCode })
+        // Forget backoff for orders that are no longer open (resolved or timed out elsewhere).
+        backoff.keys.retainAll(resolvable.mapTo(HashSet()) { it.referenceCode })
 
         val provider = providers.active
         val timeoutMillis = config().card.timeoutMinutes.coerceAtLeast(1) * 60_000L
@@ -72,12 +82,17 @@ class CardPollService(
         // Read the gateway-query decision once per pass so a reload's mode/toggle change takes effect next sweep.
         val shouldQueryGateway = queryGateway()
         logger.debug {
-            "Sweeping ${waiting.size} WAITING card order(s) on '$serverId' (queryGateway=$shouldQueryGateway)"
+            "Sweeping ${resolvable.size} open card order(s) on '$serverId' (queryGateway=$shouldQueryGateway)"
         }
 
         var checkedAny = false
-        for (payment in waiting) {
+        for (payment in resolvable) {
             try {
+                // A PENDING order inside its timeout may have its charge POST in flight on this node
+                // right now. Checking it would race that submit: the gateway does not know the card
+                // yet, so the check reports failure, the order is closed FAILED, and the charge that
+                // lands a moment later can never be awarded. Leave it strictly alone until it ages out.
+                if (payment.status == PaymentStatus.PENDING && now - payment.createdAt <= timeoutMillis) continue
                 if (now - payment.createdAt > timeoutMillis) {
                     // Force one final check (ignoring backoff) before failing so a charged-but-slow card
                     // that the backoff starved isn't failed unchecked; timeout() no-ops if it resolved.
