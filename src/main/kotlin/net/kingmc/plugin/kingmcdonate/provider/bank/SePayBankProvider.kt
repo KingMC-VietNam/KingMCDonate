@@ -29,7 +29,8 @@ class SePayBankProvider(
     private val apiToken: String,
     private val sandbox: Boolean,
     private val logger: PluginLogger,
-    private val webhookAuth: String = "none",
+    // Blank, not "none": an unspecified scheme must reject, never accept every webhook.
+    private val webhookAuth: String = "",
     private val webhookSecret: String = "",
     private val webhookApiKey: String = "",
     private val accountHolder: String = "",

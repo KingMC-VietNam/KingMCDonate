@@ -27,7 +27,8 @@ class Web2MBankProvider(
     private val token: String,
     private val logger: PluginLogger,
     private val accountHolder: String = "",
-    private val webhookAuth: String = "none",
+    // Blank, not "none": an unspecified scheme must reject, never accept every webhook.
+    private val webhookAuth: String = "",
     private val webhookToken: String = "",
 ) : BankProvider, BankWebhookCapable {
 

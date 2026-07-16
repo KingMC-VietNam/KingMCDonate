@@ -9,6 +9,10 @@ import java.util.UUID
  * claims a row and marks it delivered in one statement, so no row's payload can run on two
  * nodes or run twice after a crash. There is no reaper — a crash between the mark and the
  * dispatch loses that one reward rather than replaying its reward commands.
+ *
+ * `delivered` is the sole authority on whether a row is still up for grabs; `claimed_by`/`claimed_at`
+ * are an audit trail of who took it. They move together in [claimAndDeliver], so a row the previous
+ * at-least-once code left claimed-but-undelivered stays claimable instead of stranding.
  */
 class PendingRewardDao(database: Database) : Dao(database) {
 
@@ -26,25 +30,25 @@ class PendingRewardDao(database: Database) : Dao(database) {
         }
     }
 
-    /** Unclaimed, undelivered rows (any player), capped at [limit]; the deliverer filters to local players. */
+    /** Undelivered rows (any player), capped at [limit]; the deliverer filters to local players. */
     fun findClaimable(limit: Int): List<PendingReward> = withConnection { conn ->
         conn.prepareStatement(
             "SELECT id, player_uuid, reference_code, payload FROM pending_reward " +
-                "WHERE delivered = 0 AND claimed_by IS NULL ORDER BY created_at LIMIT ?",
+                "WHERE delivered = 0 ORDER BY created_at LIMIT ?",
         ).use { ps ->
             ps.setInt(1, limit)
             ps.executeQuery().use { rs -> rs.mapAll { toPendingReward() } }
         }
     }
 
-    /** Unclaimed, undelivered rows for any of [playerUuids]; empty when the input is empty. */
+    /** Undelivered rows for any of [playerUuids]; empty when the input is empty. */
     fun findClaimableFor(playerUuids: Collection<UUID>): List<PendingReward> {
         if (playerUuids.isEmpty()) return emptyList()
         val placeholders = playerUuids.joinToString(",") { "?" }
         return withConnection { conn ->
             conn.prepareStatement(
                 "SELECT id, player_uuid, reference_code, payload FROM pending_reward " +
-                    "WHERE delivered = 0 AND claimed_by IS NULL AND player_uuid IN ($placeholders)",
+                    "WHERE delivered = 0 AND player_uuid IN ($placeholders)",
             ).use { ps ->
                 playerUuids.forEachIndexed { i, uuid -> ps.setString(i + 1, uuid.toString()) }
                 ps.executeQuery().use { rs -> rs.mapAll { toPendingReward() } }

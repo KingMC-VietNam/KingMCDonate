@@ -97,6 +97,28 @@ class PendingRewardDaoTest {
     }
 
     @Test
+    fun `a row left claimed by the previous at-least-once code is still deliverable after the upgrade`() {
+        // Pre-upgrade state: a node claimed this row and died before delivering. The reaper used to
+        // requeue it; the reaper is gone, so `delivered` must be the sole authority on claimability
+        // or the row would be stranded forever with no audit line.
+        val uuid = UUID.randomUUID()
+        dao.enqueue(uuid, "KMDSTUCK01", """{"message":"hi"}""", 1_000)
+        database.withConnection { conn ->
+            conn.prepareStatement(
+                "UPDATE pending_reward SET claimed_by = 'dead-node', claimed_at = 1500 WHERE reference_code = ?",
+            ).use { ps ->
+                ps.setString(1, "KMDSTUCK01")
+                ps.executeUpdate()
+            }
+        }
+
+        val row = dao.findClaimable(10).singleOrNull { it.referenceCode == "KMDSTUCK01" }
+        assertTrue(row != null, "a row stranded by the old code must be claimable again")
+        assertEquals(1, dao.claimAndDeliver(row!!.id, "node-b", 2_000))
+        assertTrue(dao.findClaimableFor(listOf(uuid)).isEmpty())
+    }
+
+    @Test
     fun `an enqueued payload is stored verbatim for the delivering node`() {
         val uuid = UUID.randomUUID()
         val payload = """{"messageKey":"bank-success","commands":["console: give {player}"]}"""

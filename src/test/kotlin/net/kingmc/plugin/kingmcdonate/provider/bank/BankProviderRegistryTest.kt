@@ -132,6 +132,34 @@ class BankProviderRegistryTest {
     }
 
     @Test
+    fun `a provider built without an explicit scheme rejects rather than accepting all`() {
+        // The registry passes the scheme explicitly, but the constructor default must fail closed too —
+        // otherwise any future construction site silently re-opens the hole this spec closed.
+        val sepay = SePayBankProvider(
+            httpGet = { _, _ -> "" },
+            accountNumber = "0123456789", bank = "ACB", apiToken = "token", sandbox = false, logger = logger,
+        )
+        val web2m = Web2MBankProvider(
+            httpGet = { _, _ -> "" },
+            accountNumber = "0123456789", bankType = BankType.ACB, password = "secret", token = "tok",
+            logger = logger,
+        )
+        for (provider in listOf(sepay, web2m)) {
+            val handler = (provider as BankWebhookCapable).webhookHandler(
+                BankWebhookDeps(
+                    findPendingByContainedReference = { _, _ -> null },
+                    confirm = { throw AssertionError("an unauthenticated webhook must never confirm") },
+                    logger = logger,
+                ),
+            )
+            val response = handler.handle(
+                WebhookRequest("POST", "/kmd", emptyMap(), emptyMap(), "{}".toByteArray()),
+            )
+            assertEquals(401, response.status, "${provider.name} must reject when no scheme was given")
+        }
+    }
+
+    @Test
     fun `a default web2m yml ships on the classpath`() {
         val shipped = javaClass.classLoader.getResource("providers/web2m.yml")
         assertNotNull(shipped, "providers/web2m.yml must be shipped")
