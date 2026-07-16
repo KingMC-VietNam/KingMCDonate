@@ -5,9 +5,10 @@ import net.kingmc.plugin.kingmcdonate.payment.reward.PendingReward
 import java.util.UUID
 
 /**
- * The multi-node reward outbox (`pending_reward`). Delivery is claimed atomically
- * (`SET claimed_by WHERE claimed_by IS NULL`) so only one node runs a row; a
- * stale-claim reaper requeues rows a dead claimer never delivered.
+ * The multi-node reward outbox (`pending_reward`). Delivery is at-most-once: [claimAndDeliver]
+ * claims a row and marks it delivered in one statement, so no row's payload can run on two
+ * nodes or run twice after a crash. There is no reaper — a crash between the mark and the
+ * dispatch loses that one reward rather than replaying its reward commands.
  */
 class PendingRewardDao(database: Database) : Dao(database) {
 
@@ -57,6 +58,22 @@ class PendingRewardDao(database: Database) : Dao(database) {
         referenceCode = getString("reference_code"),
         payload = getString("payload"),
     )
+
+    /**
+     * Atomically claim row [id] for [node] **and** mark it delivered, in one statement; returns 1
+     * for the single winner, 0 otherwise. Marking before the payload runs is what makes delivery
+     * at-most-once: only the winner may dispatch, and no later pass can hand the row to anyone else.
+     */
+    fun claimAndDeliver(id: Long, node: String, now: Long): Int = withConnection { conn ->
+        conn.prepareStatement(
+            "UPDATE pending_reward SET delivered = 1, claimed_by = ?, claimed_at = ? WHERE id = ? AND delivered = 0",
+        ).use { ps ->
+            ps.setString(1, node)
+            ps.setLong(2, now)
+            ps.setLong(3, id)
+            ps.executeUpdate()
+        }
+    }
 
     /** Atomically claim row [id] for [node]; returns 1 for the single winner, 0 otherwise. */
     fun claim(id: Long, node: String, now: Long): Int = withConnection { conn ->
