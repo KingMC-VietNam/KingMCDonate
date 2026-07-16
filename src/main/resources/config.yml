@@ -165,10 +165,6 @@ bank:
 # ============================================================
 # Chu kỳ quét hàng đợi trao thưởng cần người chơi hiện diện (ticks; 20 ticks = 1 giây).
 reward-delivery-interval: 40
-# KHÔNG CÒN TÁC DỤNG — giữ lại để config cũ không báo lỗi; sẽ xoá ở bản sau.
-# Trước đây bản ghi bị node chết giành quá số phút này sẽ được trả lại cho node khác. Cơ chế đó đã bỏ:
-# mỗi phần thưởng giờ được đánh dấu ngay lúc giành, chạy tối đa 1 lần trên đúng 1 node (không trao trùng).
-stale-claim-minutes: 5
 
 # ============================================================
 #  Lệnh thưởng theo mốc (dùng chung thẻ + bank)

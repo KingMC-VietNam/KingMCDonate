@@ -23,9 +23,6 @@ class PluginConfig(root: ConfigurationSection) {
     /** How often the reward outbox is drained, in ticks. */
     val rewardDeliveryIntervalTicks: Long = root.getLong("reward-delivery-interval", 40L).coerceAtLeast(1L)
 
-    /** A claimed-but-undelivered outbox row older than this many minutes is requeued. */
-    val staleClaimMinutes: Long = root.getLong("stale-claim-minutes", 5L).coerceAtLeast(1L)
-
     val pointUnit: String = root.getString("point-unit", "point")!!
     val broadcast: BroadcastConfig = BroadcastConfig(root.getConfigurationSection("broadcast"))
     val firstTopup: FirstTopupConfig = FirstTopupConfig(root.getConfigurationSection("first-topup"))
