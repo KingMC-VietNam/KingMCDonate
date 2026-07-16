@@ -75,33 +75,4 @@ class PendingRewardDao(database: Database) : Dao(database) {
         }
     }
 
-    /** Atomically claim row [id] for [node]; returns 1 for the single winner, 0 otherwise. */
-    fun claim(id: Long, node: String, now: Long): Int = withConnection { conn ->
-        conn.prepareStatement(
-            "UPDATE pending_reward SET claimed_by = ?, claimed_at = ? WHERE id = ? AND claimed_by IS NULL",
-        ).use { ps ->
-            ps.setString(1, node)
-            ps.setLong(2, now)
-            ps.setLong(3, id)
-            ps.executeUpdate()
-        }
-    }
-
-    fun markDelivered(id: Long): Int = withConnection { conn ->
-        conn.prepareStatement("UPDATE pending_reward SET delivered = 1 WHERE id = ?").use { ps ->
-            ps.setLong(1, id)
-            ps.executeUpdate()
-        }
-    }
-
-    /** Clear claims older than [thresholdMillis] that were never delivered; returns the requeued count. */
-    fun reapStale(thresholdMillis: Long, now: Long): Int = withConnection { conn ->
-        conn.prepareStatement(
-            "UPDATE pending_reward SET claimed_by = NULL, claimed_at = NULL " +
-                "WHERE delivered = 0 AND claimed_by IS NOT NULL AND claimed_at < ?",
-        ).use { ps ->
-            ps.setLong(1, now - thresholdMillis)
-            ps.executeUpdate()
-        }
-    }
 }

@@ -2,7 +2,6 @@ package net.kingmc.plugin.kingmcdonate.database
 
 import net.kingmc.plugin.kingmcdonate.config.PluginConfig
 import net.kingmc.plugin.kingmcdonate.database.dao.BankPaymentDao
-import net.kingmc.plugin.kingmcdonate.database.dao.PendingRewardDao
 import net.kingmc.plugin.kingmcdonate.database.dao.ProcessedBankTxDao
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger
 import org.junit.jupiter.api.AfterEach
@@ -27,7 +26,6 @@ class BankDaoTest {
     private lateinit var database: Database
     private lateinit var bank: BankPaymentDao
     private lateinit var processed: ProcessedBankTxDao
-    private lateinit var outbox: PendingRewardDao
 
     @BeforeEach
     fun setUp() {
@@ -37,7 +35,6 @@ class BankDaoTest {
         }
         bank = BankPaymentDao(database)
         processed = ProcessedBankTxDao(database)
-        outbox = PendingRewardDao(database)
     }
 
     @AfterEach
@@ -125,53 +122,4 @@ class BankDaoTest {
         assertFalse(processed.insertIfAbsent("TX1", "REF1", 2_000))
     }
 
-    @Test
-    fun `outbox claim has a single winner and reaper requeues stale claims`() {
-        outbox.enqueue(UUID.randomUUID(), "REF1", "{}", 1_000)
-        val row = outbox.findClaimableFor(listOf(claimableUuid())).first()
-
-        assertEquals(1, outbox.claim(row.id, "node-a", 2_000))
-        assertEquals(0, outbox.claim(row.id, "node-b", 2_001))
-
-        // Not yet stale: reaper leaves it. Past threshold: requeued and claimable again.
-        assertEquals(0, outbox.reapStale(thresholdMillis = 10_000, now = 5_000))
-        assertEquals(1, outbox.reapStale(thresholdMillis = 10_000, now = 20_000))
-        assertEquals(1, outbox.claim(row.id, "node-b", 21_000))
-    }
-
-    @Test
-    fun `outbox payload is unchanged after a stale requeue`() {
-        val uuid = UUID.randomUUID()
-        val payload = """{"messageKey":"bank-success","commands":["console: give {player}"]}"""
-        outbox.enqueue(uuid, "REF1", payload, 1_000)
-        val row = outbox.findClaimable(10).first()
-        outbox.claim(row.id, "node-a", 2_000)
-        outbox.reapStale(thresholdMillis = 10_000, now = 20_000)
-        val requeued = outbox.findClaimable(10).first()
-        assertEquals(payload, requeued.payload)
-    }
-
-    @Test
-    fun `delivered rows are not claimable`() {
-        val uuid = UUID.randomUUID()
-        outbox.enqueue(uuid, "REF1", "{}", 1_000)
-        val row = outbox.findClaimableFor(listOf(uuid)).first()
-        outbox.claim(row.id, "node-a", 2_000)
-        outbox.markDelivered(row.id)
-        assertTrue(outbox.findClaimableFor(listOf(uuid)).isEmpty())
-        assertNull(outbox.findClaimableFor(emptyList()).firstOrNull())
-    }
-
-    private fun claimableUuid(): UUID =
-        outbox.findClaimableFor(allOutboxUuids()).first().playerUuid
-
-    private fun allOutboxUuids(): List<UUID> = database.withConnection { conn ->
-        conn.prepareStatement("SELECT player_uuid FROM pending_reward").use { ps ->
-            ps.executeQuery().use { rs ->
-                val out = ArrayList<UUID>()
-                while (rs.next()) out.add(UUID.fromString(rs.getString("player_uuid")))
-                out
-            }
-        }
-    }
 }

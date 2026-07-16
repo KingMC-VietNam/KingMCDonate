@@ -88,4 +88,20 @@ class PendingRewardDaoTest {
 
         assertTrue(dao.findClaimableFor(listOf(uuid)).isEmpty(), "the join path must not redeliver a won row")
     }
+
+    @Test
+    fun `a per-player lookup for nobody returns nothing`() {
+        enqueue()
+
+        assertTrue(dao.findClaimableFor(emptyList()).isEmpty(), "an empty input must not fall back to every row")
+    }
+
+    @Test
+    fun `an enqueued payload is stored verbatim for the delivering node`() {
+        val uuid = UUID.randomUUID()
+        val payload = """{"messageKey":"bank-success","commands":["console: give {player}"]}"""
+        dao.enqueue(uuid, "REF1", payload, 1_000)
+
+        assertEquals(payload, dao.findClaimable(10).single().payload)
+    }
 }

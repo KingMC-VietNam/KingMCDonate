@@ -14,10 +14,14 @@ import java.util.UUID
 /**
  * The multi-node reward outbox. Player-present rewards (messages, reward commands)
  * are enqueued by the confirming node and delivered by whichever node has the player
- * online — via a recurring timer and on join. A row is taken by an atomic claim
- * before it is run; the claim wins for exactly one node, and `delivered` is set right
- * after dispatch. A reaper requeues rows a dead claimer never delivered, so delivery
- * is at-least-once and reward commands are expected to tolerate replay.
+ * online — via a recurring timer and on join.
+ *
+ * Delivery is **at-most-once**: [PendingRewardDao.claimAndDeliver] claims a row and marks
+ * it delivered in one statement, before the payload runs, so exactly one node dispatches
+ * a row and nothing can hand it out again. A crash between that mark and the dispatch
+ * loses that single reward — deliberate, because the alternative replays reward commands
+ * (`give`, `lp add`) and silently inflates the economy. Losses are logged by reference for
+ * manual reconciliation. The financial point credit is separate (`RewardGate`) and unaffected.
  */
 class RewardDeliveryService(
     private val dao: PendingRewardDao,
@@ -25,6 +29,8 @@ class RewardDeliveryService(
     private val logger: PluginLogger,
     private val config: () -> PluginConfig,
     private val messages: () -> Messages,
+    // Seam: is the player online on THIS node right now? Injected so delivery is testable.
+    private val onlineHere: (UUID) -> Boolean = { Bukkit.getPlayer(it) != null },
 ) : RewardSink {
 
     /** Enqueue a player-present reward. The payload is fully resolved at this point. */
@@ -35,7 +41,7 @@ class RewardDeliveryService(
 
     fun start() {
         val period = config().rewardDeliveryIntervalTicks.coerceAtLeast(1)
-        scheduler.runTimerAsync({ scheduler.runIo(::drainAndReap) }, period, period)
+        scheduler.runTimerAsync({ scheduler.runIo(::drain) }, period, period)
     }
 
     /** Deliver any outstanding rewards for a player who just joined this node. */
@@ -43,31 +49,42 @@ class RewardDeliveryService(
         scheduler.runIo { deliver(dao.findClaimableFor(listOf(player.uniqueId))) }
     }
 
-    private fun drainAndReap() {
+    private fun drain() {
         deliver(dao.findClaimable(BATCH))
-        val staleMillis = config().staleClaimMinutes.coerceAtLeast(1) * 60_000L
-        val requeued = dao.reapStale(staleMillis, System.currentTimeMillis())
-        if (requeued > 0) logger.warn("Requeued $requeued stale outbox reward(s) for re-delivery.")
     }
 
     private fun deliver(rows: List<PendingReward>) {
         if (rows.isEmpty()) return
         val node = config().serverId
-        val now = System.currentTimeMillis()
-        for (row in rows) {
-            val player = Bukkit.getPlayer(row.playerUuid) ?: continue
-            // Claim first: only the single winner runs the payload.
-            if (dao.claim(row.id, node, now) != 1) continue
-            val payload = parse(row.payload) ?: run {
-                dao.markDelivered(row.id)
+        for ((row, payload) in claimDeliverable(rows, node, System.currentTimeMillis())) {
+            logger.info("Outbox dispatching ref=${row.referenceCode} uuid=${row.playerUuid} on '$node'.")
+            // Re-resolve: the claim above already marked the row, so if the player left in between
+            // this reward is gone. Log it by reference — that is the at-most-once trade.
+            val player = Bukkit.getPlayer(row.playerUuid) ?: run {
+                logger.error(
+                    "Outbox reward ref=${row.referenceCode} uuid=${row.playerUuid} was claimed on '$node' but the " +
+                        "player left before dispatch; it is LOST and needs manual reconciliation.",
+                )
                 continue
             }
-            scheduler.runAtEntity(player) {
-                runPayload(player, payload)
-                scheduler.runIo { dao.markDelivered(row.id) }
-            }
-            logger.debug { "Outbox delivered ref=${row.referenceCode} uuid=${row.playerUuid} on '$node'" }
+            scheduler.runAtEntity(player) { runPayload(player, payload) }
         }
+    }
+
+    /**
+     * The rows this node may run: the player is online here and the atomic claim-and-mark won.
+     * Marking happens here, before any dispatch, which is what makes delivery at-most-once.
+     * Returns data only (no `Player`), so the invariant is testable without a running server.
+     */
+    internal fun claimDeliverable(
+        rows: List<PendingReward>,
+        node: String,
+        now: Long,
+    ): List<Pair<PendingReward, RewardPayload>> = rows.mapNotNull { row ->
+        if (!onlineHere(row.playerUuid)) return@mapNotNull null
+        if (dao.claimAndDeliver(row.id, node, now) != 1) return@mapNotNull null
+        // An unreadable payload is dropped: the row is already marked, so it is not retried forever.
+        parse(row.payload)?.let { row to it }
     }
 
     private fun runPayload(player: Player, payload: RewardPayload) {
