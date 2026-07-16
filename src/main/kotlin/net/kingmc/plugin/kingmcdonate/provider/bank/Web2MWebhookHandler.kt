@@ -26,6 +26,10 @@ class Web2MWebhookHandler(
 
     override val providerKey = Web2MBankProvider.NAME
 
+    init {
+        BankWebhookAuth.warnOnStartup(auth, Web2MBankProvider.NAME, deps.logger)
+    }
+
     override fun handle(request: WebhookRequest): WebhookResponse {
         if (!verify(request)) {
             deps.logger.warn("Web2M webhook rejected: authentication failed (scheme=$auth).")

@@ -25,12 +25,12 @@ class SePayWebhookHandlerTest {
 
     private var confirmed: net.kingmc.plugin.kingmcdonate.provider.bank.BankConfirmation? = null
 
-    private fun deps(found: BankPayment? = order) = BankWebhookDeps(
+    private fun deps(found: BankPayment? = order, log: PluginLogger = logger) = BankWebhookDeps(
         findPendingByContainedReference = { haystack, amount ->
             found?.takeIf { haystack.contains(it.referenceCode) && amount == it.amount }
         },
         confirm = { confirmed = it },
-        logger = logger,
+        logger = log,
     )
 
     private fun body(
@@ -94,6 +94,40 @@ class SePayWebhookHandlerTest {
         val raw = body(amount = 50_000, content = "CK KMDSTALE01 KMD7X9A2QP NAP")
         SePayWebhookHandler("hmac", secret, "", "", deps).handle(hmacRequest(raw))
         assertEquals("KMD7X9A2QP", confirmed?.referenceCode)
+    }
+
+    @Test
+    fun `a blank auth scheme rejects with 401 and never confirms`() {
+        val response = handler("").handle(hmacRequest(body()))
+        assertEquals(401, response.status)
+        assertNull(confirmed)
+    }
+
+    @Test
+    fun `a blank auth scheme warns at construction that requests will be rejected`() {
+        val capturing = CapturingLogger()
+        SePayWebhookHandler("", secret, "", "", deps(log = capturing.plugin))
+        assertTrue(
+            capturing.warnedContaining("sepay", "rejected"),
+            "expected a startup warning naming the provider and the rejection; got ${capturing.warnings}",
+        )
+    }
+
+    @Test
+    fun `the none scheme warns at construction that authentication is disabled`() {
+        val capturing = CapturingLogger()
+        SePayWebhookHandler("none", secret, "", "", deps(log = capturing.plugin))
+        assertTrue(
+            capturing.warnedContaining("sepay", "disabled"),
+            "expected a startup warning that auth is disabled; got ${capturing.warnings}",
+        )
+    }
+
+    @Test
+    fun `a configured scheme warns nothing at construction`() {
+        val capturing = CapturingLogger()
+        SePayWebhookHandler("hmac", secret, "", "", deps(log = capturing.plugin))
+        assertTrue(capturing.warnings.isEmpty(), "a configured scheme must be silent; got ${capturing.warnings}")
     }
 
     @Test

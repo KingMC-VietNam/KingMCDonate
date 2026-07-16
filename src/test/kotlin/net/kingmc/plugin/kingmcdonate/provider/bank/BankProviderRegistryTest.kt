@@ -3,6 +3,9 @@ package net.kingmc.plugin.kingmcdonate.provider.bank
 import net.kingmc.plugin.kingmcdonate.util.Http
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger
 import net.kingmc.plugin.kingmcdonate.webhook.BankWebhookCapable
+import net.kingmc.plugin.kingmcdonate.webhook.BankWebhookDeps
+import net.kingmc.plugin.kingmcdonate.webhook.WebhookRequest
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -92,6 +95,40 @@ class BankProviderRegistryTest {
         // no web2m.yml written
         val registry = BankProviderRegistry(logger, BankProviderRegistry.defaultFactory(http, dataFolder, logger))
         assertSame(UnavailableBankProvider, registry.resolve(Web2MBankProvider.NAME))
+    }
+
+    @Test
+    fun `an omitted webhook-auth defaults to blank so the webhook rejects instead of accepting all`() {
+        val dir = File(dataFolder, "providers").apply { mkdirs() }
+        // No webhook-auth key at all — the fail-open default would coerce this to "none" and accept anything.
+        File(dir, "web2m.yml").writeText(
+            """
+            account-number: "0123456789"
+            bank-type: "ACB"
+            password: "secret"
+            token: "tok123"
+            webhook-token: "whtok"
+            """.trimIndent(),
+        )
+        val provider = resolve()
+        assertTrue(provider is BankWebhookCapable)
+        val handler = (provider as BankWebhookCapable).webhookHandler(
+            BankWebhookDeps(
+                findPendingByContainedReference = { _, _ -> null },
+                confirm = { throw AssertionError("an unauthenticated webhook must never confirm") },
+                logger = logger,
+            ),
+        )
+        val response = handler.handle(
+            WebhookRequest(
+                method = "POST",
+                path = "/kmd/web2m",
+                query = emptyMap(),
+                headers = emptyMap(),
+                rawBody = """{"status":true,"data":[{"type":"IN","transactionID":"1","amount":"50000",""".toByteArray(),
+            ),
+        )
+        assertEquals(401, response.status)
     }
 
     @Test

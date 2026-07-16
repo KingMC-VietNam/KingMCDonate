@@ -36,7 +36,8 @@ class BankProviderRegistry(
                         val bank = yml.getString("bank").orEmpty()
                         val token = yml.getString("api-token").orEmpty()
                         val sandbox = yml.getBoolean("sandbox", false)
-                        val webhookAuth = yml.getString("webhook-auth", "none").orEmpty()
+                        // No default: an absent key must fail closed (reject), not silently accept every webhook.
+                        val webhookAuth = yml.getString("webhook-auth").orEmpty()
                         val webhookSecret = yml.getString("webhook-secret").orEmpty()
                         val webhookApiKey = yml.getString("webhook-api-key").orEmpty()
                         val accountHolder = yml.getString("account-holder").orEmpty()
@@ -57,7 +58,8 @@ class BankProviderRegistry(
                         val password = yml.getString("password").orEmpty()
                         val token = yml.getString("token").orEmpty()
                         val accountHolder = yml.getString("account-holder").orEmpty()
-                        val webhookAuth = yml.getString("webhook-auth", "none").orEmpty()
+                        // No default: an absent key must fail closed (reject), not silently accept every webhook.
+                        val webhookAuth = yml.getString("webhook-auth").orEmpty()
                         val webhookToken = yml.getString("webhook-token").orEmpty()
                         if (account.isBlank() || account == WEB2M_ACCOUNT_PLACEHOLDER ||
                             token.isBlank() || token == WEB2M_TOKEN_PLACEHOLDER ||

@@ -7,6 +7,7 @@ import net.kingmc.plugin.kingmcdonate.webhook.BankWebhookDeps
 import net.kingmc.plugin.kingmcdonate.webhook.WebhookRequest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.util.UUID
 
@@ -22,12 +23,12 @@ class Web2MWebhookHandlerTest {
 
     private var confirmed: BankConfirmation? = null
 
-    private fun deps(found: BankPayment? = order) = BankWebhookDeps(
+    private fun deps(found: BankPayment? = order, log: PluginLogger = logger) = BankWebhookDeps(
         findPendingByContainedReference = { haystack, amount ->
             found?.takeIf { haystack.contains(it.referenceCode) && amount == it.amount }
         },
         confirm = { confirmed = it },
-        logger = logger,
+        logger = log,
     )
 
     private fun item(
@@ -86,6 +87,40 @@ class Web2MWebhookHandlerTest {
         val response = handler(auth = "none", token = "").handle(request(body(item()), authHeader = null))
         assertEquals(200, response.status)
         assertEquals("KMD7X9A2QP", confirmed?.referenceCode)
+    }
+
+    @Test
+    fun `a blank auth scheme rejects with 401 and never confirms`() {
+        val response = handler(auth = "").handle(request(body(item())))
+        assertEquals(401, response.status)
+        assertNull(confirmed)
+    }
+
+    @Test
+    fun `a blank auth scheme warns at construction that requests will be rejected`() {
+        val capturing = CapturingLogger()
+        Web2MWebhookHandler("", "whtok", deps(log = capturing.plugin))
+        assertTrue(
+            capturing.warnedContaining("web2m", "rejected"),
+            "expected a startup warning naming the provider and the rejection; got ${capturing.warnings}",
+        )
+    }
+
+    @Test
+    fun `the none scheme warns at construction that authentication is disabled`() {
+        val capturing = CapturingLogger()
+        Web2MWebhookHandler("none", "", deps(log = capturing.plugin))
+        assertTrue(
+            capturing.warnedContaining("web2m", "disabled"),
+            "expected a startup warning that auth is disabled; got ${capturing.warnings}",
+        )
+    }
+
+    @Test
+    fun `a configured scheme warns nothing at construction`() {
+        val capturing = CapturingLogger()
+        Web2MWebhookHandler("bearer", "whtok", deps(log = capturing.plugin))
+        assertTrue(capturing.warnings.isEmpty(), "a configured scheme must be silent; got ${capturing.warnings}")
     }
 
     @Test

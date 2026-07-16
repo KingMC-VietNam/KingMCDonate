@@ -23,6 +23,8 @@ sandbox: false
 
 # ----- Webhook (chỉ dùng khi bank.confirmation = "webhook" hoặc "both") -----
 # Cách xác thực webhook SePay gửi tới: "hmac" (khuyến nghị) | "apikey" | "none" (chỉ test).
+# BẮT BUỘC khi webhook đang bật: bỏ trống / xoá dòng này thì MỌI webhook đều bị từ chối (401) —
+# fail-closed để một khoá thiếu không vô tình mở cửa cho xác nhận giả mạo. Chọn "none" là tự tắt xác thực.
 webhook-auth: "hmac"
 # Secret Key của webhook (dùng cho hmac). Lấy ở dashboard SePay khi tạo webhook; chỉ hiện 1 lần.
 webhook-secret: ""

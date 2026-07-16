@@ -27,6 +27,10 @@ class SePayWebhookHandler(
 
     override val providerKey = SePayBankProvider.NAME
 
+    init {
+        BankWebhookAuth.warnOnStartup(auth, SePayBankProvider.NAME, deps.logger)
+    }
+
     override fun handle(request: WebhookRequest): WebhookResponse {
         if (!verify(request)) {
             deps.logger.warn("SePay webhook rejected: authentication failed (scheme=$auth).")
