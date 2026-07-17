@@ -2,12 +2,14 @@ package net.kingmc.plugin.kingmcdonate.provider.card
 
 import net.kingmc.plugin.kingmcdonate.payment.model.CardPayment
 import net.kingmc.plugin.kingmcdonate.payment.model.PaymentStatus
+import net.kingmc.plugin.kingmcdonate.provider.bank.CapturingLogger
 import net.kingmc.plugin.kingmcdonate.util.Hashing
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger
 import net.kingmc.plugin.kingmcdonate.webhook.CardWebhookDeps
 import net.kingmc.plugin.kingmcdonate.webhook.WebhookRequest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.util.UUID
 
@@ -17,9 +19,11 @@ class NencerCallbackHandlerTest {
     private val partnerKey = "pkey"
     private val uuid = UUID.randomUUID()
 
+    /** Holds the very card the callbacks below are signed for — the gateway only ever calls back about
+     *  the card an order submitted, so a fixture where they differ describes traffic that cannot exist. */
     private val order = CardPayment(
         id = 1, playerUuid = uuid, playerName = "Alice", cardType = "VIETTEL", amount = 50_000,
-        serial = "S", pin = "P", status = PaymentStatus.WAITING, referenceCode = "REF1",
+        serial = "0898", pin = "664196324427", status = PaymentStatus.WAITING, referenceCode = "REF1",
         cardProvider = "card2k", transactionId = "T1", ownerServer = "node-a", point = 0,
         createdAt = 0, updatedAt = 0,
     )
@@ -126,5 +130,63 @@ class NencerCallbackHandlerTest {
         val response = handler(found = null).handle(request("1"))
         assertEquals(200, response.status)
         assertNull(applied)
+    }
+
+    @Test
+    fun `a callback signed for another card cannot resolve this order`() {
+        // C2. The gateway signs code+serial only — never request_id, status or value — so a valid
+        // callback for any card the caller holds (one 10k card they bought is enough) carries a
+        // signature that verifies while request_id points at someone else's order. Nothing but this
+        // check stands between that and minting points at will.
+        val response = handler().handle(request("1", code = "999999999999", serial = "1234"))
+
+        assertEquals(401, response.status)
+        assertNull(applied, "a card that does not belong to this order must never resolve it")
+    }
+
+    @Test
+    fun `a callback echoing the card with extra padding still resolves`() {
+        // We store the serial exactly as the player typed it; if the gateway trims before echoing,
+        // the signature still verifies (it signs what it echoes) and only this compare would differ.
+        // Rejecting here would strand a charged card in webhook-only mode, which runs no final check.
+        val response = handler().handle(request("1", serial = " 0898 ", code = " 664196324427"))
+
+        assertEquals(200, response.status)
+        assertEquals(PaymentStatus.SUCCESS, applied?.outcome?.status)
+    }
+
+    @Test
+    fun `a callback echoing a letter-bearing card in another case still resolves`() {
+        val gate = order.copy(serial = "gate-abc", pin = "gate-pin")
+
+        val response = handler(found = gate).handle(request("1", code = "GATE-PIN", serial = "GATE-ABC"))
+
+        assertEquals(200, response.status)
+        assertEquals(PaymentStatus.SUCCESS, applied?.outcome?.status)
+    }
+
+    @Test
+    fun `a mismatch is logged at ERROR and never spells out the card`() {
+        // A bad signature is internet noise; a *valid* signature aimed at the wrong order is either an
+        // attack or a serious bug, so it must reach an operator — without printing card secrets to a log.
+        val capturing = CapturingLogger()
+        val h = NencerCallbackHandler(
+            "card2k",
+            partnerKey,
+            CardWebhookDeps({ order }, { _, _, _, _, _ -> }, capturing.plugin),
+        )
+
+        h.handle(request("1", code = "999999999999", serial = "1234"))
+
+        assertTrue(
+            capturing.erroredContaining("card2k", "REF1"),
+            "expected an ERROR naming the provider and the reference; got ${capturing.errors}",
+        )
+        assertTrue(
+            capturing.errors.none { line ->
+                listOf("999999999999", "1234", "0898", "664196324427").any { line.contains(it) }
+            },
+            "the log must not carry the card's serial or pin; got ${capturing.errors}",
+        )
     }
 }

@@ -44,6 +44,17 @@ class NencerCallbackHandler(
             return WebhookResponse.ok()
         }
 
+        // The signature proves the caller knows *a* valid (code, serial), not that it belongs to this
+        // order. A physical card belongs to exactly one order — the one that submitted and stored it — so
+        // a signature re-bound to a different reference names a card this order never held. Reject it, or a
+        // single captured/self-bought callback replays onto any pending order. Compare trimmed and case-
+        // insensitively: we store what the player typed, and a gateway that echoes it re-cased or re-padded
+        // must not cost a charged card its credit (webhook-only mode runs no final check to recover it).
+        if (!cardMatches(serial, order.serial) || !cardMatches(code, order.pin)) {
+            deps.logger.error("$providerKey callback rejected: card does not match order (reference=$reference).")
+            return WebhookResponse.unauthorized()
+        }
+
         val status = q["status"]?.trim()?.toIntOrNull()
         val recognized = q["value"]?.toLongOrNull()
         val message = q["message"].orEmpty()
@@ -71,4 +82,8 @@ class NencerCallbackHandler(
         NencerStatus.MAINTENANCE, NencerStatus.PENDING -> PaymentStatus.WAITING
         else -> PaymentStatus.WAITING
     }
+
+    /** Constant-time compare of a callback-supplied card value against the stored one, trimmed and case-folded. */
+    private fun cardMatches(supplied: String, stored: String): Boolean =
+        Hashing.constantTimeEquals(supplied.trim().lowercase(), stored.trim().lowercase())
 }
