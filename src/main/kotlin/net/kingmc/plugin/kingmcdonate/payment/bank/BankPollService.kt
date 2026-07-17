@@ -82,7 +82,10 @@ class BankPollService(
             val orders = pending + recentFailed
             if (orders.isNotEmpty()) {
                 logger.debug { "Polling ${pending.size} pending + ${recentFailed.size} recent-failed order(s) network-wide" }
-                providers.active.poll(orders).forEach(confirmService::confirm)
+                val result = providers.active.poll(orders)
+                result.confirmations.forEach(confirmService::confirm)
+                // Only transfers that matched nothing — a wrong-amount payer is surfaced here, never credited.
+                result.unmatched.forEach(confirmService::reportUnmatched)
             }
         }
 

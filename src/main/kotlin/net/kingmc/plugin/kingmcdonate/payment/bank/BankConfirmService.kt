@@ -1,5 +1,6 @@
 package net.kingmc.plugin.kingmcdonate.payment.bank
 
+import net.kingmc.plugin.kingmcdonate.KingMCDonateContext
 import net.kingmc.plugin.kingmcdonate.config.MessageKeys
 import net.kingmc.plugin.kingmcdonate.config.PluginConfig
 import net.kingmc.plugin.kingmcdonate.currency.CurrencyRegistry
@@ -15,6 +16,7 @@ import net.kingmc.plugin.kingmcdonate.payment.model.BankPayment
 import net.kingmc.plugin.kingmcdonate.payment.model.PaymentStatus
 import net.kingmc.plugin.kingmcdonate.payment.reward.RewardGate
 import net.kingmc.plugin.kingmcdonate.provider.bank.BankConfirmation
+import net.kingmc.plugin.kingmcdonate.provider.bank.UnmatchedTransfer
 import net.kingmc.plugin.kingmcdonate.promo.PromoService
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger
 import java.sql.SQLException
@@ -73,10 +75,14 @@ class BankConfirmService(
     }
 
     private fun resolvePending(order: BankPayment, confirmation: BankConfirmation) {
+        // Unreachable in practice — both ingress paths find the order *by* amount, so a confirmation
+        // always carries the order's amount, and a real wrong-amount transfer never gets this far
+        // (it is surfaced by reportUnmatched instead). Kept as a last guard on the credit path: no
+        // future caller should be able to build a mismatched confirmation and have it credited.
         if (confirmation.amount != order.amount) {
-            logger.warn(
-                "Bank ${order.referenceCode} amount mismatch: order=${order.amount} paid=${confirmation.amount}; " +
-                    "kept PENDING for manual reconciliation.",
+            logger.error(
+                "Bank ${order.referenceCode}: confirmation amount ${confirmation.amount} does not match the " +
+                    "order's ${order.amount}; refusing to credit. This should be unreachable — please report it.",
             )
             return
         }
@@ -128,6 +134,34 @@ class BankConfirmService(
         ) {
             val name = playerDao.findName(order.playerUuid)
             Donation(order.playerUuid, name, METHOD_BANK, order.amount, point, order.referenceCode, MessageKeys.BANK_SUCCESS, order.provider)
+        }
+    }
+
+    /**
+     * Surface an incoming transfer that matched no order but names a PENDING one — the payer got the
+     * amount wrong, so today it is dropped and neither they nor an operator ever learns why. Warns
+     * once per transfer and never credits: only the exact-amount match may do that.
+     *
+     * Safe only because [u] matched **nothing** ([UnmatchedTransfer]), and because the marker is
+     * keyed via [ProcessedBankTxDao.mismatchKey] rather than the bare tx id. A transfer's text can
+     * name several orders — one stale, one correct — and recording the bare id here would make the
+     * correct one's confirmation violate UNIQUE and roll back, losing that credit for good.
+     */
+    fun reportUnmatched(u: UnmatchedTransfer) {
+        val named = bankPaymentDao.findPendingByContainedReferenceAnyAmount(u.searchText) ?: return
+        val first = processedBankTxDao.insertIfAbsent(
+            ProcessedBankTxDao.mismatchKey(u.transactionId), named.referenceCode, System.currentTimeMillis(),
+        )
+        if (first) {
+            logger.warn(
+                "Bank ${named.referenceCode}: transfer (tx=${u.transactionId}) names this order but paid " +
+                    "${u.amount} instead of ${named.amount}; NOT credited, recorded for manual reconciliation.",
+            )
+            KingMCDonateContext.activityLogOrNull?.log(
+                "TXN",
+                "bank amount-mismatch ref=${named.referenceCode} tx=${u.transactionId} " +
+                    "paid=${u.amount} expected=${named.amount}",
+            )
         }
     }
 

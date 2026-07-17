@@ -22,6 +22,35 @@ data class BankConfirmation(
 )
 
 /**
+ * An incoming transfer that matched **no** order, with its reference text already extracted
+ * (the shape of that text is gateway-specific, so only the provider can do it). The payment
+ * core decides what to make of it — typically: does it name a pending order the payer got the
+ * amount wrong for?
+ *
+ * Matching nothing is the whole point of this type. It is what makes surfacing such a transfer
+ * safe: a transfer that *did* match is on its way to being credited, and must never be touched
+ * by the reporting path.
+ */
+data class UnmatchedTransfer(
+    val transactionId: String,
+    val searchText: String,
+    val amount: Long,
+)
+
+/**
+ * One poll's outcome: the transfers that matched an order exactly, and the ones that matched
+ * nothing. Every incoming transfer lands in exactly one of the two.
+ */
+data class BankPollResult(
+    val confirmations: List<BankConfirmation>,
+    val unmatched: List<UnmatchedTransfer>,
+) {
+    companion object {
+        val EMPTY = BankPollResult(emptyList(), emptyList())
+    }
+}
+
+/**
  * A bank gateway. [createQr] produces the payment QR for an order; [poll] lists the
  * gateway's recent incoming transfers and returns those matching the supplied orders
  * (by exact reference token/code and amount). Confirmation is by outbound polling
@@ -36,8 +65,8 @@ interface BankProvider {
     /** Build the payment QR for an order of [amountVnd] carrying [referenceCode]. */
     fun createQr(amountVnd: Long, referenceCode: String): BankQr
 
-    /** Match the gateway's recent incoming transfers against [orders]; returns the confirmed ones. */
-    fun poll(orders: List<BankPayment>): List<BankConfirmation>
+    /** Match the gateway's recent incoming transfers against [orders]; splits them into matched and not. */
+    fun poll(orders: List<BankPayment>): BankPollResult
 }
 
 /** Sentinel for a missing/misconfigured gateway; never produces a QR, so intake is blocked. */
@@ -45,5 +74,5 @@ object UnavailableBankProvider : BankProvider {
     override val name = "unavailable"
     override fun createQr(amountVnd: Long, referenceCode: String): BankQr =
         throw IllegalStateException("No usable bank provider is configured")
-    override fun poll(orders: List<BankPayment>): List<BankConfirmation> = emptyList()
+    override fun poll(orders: List<BankPayment>): BankPollResult = BankPollResult.EMPTY
 }

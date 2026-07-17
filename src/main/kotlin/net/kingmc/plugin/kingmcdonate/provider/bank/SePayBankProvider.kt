@@ -53,8 +53,8 @@ class SePayBankProvider(
         return BankQr(url, accountNumber, bank, accountHolder)
     }
 
-    override fun poll(orders: List<BankPayment>): List<BankConfirmation> {
-        if (orders.isEmpty()) return emptyList()
+    override fun poll(orders: List<BankPayment>): BankPollResult {
+        if (orders.isEmpty()) return BankPollResult.EMPTY
         val base = if (sandbox) SANDBOX_BASE else PRODUCTION_BASE
         // Bound the page to transactions since the oldest live order (minus a generous buffer that
         // absorbs any clock/timezone skew) so a busy account can't push a pending transfer off the
@@ -73,17 +73,29 @@ class SePayBankProvider(
     private fun formatDate(epochMillis: Long): String =
         DATE_FORMAT.format(Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()))
 
-    /** Pure matching: an incoming transfer confirms an order whose plain reference the transfer text contains, at the exact amount. */
-    fun match(orders: List<BankPayment>, transactions: List<SePayTransaction>): List<BankConfirmation> {
+    /**
+     * Pure matching: an incoming transfer confirms an order whose plain reference the transfer text
+     * contains, at the exact amount. The exact-amount predicate is load-bearing — a transfer's text
+     * can name several orders, and the amount is what picks the right one.
+     *
+     * A transfer matching no order goes to [BankPollResult.unmatched] so the core can surface it.
+     * It must not be reported from here: that would also flag transfers that go on to be credited.
+     */
+    fun match(orders: List<BankPayment>, transactions: List<SePayTransaction>): BankPollResult {
         val confirmations = ArrayList<BankConfirmation>()
+        val unmatched = ArrayList<UnmatchedTransfer>()
         for (tx in transactions) {
             if (!tx.transferType.equals("in", ignoreCase = true)) continue
             val txId = tx.id ?: continue
             val haystack = BankReference.searchText(tx.code, tx.content)
-            val matched = orders.firstOrNull { it.amount == tx.amountIn && haystack.contains(it.referenceCode) } ?: continue
+            val matched = orders.firstOrNull { it.amount == tx.amountIn && haystack.contains(it.referenceCode) }
+            if (matched == null) {
+                unmatched.add(UnmatchedTransfer(txId, haystack, tx.amountIn))
+                continue
+            }
             confirmations.add(BankConfirmation(matched.referenceCode, txId, tx.amountIn))
         }
-        return confirmations
+        return BankPollResult(confirmations, unmatched)
     }
 
     private fun enc(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8)

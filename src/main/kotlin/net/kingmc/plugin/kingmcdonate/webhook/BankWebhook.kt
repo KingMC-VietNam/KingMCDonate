@@ -2,6 +2,7 @@ package net.kingmc.plugin.kingmcdonate.webhook
 
 import net.kingmc.plugin.kingmcdonate.payment.model.BankPayment
 import net.kingmc.plugin.kingmcdonate.provider.bank.BankConfirmation
+import net.kingmc.plugin.kingmcdonate.provider.bank.UnmatchedTransfer
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger
 
 /**
@@ -14,6 +15,11 @@ class BankWebhookDeps(
     val findPendingByContainedReference: (haystack: String, amount: Long) -> BankPayment?,
     val confirm: (BankConfirmation) -> Unit,
     val logger: PluginLogger,
+    /**
+     * Surface an authentic transfer that matched no order. Called only on the branch where the
+     * exact-amount lookup above returned null, so it can never touch a transfer being credited.
+     */
+    val reportUnmatched: (UnmatchedTransfer) -> Unit = {},
 )
 
 /** A bank gateway that can receive webhooks; the active provider supplies its handler. */

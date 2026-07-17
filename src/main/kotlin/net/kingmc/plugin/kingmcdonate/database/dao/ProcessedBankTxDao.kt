@@ -8,6 +8,11 @@ import java.sql.SQLException
  * Records gateway transaction ids that have been processed. The UNIQUE constraint
  * on `transaction_id` is the double-credit guard: inserting it inside the
  * confirmation transaction means a transaction seen twice can only be applied once.
+ *
+ * Because that key *is* the guard, anything else recording a "we already dealt with this"
+ * marker must keep out of its namespace — a marker stored under the bare tx id would collide
+ * with [insertWithinTxn] and roll back the very credit it was meant to be independent of.
+ * [mismatchKey] is that separate namespace; see [net.kingmc.plugin.kingmcdonate.payment.bank.BankConfirmService.reportUnmatched].
  */
 class ProcessedBankTxDao(database: Database) : Dao(database) {
 
@@ -39,5 +44,15 @@ class ProcessedBankTxDao(database: Database) : Dao(database) {
         } catch (e: SQLException) {
             if (isUniqueViolation(e)) false else throw e
         }
+    }
+
+    companion object {
+        /**
+         * Key a "already warned about this transfer" marker away from the credit guard's bare tx id.
+         * Recording the raw id would make a later [insertWithinTxn] for the same transaction violate
+         * UNIQUE and roll its confirmation back — permanently losing a credit the marker had nothing
+         * to do with, since one transfer's text can name several orders.
+         */
+        fun mismatchKey(transactionId: String) = "mismatch:$transactionId"
     }
 }

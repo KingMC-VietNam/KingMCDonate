@@ -84,6 +84,24 @@ class BankPaymentDao(database: Database) : PaymentDao<BankPayment>(database, "ba
     }
 
     /**
+     * The oldest PENDING order whose plain reference is contained in [haystack], **at any amount** —
+     * for reporting a transfer that named an order but paid the wrong figure.
+     *
+     * Never credit from this: only [findPendingByContainedReference]'s exact-amount match may do
+     * that. A transfer's text can name several orders, and the amount is what picks the right one.
+     */
+    fun findPendingByContainedReferenceAnyAmount(haystack: String): BankPayment? = withConnection { conn ->
+        conn.prepareStatement(
+            "SELECT * FROM bank_payments WHERE status = ? AND INSTR(?, reference_code) > 0 " +
+                "ORDER BY created_at LIMIT 1",
+        ).use { ps ->
+            ps.setString(1, PaymentStatus.PENDING.storageValue)
+            ps.setString(2, haystack)
+            ps.executeQuery().use { rs -> rs.mapAll { toModel() }.firstOrNull() }
+        }
+    }
+
+    /**
      * FAILED orders network-wide updated at or after [since] — added to the confirmer's match set so a
      * late transfer for a just-expired order is still surfaced, not dropped, whichever node owns it.
      */

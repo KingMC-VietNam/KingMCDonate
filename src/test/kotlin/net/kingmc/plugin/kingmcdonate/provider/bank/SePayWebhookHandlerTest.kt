@@ -25,12 +25,15 @@ class SePayWebhookHandlerTest {
 
     private var confirmed: net.kingmc.plugin.kingmcdonate.provider.bank.BankConfirmation? = null
 
+    private var reported: net.kingmc.plugin.kingmcdonate.provider.bank.UnmatchedTransfer? = null
+
     private fun deps(found: BankPayment? = order, log: PluginLogger = logger) = BankWebhookDeps(
         findPendingByContainedReference = { haystack, amount ->
             found?.takeIf { haystack.contains(it.referenceCode) && amount == it.amount }
         },
         confirm = { confirmed = it },
         logger = log,
+        reportUnmatched = { reported = it },
     )
 
     private fun body(
@@ -94,6 +97,27 @@ class SePayWebhookHandlerTest {
         val raw = body(amount = 50_000, content = "CK KMDSTALE01 KMD7X9A2QP NAP")
         SePayWebhookHandler("hmac", secret, "", "", deps).handle(hmacRequest(raw))
         assertEquals("KMD7X9A2QP", confirmed?.referenceCode)
+    }
+
+    @Test
+    fun `a wrong-amount transfer is handed to the report path instead of being dropped`() {
+        // The order is only found at its exact amount, so this transfer matches nothing — today it is
+        // acknowledged with a bare "matched no pending order" and the payer is never told why.
+        val response = handler("hmac").handle(hmacRequest(body(amount = 20_000, content = "CK KMD7X9A2QP NAP")))
+
+        assertEquals(200, response.status)
+        assertNull(confirmed, "a wrong amount must never confirm")
+        assertEquals("92704", reported?.transactionId)
+        assertEquals(20_000L, reported?.amount)
+        assertTrue(reported!!.searchText.contains("KMD7X9A2QP"), "the core needs the text to name the order")
+    }
+
+    @Test
+    fun `an exact-amount transfer confirms and is not reported`() {
+        handler("hmac").handle(hmacRequest(body()))
+
+        assertEquals("KMD7X9A2QP", confirmed?.referenceCode)
+        assertNull(reported, "a transfer being credited must never reach the report path")
     }
 
     @Test

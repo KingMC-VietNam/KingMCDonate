@@ -14,6 +14,7 @@ import net.kingmc.plugin.kingmcdonate.payment.model.PaymentStatus
 import net.kingmc.plugin.kingmcdonate.payment.reward.RewardPayload
 import net.kingmc.plugin.kingmcdonate.payment.reward.RewardSink
 import net.kingmc.plugin.kingmcdonate.provider.bank.BankConfirmation
+import net.kingmc.plugin.kingmcdonate.provider.bank.UnmatchedTransfer
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger
 import org.bukkit.configuration.file.YamlConfiguration
 import org.junit.jupiter.api.AfterEach
@@ -211,5 +212,47 @@ class BankConfirmServiceTest {
         service.reapplyReward(order) // second reconcile is a no-op
         assertEquals(50L, fakeCurrency.balance(uuid))
         assertEquals(50_000L, totalAll(uuid))
+    }
+
+    @Test
+    fun `a transfer naming a pending order at the wrong amount is reported once and never credited`() {
+        val (uuid, ref) = newOrder(amount = 50_000)
+
+        val stray = UnmatchedTransfer("T1", "CK $ref NAP", 20_000)
+        service.reportUnmatched(stray)
+        service.reportUnmatched(stray) // a repeated poll of the same bank transaction
+
+        assertEquals(PaymentStatus.PENDING, bank.findByReference(ref)!!.status, "it must never be credited")
+        assertEquals(0L, fakeCurrency.balance(uuid))
+        assertEquals(0L, totalAll(uuid))
+        // Reported once: the second call finds the marker already recorded.
+        assertTrue(
+            ProcessedBankTxDao(database).insertIfAbsent(ProcessedBankTxDao.mismatchKey("T1"), ref, 3_000).not(),
+            "the mismatch marker must have been recorded on the first report",
+        )
+    }
+
+    @Test
+    fun `reporting a stray transfer cannot block a later credit carrying the same bank tx id`() {
+        // The money-loss guard, at the service level. The mismatch marker is keyed away from the
+        // credit guard's bare tx id, so recording it leaves the confirmation path completely free —
+        // even for the very same transaction id.
+        val (uuid, ref) = newOrder(amount = 50_000)
+        service.reportUnmatched(UnmatchedTransfer("T1", "CK $ref NAP", 20_000))
+
+        service.confirm(BankConfirmation(ref, "T1", 50_000))
+
+        assertEquals(PaymentStatus.SUCCESS, bank.findByReference(ref)!!.status, "the credit must still go through")
+        assertEquals(50L, fakeCurrency.balance(uuid))
+    }
+
+    @Test
+    fun `a transfer naming no pending order is not reported`() {
+        service.reportUnmatched(UnmatchedTransfer("T9", "CK SOMEONE ELSE", 20_000))
+
+        assertTrue(
+            ProcessedBankTxDao(database).insertIfAbsent(ProcessedBankTxDao.mismatchKey("T9"), "X", 3_000),
+            "a transfer naming nothing of ours must leave no marker and no warning",
+        )
     }
 }

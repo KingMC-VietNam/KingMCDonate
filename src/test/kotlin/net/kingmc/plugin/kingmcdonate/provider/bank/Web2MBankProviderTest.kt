@@ -71,7 +71,7 @@ class Web2MBankProviderTest {
               ]
             }
         """.trimIndent()
-        val matches = provider(json).poll(listOf(order("KMD7X9A2QP", 150_000)))
+        val matches = provider(json).poll(listOf(order("KMD7X9A2QP", 150_000))).confirmations
         assertEquals(1, matches.size)
         assertEquals("KMD7X9A2QP", matches.first().referenceCode)
         assertEquals("9668", matches.first().transactionId)
@@ -84,7 +84,7 @@ class Web2MBankProviderTest {
             { "status": true, "transactions": [
                 { "transactionID": 9668, "amount": 150000, "description": "thanh toan KMD7X9A2QP", "type": "IN" } ] }
         """.trimIndent()
-        val matches = provider(json).poll(listOf(order("KMD7X9A2QP", 150_000)))
+        val matches = provider(json).poll(listOf(order("KMD7X9A2QP", 150_000))).confirmations
         assertEquals(1, matches.size)
         assertEquals("9668", matches.first().transactionId)
     }
@@ -95,7 +95,7 @@ class Web2MBankProviderTest {
             { "status": true, "transactions": [
                 { "transactionID": "7", "amount": "50000", "description": "UNG HO TTA1B2C3D4", "type": "IN" } ] }
         """.trimIndent()
-        val matches = provider(json).poll(listOf(order("A1B2C3D4", 50_000)))
+        val matches = provider(json).poll(listOf(order("A1B2C3D4", 50_000))).confirmations
         assertEquals(1, matches.size)
         assertEquals("A1B2C3D4", matches.first().referenceCode)
     }
@@ -106,7 +106,7 @@ class Web2MBankProviderTest {
             { "status": true, "transactions": [
                 { "transactionID": "7", "amount": "-1000000", "description": "KMD7X9A2QP", "type": "OUT" } ] }
         """.trimIndent()
-        assertTrue(provider(json).poll(listOf(order("KMD7X9A2QP", 1_000_000))).isEmpty())
+        assertTrue(provider(json).poll(listOf(order("KMD7X9A2QP", 1_000_000))).confirmations.isEmpty())
     }
 
     @Test
@@ -115,7 +115,7 @@ class Web2MBankProviderTest {
             { "status": true, "transactions": [
                 { "transactionID": "7", "amount": "20000", "description": "KMD7X9A2QP", "type": "IN" } ] }
         """.trimIndent()
-        assertTrue(provider(json).poll(listOf(order("KMD7X9A2QP", 50_000))).isEmpty())
+        assertTrue(provider(json).poll(listOf(order("KMD7X9A2QP", 50_000))).confirmations.isEmpty())
     }
 
     @Test

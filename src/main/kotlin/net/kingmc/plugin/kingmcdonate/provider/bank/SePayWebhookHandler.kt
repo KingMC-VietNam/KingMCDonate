@@ -75,6 +75,8 @@ class SePayWebhookHandler(
             "WEBHOOK", "sepay tx=$txId amount=${payload.transferAmount} matched no pending order",
         )
         deps.logger.warn("SePay webhook: authentic transfer tx=$txId matched no pending order; acknowledged.")
+        // Matched nothing: if it names a pending order at the wrong amount, say so rather than drop it.
+        deps.reportUnmatched(UnmatchedTransfer(txId, haystack, payload.transferAmount))
         return ACK
     }
 

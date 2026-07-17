@@ -49,8 +49,8 @@ class Web2MBankProvider(
         return BankQr(url, accountNumber, bankType.name, accountHolder)
     }
 
-    override fun poll(orders: List<BankPayment>): List<BankConfirmation> {
-        if (orders.isEmpty()) return emptyList()
+    override fun poll(orders: List<BankPayment>): BankPollResult {
+        if (orders.isEmpty()) return BankPollResult.EMPTY
         // V3 puts the credentials in the path: OpenAPI banks take only the token, the rest take
         // password/account/token. The token authenticates, so no header is sent.
         val url = if (bankType.oneParam) {
@@ -65,18 +65,30 @@ class Web2MBankProvider(
         return match(orders, transactions)
     }
 
-    /** Pure matching: an incoming transfer confirms an order whose plain reference its description contains, at the exact amount. */
-    fun match(orders: List<BankPayment>, transactions: List<W2MTransaction>): List<BankConfirmation> {
+    /**
+     * Pure matching: an incoming transfer confirms an order whose plain reference its description
+     * contains, at the exact amount. The exact-amount predicate is load-bearing — a description can
+     * name several orders, and the amount is what picks the right one.
+     *
+     * A transfer matching no order goes to [BankPollResult.unmatched] so the core can surface it.
+     * It must not be reported from here: that would also flag transfers that go on to be credited.
+     */
+    fun match(orders: List<BankPayment>, transactions: List<W2MTransaction>): BankPollResult {
         val confirmations = ArrayList<BankConfirmation>()
+        val unmatched = ArrayList<UnmatchedTransfer>()
         for (tx in transactions) {
             if (!tx.type.equals("IN", ignoreCase = true)) continue
             val txId = tx.transactionID ?: continue
             val amount = parseAmount(tx.amount) ?: continue
             val haystack = BankReference.searchText(null, tx.description)
-            val matched = orders.firstOrNull { it.amount == amount && haystack.contains(it.referenceCode) } ?: continue
+            val matched = orders.firstOrNull { it.amount == amount && haystack.contains(it.referenceCode) }
+            if (matched == null) {
+                unmatched.add(UnmatchedTransfer(txId, haystack, amount))
+                continue
+            }
             confirmations.add(BankConfirmation(matched.referenceCode, txId, amount))
         }
-        return confirmations
+        return BankPollResult(confirmations, unmatched)
     }
 
     /** Strip non-digits (OUT rows already filtered, so no sign) and read as Long. */

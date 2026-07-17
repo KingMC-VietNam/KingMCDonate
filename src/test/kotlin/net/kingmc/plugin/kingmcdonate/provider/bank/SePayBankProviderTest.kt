@@ -63,9 +63,36 @@ class SePayBankProviderTest {
     }
 
     @Test
+    fun `a transfer naming a pending order at the wrong amount is unmatched, not confirmed`() {
+        val orders = listOf(order("A1B2C3D4", 50_000))
+        val result = provider().match(orders, listOf(tx("T1", amountIn = 20_000, content = "CK A1B2C3D4 NAP")))
+        assertTrue(result.confirmations.isEmpty(), "the wrong amount must never confirm")
+        assertEquals(1, result.unmatched.size)
+        assertEquals("T1", result.unmatched.first().transactionId)
+        assertEquals(20_000L, result.unmatched.first().amount)
+        assertTrue(result.unmatched.first().searchText.contains("A1B2C3D4"), "the core needs the text to name the order")
+    }
+
+    @Test
+    fun `a transfer naming two pending orders confirms the one it paid and reports nothing`() {
+        // The money-loss guard. This content shape is real: an older order's reference lingers in the
+        // transfer text next to the correct one. The exact amount picks the right order — and because
+        // the transfer matched, it must NOT also land in `unmatched`, where reporting it would record
+        // its tx id and make this very confirmation violate the double-credit UNIQUE and roll back.
+        val stale = order("KMDSTALE01", 99_000)
+        val correct = order("KMD7X9A2QP", 50_000)
+        val result = provider().match(
+            listOf(stale, correct),
+            listOf(tx("T1", amountIn = 50_000, content = "CK KMDSTALE01 KMD7X9A2QP NAP")),
+        )
+        assertEquals(listOf("KMD7X9A2QP"), result.confirmations.map { it.referenceCode })
+        assertTrue(result.unmatched.isEmpty(), "a transfer being credited must never be reported as unmatched")
+    }
+
+    @Test
     fun `reference in content matches`() {
         val orders = listOf(order("A1B2C3D4", 50_000))
-        val matches = provider().match(orders, listOf(tx("T1", content = "CK A1B2C3D4 MUA POINT")))
+        val matches = provider().match(orders, listOf(tx("T1", content = "CK A1B2C3D4 MUA POINT"))).confirmations
         assertEquals(1, matches.size)
         assertEquals("A1B2C3D4", matches.first().referenceCode)
         assertEquals("T1", matches.first().transactionId)
@@ -74,8 +101,8 @@ class SePayBankProviderTest {
     @Test
     fun `reference in code field or content both match`() {
         val orders = listOf(order("A1B2C3D4", 50_000))
-        val byCode = provider().match(orders, listOf(tx("T1", content = "noise", code = "A1B2C3D4")))
-        val byContent = provider().match(orders, listOf(tx("T2", content = "CK A1B2C3D4 NAP")))
+        val byCode = provider().match(orders, listOf(tx("T1", content = "noise", code = "A1B2C3D4"))).confirmations
+        val byContent = provider().match(orders, listOf(tx("T2", content = "CK A1B2C3D4 NAP"))).confirmations
         assertEquals("A1B2C3D4", byCode.first().referenceCode)
         assertEquals("A1B2C3D4", byContent.first().referenceCode)
     }
@@ -83,7 +110,7 @@ class SePayBankProviderTest {
     @Test
     fun `a different order reference is not matched`() {
         val orders = listOf(order("A1B2C3D4", 50_000), order("E5F6G7H8", 50_000))
-        val matches = provider().match(orders, listOf(tx("T1", content = "CK A1B2C3D4 NAP")))
+        val matches = provider().match(orders, listOf(tx("T1", content = "CK A1B2C3D4 NAP"))).confirmations
         assertEquals(1, matches.size)
         assertEquals("A1B2C3D4", matches.first().referenceCode)
     }
@@ -92,7 +119,7 @@ class SePayBankProviderTest {
     fun `reference matches even when the bank strips the space before it`() {
         // Player content "UNG HO TT" + "A1B2C3D4"; the bank app dropped the space between them.
         val orders = listOf(order("A1B2C3D4", 50_000))
-        val matches = provider().match(orders, listOf(tx("T1", content = "UNG HO TTA1B2C3D4")))
+        val matches = provider().match(orders, listOf(tx("T1", content = "UNG HO TTA1B2C3D4"))).confirmations
         assertEquals(1, matches.size)
         assertEquals("A1B2C3D4", matches.first().referenceCode)
     }
@@ -100,14 +127,14 @@ class SePayBankProviderTest {
     @Test
     fun `outgoing transfer is ignored`() {
         val orders = listOf(order("A1B2C3D4", 50_000))
-        val matches = provider().match(orders, listOf(tx("T1", transferType = "out", content = "A1B2C3D4")))
+        val matches = provider().match(orders, listOf(tx("T1", transferType = "out", content = "A1B2C3D4"))).confirmations
         assertTrue(matches.isEmpty())
     }
 
     @Test
     fun `amount mismatch is not matched`() {
         val orders = listOf(order("A1B2C3D4", 50_000))
-        val matches = provider().match(orders, listOf(tx("T1", amountIn = 20_000, content = "A1B2C3D4")))
+        val matches = provider().match(orders, listOf(tx("T1", amountIn = 20_000, content = "A1B2C3D4"))).confirmations
         assertTrue(matches.isEmpty())
     }
 
@@ -144,7 +171,7 @@ class SePayBankProviderTest {
               "meta": { "pagination": { "total": 1 } }
             }
         """.trimIndent()
-        val matches = provider(json).poll(listOf(order("KMD7X9A2QP", 50_000)))
+        val matches = provider(json).poll(listOf(order("KMD7X9A2QP", 50_000))).confirmations
         assertEquals(1, matches.size)
         assertEquals("a1b2c3d4", matches.first().transactionId)
     }
