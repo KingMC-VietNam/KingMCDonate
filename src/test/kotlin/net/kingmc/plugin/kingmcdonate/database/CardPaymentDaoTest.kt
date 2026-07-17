@@ -2,7 +2,9 @@ package net.kingmc.plugin.kingmcdonate.database
 
 import net.kingmc.plugin.kingmcdonate.config.PluginConfig
 import net.kingmc.plugin.kingmcdonate.database.dao.CardPaymentDao
+import net.kingmc.plugin.kingmcdonate.database.dao.PointLogDao
 import net.kingmc.plugin.kingmcdonate.payment.model.PaymentStatus
+import net.kingmc.plugin.kingmcdonate.payment.model.PointLogEntry
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -56,6 +58,61 @@ class CardPaymentDaoTest {
         assertEquals(setOf(stillPending, waiting), refs.toSet())
         assertEquals(false, refs.contains(done), "a resolved order is not resolvable again")
         assertEquals(false, refs.contains(otherNode), "polling stays owner-scoped")
+    }
+
+    @Test
+    fun `a claimed order with no ledger row is reported as a lost credit`() {
+        val paid = insert()
+        dao.resolve(paid, PaymentStatus.SUCCESS, 100, 2_000)
+        dao.claimRewardApplied(paid, 2_000)
+        PointLogDao(database).record(
+            PointLogEntry(
+                playerUuid = UUID.randomUUID(), playerName = "Alice", amount = 100, method = "card",
+                provider = "card2k", referenceCode = paid, actor = null, server = "node-a",
+                content = "ok", createdAt = 2_000,
+            ),
+        )
+        val lost = insert()
+        dao.resolve(lost, PaymentStatus.SUCCESS, 100, 2_000)
+        dao.claimRewardApplied(lost, 2_000) // claimed, then the credit threw or the node died
+
+        val refs = dao.findLostCredits(10).map { it.referenceCode }
+
+        assertEquals(listOf(lost), refs, "only the order with no ledger row is a candidate")
+    }
+
+    @Test
+    fun `an unclaimed or still-open order is not a lost credit`() {
+        val unclaimed = insert()
+        dao.resolve(unclaimed, PaymentStatus.SUCCESS, 100, 2_000) // reconcile will still credit this one
+        insert() // still PENDING
+
+        assertEquals(emptyList<String>(), dao.findLostCredits(10).map { it.referenceCode })
+    }
+
+    @Test
+    fun `an open order can be re-owned to another node, a resolved one cannot`() {
+        val open = insert()
+        assertEquals(1, dao.reown(open, "node-b", 5_000))
+        assertEquals("node-b", dao.findByReference(open)!!.ownerServer)
+        assertEquals(emptyList<String>(), dao.findResolvableByServer("node-a").map { it.referenceCode })
+
+        val done = insert()
+        dao.resolve(done, PaymentStatus.SUCCESS, 100, 2_000)
+        assertEquals(0, dao.reown(done, "node-b", 5_000), "a finished order must not change hands")
+    }
+
+    @Test
+    fun `the stranded set is the open orders owned by other nodes`() {
+        val mine = insert()
+        val theirs = dao.insertPending(UUID.randomUUID(), "Bob", "VIETTEL", 10_000, "s", "p", "card2k", "node-b", 1_000)
+        val theirsDone = dao.insertPending(UUID.randomUUID(), "Bob", "VIETTEL", 10_000, "s", "p", "card2k", "node-b", 1_000)
+        dao.resolve(theirsDone, PaymentStatus.SUCCESS, 100, 2_000)
+
+        val refs = dao.findResolvableOnOtherServers("node-a").map { it.referenceCode }
+
+        assertEquals(listOf(theirs), refs)
+        assertEquals(false, refs.contains(mine), "this node's own orders are its poll's job")
     }
 
     @Test

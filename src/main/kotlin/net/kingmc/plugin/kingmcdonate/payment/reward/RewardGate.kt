@@ -14,6 +14,13 @@ import java.util.UUID
  * manual reconciliation but never aborts post-success work — the atomic status/totals commit
  * already happened. [donation] is built lazily so its collaborators (e.g. a name lookup) only
  * run on the winning path.
+ *
+ * Whether the credit actually landed is passed on to [DonationSuccessService.onSuccess], which
+ * books the ledger row only when it did. That keeps `point_log` an honest record of credits that
+ * happened — and makes the at-most-once loss discoverable: this gate claims before it credits, so
+ * a `give` failure, or a crash between the claim and the credit, leaves `reward_applied = 1` on an
+ * order that was never paid. Such an order is indistinguishable from a paid one except by the
+ * ledger row it lacks (`/kingmcdonate reconcile` reports exactly that).
  */
 class RewardGate(
     private val currency: CurrencyRegistry,
@@ -26,11 +33,13 @@ class RewardGate(
             logger.debug { "$context: reward already applied; skipping credit." }
             return
         }
-        try {
+        val credited = try {
             currency.active.give(uuid, point)
+            true
         } catch (e: Exception) {
             logger.error("$context: reward credit failed uuid=$uuid point=$point; reconcile manually.", e)
+            false
         }
-        donationSuccess.onSuccess(donation())
+        donationSuccess.onSuccess(donation(), credited)
     }
 }

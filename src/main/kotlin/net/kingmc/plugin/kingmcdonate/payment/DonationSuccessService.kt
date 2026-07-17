@@ -49,11 +49,17 @@ class DonationSuccessService(
     var eventHook: (Donation) -> Unit = {}
     var auditHook: (Donation) -> Unit = {}
 
-    fun onSuccess(d: Donation) {
+    /**
+     * [credited] says whether the point credit actually landed. Only the ledger listens to it: a
+     * credit that threw must not book revenue the player never received. Everything else runs
+     * either way — the order is SUCCESS, the money is real, and the reward/milestones are owed
+     * regardless of whether the currency backend accepted the points on this attempt.
+     */
+    fun onSuccess(d: Donation, credited: Boolean = true) {
         val name = resolveName(d)
         logger.debug { "Donation success ref=${d.referenceCode} uuid=${d.uuid} method=${d.method} amount=${d.amountVnd} point=${d.point}" }
 
-        auditHook(d)
+        if (credited) auditHook(d)
         enqueueSuccessReward(d, name)
         runFirstTopup(d, name)
         leaderboardHook(d)

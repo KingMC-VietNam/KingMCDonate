@@ -6,6 +6,7 @@ import net.kingmc.plugin.kingmcdonate.command.BossBarCommand
 import net.kingmc.plugin.kingmcdonate.command.CommandRouter
 import net.kingmc.plugin.kingmcdonate.command.FakeBankSubCommand
 import net.kingmc.plugin.kingmcdonate.command.GiveSubCommand
+import net.kingmc.plugin.kingmcdonate.command.ReconcileSubCommand
 import net.kingmc.plugin.kingmcdonate.command.FakeCardSubCommand
 import net.kingmc.plugin.kingmcdonate.command.LichSuNapCommand
 import net.kingmc.plugin.kingmcdonate.command.LichSuSubCommand
@@ -602,6 +603,7 @@ class KingMCDonate : JavaPlugin() {
             register(FakeCardSubCommand(card.service, configRef, messagesRef))
             register(FakeBankSubCommand(bank.service, messagesRef))
             register(GiveSubCommand(manualCredit, PlayerDao(database), scheduler, pluginLogger, configRef, messagesRef))
+            register(ReconcileSubCommand(card.cardPaymentDao, bank.bankPaymentDao, scheduler, configRef))
         }
         getCommand("kingmcdonate")?.apply {
             setExecutor(router)

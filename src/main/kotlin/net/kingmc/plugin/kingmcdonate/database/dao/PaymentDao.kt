@@ -49,6 +49,29 @@ abstract class PaymentDao<T>(database: Database, protected val table: String) : 
     }
 
     /**
+     * SUCCESS orders that claimed the reward but have no ledger row to show for it — the credit
+     * was lost. The gate claims `reward_applied` before crediting (at-most-once: never double-pay),
+     * so a `give` failure or a crash in between leaves a row that looks exactly like a paid one.
+     * The ledger is the only witness: it is written only once a credit actually lands.
+     *
+     * Reports candidates, not proof. Two known limits, which the caller must state:
+     * an order whose ledger write itself failed shows up here although the player was paid, and
+     * orders resolved before the ledger became credit-gated cannot be judged at all — back then a
+     * row was written even when the credit threw.
+     */
+    fun findLostCredits(limit: Int): List<T> = withConnection { conn ->
+        conn.prepareStatement(
+            "SELECT p.* FROM $table p WHERE p.status = ? AND p.reward_applied = 1 " +
+                "AND NOT EXISTS (SELECT 1 FROM point_log l WHERE l.reference_code = p.reference_code) " +
+                "ORDER BY p.created_at DESC LIMIT ?",
+        ).use { ps ->
+            ps.setString(1, PaymentStatus.SUCCESS.storageValue)
+            ps.setInt(2, limit)
+            ps.executeQuery().use { rs -> rs.mapAll { toModel() } }
+        }
+    }
+
+    /**
      * Conditionally claim the external-reward right: flip `reward_applied` 0 -> 1. Returns 1 for
      * the single winner, 0 otherwise, so the point credit runs at most once across the resolving
      * caller and any reconcile pass.

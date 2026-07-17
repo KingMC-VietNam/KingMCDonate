@@ -130,6 +130,41 @@ class CardPaymentDao(database: Database) : PaymentDao<CardPayment>(database, "ca
         }
     }
 
+    /**
+     * Open orders owned by a node **other** than [serverId], oldest first — the stranded set.
+     *
+     * Polling is deliberately owner-scoped, so if a node dies for good (or its `server-id` changes)
+     * nothing sweeps its open orders: a charged card sits there forever. This is the finder behind
+     * the manual `/kingmcdonate reconcile card` escape hatch, not an automatic takeover. Orders of
+     * a live sibling node show up here too — it is the operator who knows which nodes are dead.
+     */
+    fun findResolvableOnOtherServers(serverId: String): List<CardPayment> = withConnection { conn ->
+        conn.prepareStatement(
+            "SELECT * FROM card_payments WHERE owner_server <> ? AND status IN (?, ?) ORDER BY created_at LIMIT ?",
+        ).use { ps ->
+            ps.setString(1, serverId)
+            ps.setString(2, PaymentStatus.PENDING.storageValue)
+            ps.setString(3, PaymentStatus.WAITING.storageValue)
+            ps.setInt(4, MAX_BATCH)
+            ps.executeQuery().use { rs -> rs.mapAll { toModel() } }
+        }
+    }
+
+    /** Hand an open order to [serverId] so this node's poll picks it up; 0 if it already resolved. */
+    fun reown(referenceCode: String, serverId: String, now: Long): Int = withConnection { conn ->
+        conn.prepareStatement(
+            "UPDATE card_payments SET owner_server = ?, updated_at = ? " +
+                "WHERE reference_code = ? AND status IN (?, ?)",
+        ).use { ps ->
+            ps.setString(1, serverId)
+            ps.setLong(2, now)
+            ps.setString(3, referenceCode)
+            ps.setString(4, PaymentStatus.PENDING.storageValue)
+            ps.setString(5, PaymentStatus.WAITING.storageValue)
+            ps.executeUpdate()
+        }
+    }
+
     override fun ResultSet.toModel() = CardPayment(
         id = getLong("id"),
         playerUuid = UUID.fromString(getString("player_uuid")),
