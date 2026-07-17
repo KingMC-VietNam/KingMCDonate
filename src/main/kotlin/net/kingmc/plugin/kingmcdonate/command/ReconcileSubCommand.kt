@@ -49,21 +49,34 @@ class ReconcileSubCommand(
         if (args.size == 1 && "card".startsWith(args[0], ignoreCase = true)) listOf("card") else emptyList()
 
     private fun reportLostCredits(sender: CommandSender) {
+        val serverId = config().serverId
         val cards = cardPaymentDao.findLostCredits(LIMIT)
         val banks = bankPaymentDao.findLostCredits(LIMIT)
-        if (cards.isEmpty() && banks.isEmpty()) {
-            send(sender, "&aKhông có giao dịch nào nghi mất điểm.")
+        // Awaiting-credit orders owned elsewhere: their owner retries them, unless it never comes back.
+        val waitingCards = cardPaymentDao.findUnrewardedOnOtherServers(serverId, LIMIT)
+        val waitingBanks = bankPaymentDao.findUnrewardedOnOtherServers(serverId, LIMIT)
+
+        if (cards.isEmpty() && banks.isEmpty() && waitingCards.isEmpty() && waitingBanks.isEmpty()) {
+            send(sender, "&aKhông có giao dịch nào cần đối soát.")
             return
         }
-        send(sender, "&e&lGiao dịch đã trừ tiền nhưng KHÔNG có dòng sổ điểm &7(nghi mất khi cộng):")
-        cards.forEach { send(sender, "  &7[thẻ] &f${it.line()}") }
-        banks.forEach { send(sender, "  &7[bank] &f${it.line()}") }
-        send(sender, "&7Cộng bù bằng: &f/kingmcdonate give <card|bank> <player> <amount> [point]")
-        send(
-            sender,
-            "&8Lưu ý: đơn resolve TRƯỚC bản cập nhật này không xét được (hồi đó sổ vẫn ghi dù cộng lỗi); " +
-                "đơn mà chính lượt ghi sổ bị lỗi cũng hiện ở đây dù đã cộng thành công.",
-        )
+        if (cards.isNotEmpty() || banks.isNotEmpty()) {
+            send(sender, "&e&lĐã trừ tiền nhưng KHÔNG có dòng sổ điểm &7(nghi mất khi cộng):")
+            cards.forEach { send(sender, "  &7[thẻ] &f${it.line()}") }
+            banks.forEach { send(sender, "  &7[bank] &f${it.line()}") }
+            send(sender, "&7Cộng bù bằng: &f/kingmcdonate give <card|bank> <player> <amount> [point]")
+            send(
+                sender,
+                "&8Lưu ý: đơn resolve TRƯỚC bản cập nhật này không xét được; đơn mà chính lượt ghi sổ bị lỗi " +
+                    "cũng hiện ở đây dù đã cộng; và lỗi cộng điểm xảy ra SAU khi bàn giao cho main thread thì không thấy.",
+            )
+        }
+        if (waitingCards.isNotEmpty() || waitingBanks.isNotEmpty()) {
+            send(sender, "&e&lĐang chờ cộng điểm, thuộc node khác &7(node còn sống sẽ tự cộng khi currency trở lại):")
+            waitingCards.forEach { send(sender, "  &7[thẻ] &f${it.line()}") }
+            waitingBanks.forEach { send(sender, "  &7[bank] &f${it.line()}") }
+            send(sender, "&7Node đó chết hẳn thì cộng bù bằng &f/kingmcdonate give&7.")
+        }
     }
 
     private fun reportStrandedCards(sender: CommandSender) {
@@ -91,7 +104,9 @@ class ReconcileSubCommand(
         }
         val rows = cardPaymentDao.reown(referenceCode, serverId, System.currentTimeMillis())
         if (rows != 1) {
-            send(sender, "&eĐơn &f$referenceCode&e đã kết thúc (&f${order.status}&e), không cần nhận nuôi.")
+            // Re-read: it resolved between the lookup and the update, so `order.status` is stale.
+            val now = cardPaymentDao.findByReference(referenceCode)?.status
+            send(sender, "&eĐơn &f$referenceCode&e đã kết thúc (&f$now&e), không cần nhận nuôi.")
             return
         }
         send(
@@ -107,7 +122,9 @@ class ReconcileSubCommand(
     private fun BankPayment.line() =
         "$referenceCode ${Text.formatMoney(amount)} ${point}pt $playerUuid @$ownerServer"
 
-    private fun send(sender: CommandSender, line: String) = sender.sendMessage(Text.colorize(line))
+    /** Hop back to the main thread: these run from `runIo`, and the rest of the plugin messages on-tick. */
+    private fun send(sender: CommandSender, line: String) =
+        scheduler.runNextTick { sender.sendMessage(Text.colorize(line)) }
 
     companion object {
         private const val LIMIT = 20

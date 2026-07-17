@@ -18,8 +18,10 @@ class BankWebhookDeps(
     /**
      * Surface an authentic transfer that matched no order. Called only on the branch where the
      * exact-amount lookup above returned null, so it can never touch a transfer being credited.
+     * Required rather than defaulted: a wiring that forgets it would silently stop reporting
+     * wrong-amount transfers, which is the whole point of having it.
      */
-    val reportUnmatched: (UnmatchedTransfer) -> Unit = {},
+    val reportUnmatched: (UnmatchedTransfer) -> Unit,
 )
 
 /** A bank gateway that can receive webhooks; the active provider supplies its handler. */

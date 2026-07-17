@@ -204,6 +204,32 @@ class CardPaymentServiceTest {
     }
 
     @Test
+    fun `a reconcile pass while the backend is still down must not burn the claim`() {
+        // The gate claims before it credits, so a reconcile that runs during the outage would flip
+        // reward_applied 0 -> 1 and credit nothing — and findSuccessUnrewardedByServer only returns
+        // reward_applied = 0, so the order would never be retried. The card poll runs every 15s, so
+        // any outage longer than that would silently eat the payment.
+        val uuid = UUID.randomUUID()
+        val ref = pending(uuid)
+        fakeCurrency.available = false
+        service.award(ref, uuid, "Alice", 50_000, CardOutcome(PaymentStatus.SUCCESS, null, null, ""))
+
+        service.reapplyReward(card.findByReference(ref)!!) // a poll pass mid-outage
+        service.reapplyReward(card.findByReference(ref)!!)
+
+        assertEquals(0L, fakeCurrency.balance(uuid))
+        assertEquals(
+            listOf(ref),
+            card.findSuccessUnrewardedByServer("node-a").map { it.referenceCode },
+            "the order must still be waiting for its credit",
+        )
+
+        fakeCurrency.available = true
+        service.reapplyReward(card.findByReference(ref)!!)
+        assertEquals(50L, fakeCurrency.balance(uuid), "and it is paid once the backend returns")
+    }
+
+    @Test
     fun `the deferred credit lands exactly once once the currency backend returns`() {
         val uuid = UUID.randomUUID()
         val ref = pending(uuid)

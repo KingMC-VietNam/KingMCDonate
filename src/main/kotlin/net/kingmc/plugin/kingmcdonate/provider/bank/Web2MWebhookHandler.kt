@@ -54,8 +54,11 @@ class Web2MWebhookHandler(
                     "WEBHOOK", "web2m tx=$txId amount=$amount matched no pending order",
                 )
                 deps.logger.warn("Web2M webhook: authentic transfer tx=$txId matched no pending order; acknowledged.")
-                // Matched nothing: if it names a pending order at the wrong amount, say so rather than drop it.
-                deps.reportUnmatched(UnmatchedTransfer(txId, haystack, amount))
+                // Matched nothing: if it names a pending order at the wrong amount, say so rather than
+                // drop it. Diagnostics must never cost us the ACK we promise, nor the confirmations
+                // queued behind this item in the batch.
+                runCatching { deps.reportUnmatched(UnmatchedTransfer(txId, haystack, amount)) }
+                    .onFailure { deps.logger.error("Web2M webhook: could not report unmatched tx=$txId; ignored.", it) }
                 continue
             }
             deps.logger.debug { "Web2M webhook tx=$txId matched ref=${order.referenceCode}; confirming." }

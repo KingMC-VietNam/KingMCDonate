@@ -117,6 +117,7 @@ class BankProviderRegistryTest {
                 findPendingByContainedReference = { _, _ -> null },
                 confirm = { throw AssertionError("an unauthenticated webhook must never confirm") },
                 logger = logger,
+                reportUnmatched = {},
             ),
         )
         val response = handler.handle(
@@ -150,6 +151,7 @@ class BankProviderRegistryTest {
                     findPendingByContainedReference = { _, _ -> null },
                     confirm = { throw AssertionError("an unauthenticated webhook must never confirm") },
                     logger = logger,
+                    reportUnmatched = {},
                 ),
             )
             val response = handler.handle(

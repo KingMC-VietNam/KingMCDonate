@@ -15,12 +15,14 @@ import java.util.UUID
  * already happened. [donation] is built lazily so its collaborators (e.g. a name lookup) only
  * run on the winning path.
  *
- * Whether the credit actually landed is passed on to [DonationSuccessService.onSuccess], which
- * books the ledger row only when it did. That keeps `point_log` an honest record of credits that
- * happened — and makes the at-most-once loss discoverable: this gate claims before it credits, so
- * a `give` failure, or a crash between the claim and the credit, leaves `reward_applied = 1` on an
- * order that was never paid. Such an order is indistinguishable from a paid one except by the
- * ledger row it lacks (`/kingmcdonate reconcile` reports exactly that).
+ * Whether [CurrencyProvider.give] returned normally is passed to [DonationSuccessService.onSuccess],
+ * which books the ledger row only when it did — so the ledger never claims points a credit visibly
+ * refused to make. That is a narrower promise than it looks: the real providers hand the credit to
+ * the main thread and return, so a backend that fails *later* still books a row. What the ledger
+ * does witness reliably is that this method reached its end, which is what makes the at-most-once
+ * loss discoverable: the claim is taken before the credit, so a node that dies in between leaves
+ * `reward_applied = 1` on an order no reconcile pass will ever revisit. Its missing ledger row is
+ * the only trace, and `/kingmcdonate reconcile` reports exactly that.
  */
 class RewardGate(
     private val currency: CurrencyRegistry,
@@ -29,6 +31,13 @@ class RewardGate(
 ) {
 
     fun applyOnce(context: String, uuid: UUID, point: Long, claim: () -> Int, donation: () -> Donation) {
+        // Never claim what cannot be credited. The claim is the at-most-once token: taking it while
+        // the backend is down would spend it on a credit that cannot happen, and the reconcile pass
+        // only ever looks for `reward_applied = 0` — so the order would look paid and never retry.
+        if (!currency.active.isAvailable()) {
+            logger.warn("$context: currency backend unavailable; credit left unclaimed for a later pass.")
+            return
+        }
         if (claim() != 1) {
             logger.debug { "$context: reward already applied; skipping credit." }
             return

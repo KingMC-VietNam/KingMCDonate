@@ -22,6 +22,7 @@ class Web2MWebhookHandlerTest {
     )
 
     private var confirmed: BankConfirmation? = null
+    private var reported: UnmatchedTransfer? = null
 
     private fun deps(found: BankPayment? = order, log: PluginLogger = logger) = BankWebhookDeps(
         findPendingByContainedReference = { haystack, amount ->
@@ -29,6 +30,7 @@ class Web2MWebhookHandlerTest {
         },
         confirm = { confirmed = it },
         logger = log,
+        reportUnmatched = { reported = it },
     )
 
     private fun item(
@@ -124,6 +126,46 @@ class Web2MWebhookHandlerTest {
     }
 
     @Test
+    fun `a wrong-amount transfer is handed to the report path instead of being dropped`() {
+        val response = handler().handle(request(body(item(amount = "20000"))))
+
+        assertEquals(200, response.status)
+        assertNull(confirmed, "a wrong amount must never confirm")
+        assertEquals("9668", reported?.transactionId)
+        assertEquals(20_000L, reported?.amount)
+        assertTrue(reported!!.searchText.contains("KMD7X9A2QP"))
+    }
+
+    @Test
+    fun `an exact-amount transfer confirms and is not reported`() {
+        handler().handle(request(body(item())))
+
+        assertEquals("KMD7X9A2QP", confirmed?.referenceCode)
+        assertNull(reported, "a transfer being credited must never reach the report path")
+    }
+
+    @Test
+    fun `a report failure never breaks the ACK or the rest of the batch`() {
+        // The handler promises Web2M a 200 for any authentic payload; a diagnostics blip must not
+        // turn into a 500 that makes it retry, nor abandon the confirmations queued behind it.
+        val d = BankWebhookDeps(
+            findPendingByContainedReference = { haystack, amount ->
+                order.takeIf { haystack.contains(it.referenceCode) && amount == it.amount }
+            },
+            confirm = { confirmed = it },
+            logger = logger,
+            reportUnmatched = { throw IllegalStateException("the database is having a bad day") },
+        )
+
+        val response = handler(d = d).handle(
+            request(body(item(transactionID = "STRAY", amount = "20000"), item())),
+        )
+
+        assertEquals(200, response.status)
+        assertEquals("KMD7X9A2QP", confirmed?.referenceCode, "the good transfer behind it must still confirm")
+    }
+
+    @Test
     fun `OUT item is acknowledged but not confirmed`() {
         val response = handler().handle(request(body(item(type = "OUT", amount = "-50000"))))
         assertEquals(200, response.status)
@@ -155,6 +197,7 @@ class Web2MWebhookHandlerTest {
             },
             confirm = { confirmed = it },
             logger = logger,
+            reportUnmatched = { reported = it },
         )
         handler(d = d).handle(request(body(item(amount = "50000", description = "CK KMDSTALE01 KMD7X9A2QP NAP"))))
         assertEquals("KMD7X9A2QP", confirmed?.referenceCode)

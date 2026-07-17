@@ -92,6 +92,7 @@ class SePayWebhookHandlerTest {
             },
             confirm = { confirmed = it },
             logger = logger,
+            reportUnmatched = { reported = it },
         )
         // Both references appear in the content, but only the second matches the transferred amount.
         val raw = body(amount = 50_000, content = "CK KMDSTALE01 KMD7X9A2QP NAP")

@@ -103,6 +103,25 @@ class CardPaymentDaoTest {
     }
 
     @Test
+    fun `an order awaiting its credit on another node is reported, since only its owner retries it`() {
+        // Left by a currency outage: SUCCESS so the stranded-card finder skips it, reward_applied = 0
+        // so the lost-credit finder skips it, and reconcile is owner-scoped. If that node never comes
+        // back, this is the only thing that sees the order.
+        val theirs = dao.insertPending(UUID.randomUUID(), "Bob", "VIETTEL", 10_000, "s", "p", "card2k", "node-b", 1_000)
+        dao.resolve(theirs, PaymentStatus.SUCCESS, 100, 2_000)
+        val theirsPaid = dao.insertPending(UUID.randomUUID(), "Bob", "VIETTEL", 10_000, "s", "p", "card2k", "node-b", 1_000)
+        dao.resolve(theirsPaid, PaymentStatus.SUCCESS, 100, 2_000)
+        dao.claimRewardApplied(theirsPaid, 2_000)
+        val mine = insert()
+        dao.resolve(mine, PaymentStatus.SUCCESS, 100, 2_000)
+
+        val refs = dao.findUnrewardedOnOtherServers("node-a", 10).map { it.referenceCode }
+
+        assertEquals(listOf(theirs), refs)
+        assertEquals(false, refs.contains(mine), "this node retries its own on every poll")
+    }
+
+    @Test
     fun `the stranded set is the open orders owned by other nodes`() {
         val mine = insert()
         val theirs = dao.insertPending(UUID.randomUUID(), "Bob", "VIETTEL", 10_000, "s", "p", "card2k", "node-b", 1_000)

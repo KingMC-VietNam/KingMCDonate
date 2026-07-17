@@ -138,9 +138,10 @@ class BankConfirmService(
     }
 
     /**
-     * Surface an incoming transfer that matched no order but names a PENDING one — the payer got the
-     * amount wrong, so today it is dropped and neither they nor an operator ever learns why. Warns
-     * once per transfer and never credits: only the exact-amount match may do that.
+     * Surface an incoming transfer that matched no order but names a PENDING one **at a different
+     * amount** — the payer got the figure wrong, so today it is dropped and neither they nor an
+     * operator ever learns why. Warns once per transfer and never credits: only the exact-amount
+     * match may do that.
      *
      * Safe only because [u] matched **nothing** ([UnmatchedTransfer]), and because the marker is
      * keyed via [ProcessedBankTxDao.mismatchKey] rather than the bare tx id. A transfer's text can
@@ -148,20 +149,34 @@ class BankConfirmService(
      * correct one's confirmation violate UNIQUE and roll back, losing that credit for good.
      */
     fun reportUnmatched(u: UnmatchedTransfer) {
-        val named = bankPaymentDao.findPendingByContainedReferenceAnyAmount(u.searchText) ?: return
-        val first = processedBankTxDao.insertIfAbsent(
-            ProcessedBankTxDao.mismatchKey(u.transactionId), named.referenceCode, System.currentTimeMillis(),
-        )
-        if (first) {
-            logger.warn(
-                "Bank ${named.referenceCode}: transfer (tx=${u.transactionId}) names this order but paid " +
-                    "${u.amount} instead of ${named.amount}; NOT credited, recorded for manual reconciliation.",
+        // Diagnostics only: it must never break the caller. The webhook handlers promise their gateway
+        // a 200 for any authentic transfer, and a 500 here would make the gateway retry — and, for a
+        // batch payload, abandon the real confirmations queued behind this one.
+        try {
+            val named = bankPaymentDao.findPendingByContainedReferenceAnyAmount(u.searchText) ?: return
+            // Same amount means the order simply wasn't in the match set (the poll caps how many
+            // orders it compares). The next pass credits it; saying "NOT credited" here would invite
+            // an operator to pay by hand and double-credit the player.
+            if (named.amount == u.amount) {
+                logger.debug { "Bank ${named.referenceCode}: tx=${u.transactionId} pays the right amount; leaving it to the next pass." }
+                return
+            }
+            val first = processedBankTxDao.insertIfAbsent(
+                ProcessedBankTxDao.mismatchKey(u.transactionId), named.referenceCode, System.currentTimeMillis(),
             )
-            KingMCDonateContext.activityLogOrNull?.log(
-                "TXN",
-                "bank amount-mismatch ref=${named.referenceCode} tx=${u.transactionId} " +
-                    "paid=${u.amount} expected=${named.amount}",
-            )
+            if (first) {
+                logger.warn(
+                    "Bank ${named.referenceCode}: transfer (tx=${u.transactionId}) names this order but paid " +
+                        "${u.amount} instead of ${named.amount}; NOT credited, recorded for manual reconciliation.",
+                )
+                KingMCDonateContext.activityLogOrNull?.log(
+                    "TXN",
+                    "bank amount-mismatch ref=${named.referenceCode} tx=${u.transactionId} " +
+                        "paid=${u.amount} expected=${named.amount}",
+                )
+            }
+        } catch (e: Exception) {
+            logger.error("Could not report unmatched transfer tx=${u.transactionId}; ignored.", e)
         }
     }
 

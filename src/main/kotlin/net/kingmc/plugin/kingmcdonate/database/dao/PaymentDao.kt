@@ -49,15 +49,38 @@ abstract class PaymentDao<T>(database: Database, protected val table: String) : 
     }
 
     /**
-     * SUCCESS orders that claimed the reward but have no ledger row to show for it — the credit
-     * was lost. The gate claims `reward_applied` before crediting (at-most-once: never double-pay),
-     * so a `give` failure or a crash in between leaves a row that looks exactly like a paid one.
-     * The ledger is the only witness: it is written only once a credit actually lands.
+     * SUCCESS orders network-wide whose credit has not been applied, owned by a node other than
+     * [serverId] — the awaiting-credit set no one is sweeping.
      *
-     * Reports candidates, not proof. Two known limits, which the caller must state:
-     * an order whose ledger write itself failed shows up here although the player was paid, and
-     * orders resolved before the ledger became credit-gated cannot be judged at all — back then a
-     * row was written even when the credit threw.
+     * [findSuccessUnrewardedByServer] is owner-scoped, so an order left awaiting its credit (the
+     * currency backend was down when it resolved) is only ever retried by its owner. If that node
+     * dies for good, nothing credits it and nothing reports it: it is SUCCESS, so the stranded-card
+     * finder ignores it, and `reward_applied = 0`, so the lost-credit finder ignores it too.
+     */
+    fun findUnrewardedOnOtherServers(serverId: String, limit: Int): List<T> = withConnection { conn ->
+        conn.prepareStatement(
+            "SELECT * FROM $table WHERE owner_server <> ? AND status = ? AND reward_applied = 0 " +
+                "ORDER BY created_at DESC LIMIT ?",
+        ).use { ps ->
+            ps.setString(1, serverId)
+            ps.setString(2, PaymentStatus.SUCCESS.storageValue)
+            ps.setInt(3, limit)
+            ps.executeQuery().use { rs -> rs.mapAll { toModel() } }
+        }
+    }
+
+    /**
+     * SUCCESS orders that claimed the reward but have no ledger row to show for it. The gate claims
+     * `reward_applied` before crediting (at-most-once: never double-pay), so a node that dies in
+     * between leaves a row that looks exactly like a paid one — the reconcile pass only looks for
+     * `reward_applied = 0` and will never revisit it. The ledger, written at the end of the credit
+     * path, is the only trace such an order leaves.
+     *
+     * Reports candidates, not proof, and it is not exhaustive. Known limits, which the caller must
+     * state: an order whose ledger write itself failed appears here although the player was paid;
+     * orders resolved before the ledger became credit-gated cannot be judged at all; and a credit
+     * that the currency backend accepted and then failed *asynchronously* is invisible — the real
+     * providers hand the credit to the main thread and return, so the row is booked either way.
      */
     fun findLostCredits(limit: Int): List<T> = withConnection { conn ->
         conn.prepareStatement(

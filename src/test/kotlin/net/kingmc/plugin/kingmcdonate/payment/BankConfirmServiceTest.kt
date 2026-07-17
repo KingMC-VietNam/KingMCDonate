@@ -247,6 +247,22 @@ class BankConfirmServiceTest {
     }
 
     @Test
+    fun `a transfer paying the correct amount is never reported, even if the poll missed the order`() {
+        // The poll matches against at most MAX_BATCH pending orders. With a bigger backlog, a perfectly
+        // correct transfer for an order outside that window arrives as unmatched. Reporting it would
+        // tell the operator it was NOT credited — they would pay by hand, and the next poll would
+        // credit it too. Same amount means "the poll just hasn't got to it": stay quiet.
+        val (_, ref) = newOrder(amount = 50_000)
+
+        service.reportUnmatched(UnmatchedTransfer("T1", "CK $ref NAP", 50_000))
+
+        assertTrue(
+            ProcessedBankTxDao(database).insertIfAbsent(ProcessedBankTxDao.mismatchKey("T1"), ref, 3_000),
+            "an exact-amount transfer must leave no mismatch marker and no warning",
+        )
+    }
+
+    @Test
     fun `a transfer naming no pending order is not reported`() {
         service.reportUnmatched(UnmatchedTransfer("T9", "CK SOMEONE ELSE", 20_000))
 
