@@ -91,7 +91,7 @@ class BankConfirmService(
             return
         }
 
-        val point = pointFor(order.amount)
+        val point = pointFor(order.amount, order.createdAt)
         val now = System.currentTimeMillis()
         val committed = try {
             database.transaction { conn ->
@@ -211,10 +211,14 @@ class BankConfirmService(
         }
     }
 
-    /** Base points (amount/1000 * rate) with the active promo bonus applied. */
-    fun pointFor(amountVnd: Long): Long {
+    /**
+     * Base points (amount/1000 * rate) with the promo bonus applied as of [createdAt] — the order's
+     * creation time, not now — so a confirmation delayed past the promo's end still grants the bonus
+     * the player was shown when they paid.
+     */
+    fun pointFor(amountVnd: Long, createdAt: Long): Long {
         val base = Math.round(amountVnd / 1000.0 * config().bank.pointRate)
-        return promo.applyBonus(base, System.currentTimeMillis())
+        return promo.applyBonus(base, createdAt)
     }
 
     companion object {

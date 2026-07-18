@@ -273,14 +273,41 @@ class CardPaymentServiceTest {
     }
 
     @Test
-    fun `active promo increases credited points and persisted point`() {
-        val now = System.currentTimeMillis()
-        service = buildService(promoCfg = PromoConfig(listOf(PromoConfig.Promo("x", 100.0, now - 1000, now + 60_000))))
+    fun `promo is computed from the order's creation time, not the confirmation time`() {
+        // pending() creates the order at t=1000; the promo ran [0, 2000] and has long since ended by now.
+        // Confirm-time promo would credit the base 50; creation-time promo still grants the bonus.
+        service = buildService(promoCfg = PromoConfig(listOf(PromoConfig.Promo("x", 100.0, 0, 2_000))))
         val uuid = UUID.randomUUID()
         val ref = pending(uuid)
         service.award(ref, uuid, "Alice", 50_000, CardOutcome(PaymentStatus.SUCCESS, null, null, ""))
-        assertEquals(100L, fakeCurrency.balance(uuid)) // 50 base * (1 + 100/100)
+        assertEquals(100L, fakeCurrency.balance(uuid)) // 50 base * (1 + 100/100), promo active at creation
         assertEquals(50_000L, totalAll(uuid))          // face amount unaffected by promo
         assertEquals(100L, card.findByReference(ref)!!.point)
+    }
+
+    @Test
+    fun `a wrong-denomination card fires the failure hook`() {
+        val uuid = UUID.randomUUID()
+        val ref = pending(uuid)
+        val reasons = mutableListOf<String>()
+        service.onFailed = { _, _, _, reason -> reasons.add(reason) }
+
+        service.award(ref, uuid, "Alice", 50_000, CardOutcome(PaymentStatus.SUCCESS, null, 20_000, ""))
+
+        assertEquals(PaymentStatus.FAILED, card.findByReference(ref)!!.status)
+        assertEquals(1, reasons.size, "the wrong-amount branch must notify onFailed for parity with applyOutcome")
+    }
+
+    @Test
+    fun `an unconfigured denomination fires the failure hook`() {
+        val uuid = UUID.randomUUID()
+        val ref = pending(uuid, amount = 99_999)
+        val reasons = mutableListOf<String>()
+        service.onFailed = { _, _, _, reason -> reasons.add(reason) }
+
+        service.award(ref, uuid, "Alice", 99_999, CardOutcome(PaymentStatus.SUCCESS, null, null, ""))
+
+        assertEquals(PaymentStatus.FAILED, card.findByReference(ref)!!.status)
+        assertEquals(1, reasons.size, "the unconfigured-denomination branch must notify onFailed")
     }
 }

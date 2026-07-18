@@ -194,6 +194,7 @@ class CardPaymentService(
             logger.warn("Card $referenceCode amount mismatch: declared=$declaredAmount recognized=$recognized; not rewarded.")
             logFailed(referenceCode, "amount-mismatch declared=$declaredAmount recognized=$recognized")
             notifyFailure(referenceCode, uuid, MessageKeys.CARD_WRONG_DENOMINATION)
+            onFailed(uuid, declaredAmount, referenceCode, "amount-mismatch")
             return
         }
 
@@ -203,11 +204,14 @@ class CardPaymentService(
             logger.warn("Card $referenceCode: amount $declaredAmount is not a configured denomination; not rewarded.")
             logFailed(referenceCode, "unconfigured-denomination amount=$declaredAmount")
             notifyFailure(referenceCode, uuid, MessageKeys.CARD_WRONG_DENOMINATION)
+            onFailed(uuid, declaredAmount, referenceCode, "unconfigured-denomination")
             return
         }
 
-        val now0 = System.currentTimeMillis()
-        val point = promo.applyBonus(basePoint, now0)
+        // Promo is computed from when the player committed (order creation), not confirm time, so a
+        // delayed confirmation past the promo's end still grants the bonus the player was shown.
+        val createdAt = cardPaymentDao.findByReference(referenceCode)?.createdAt ?: System.currentTimeMillis()
+        val point = promo.applyBonus(basePoint, createdAt)
 
         // Flip status and accumulate totals in one transaction so they commit together (exactly once);
         // the external point credit is then applied under a separate gate so a reconcile pass can

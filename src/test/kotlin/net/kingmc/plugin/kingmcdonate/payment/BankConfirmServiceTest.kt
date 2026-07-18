@@ -156,16 +156,16 @@ class BankConfirmServiceTest {
     }
 
     @Test
-    fun `active promo increases credited points and totals`() {
-        // Rebuild the service with a +100% promo active now.
-        val now = System.currentTimeMillis()
+    fun `promo is computed from the order's creation time, not the confirmation time`() {
+        // newOrder creates the order at t=1000; the promo ran [0, 2000] and has long since ended by now.
+        // Confirm-time promo would credit the base 50; creation-time promo still grants the bonus.
         val promoCfg = net.kingmc.plugin.kingmcdonate.promo.PromoConfig(
-            listOf(net.kingmc.plugin.kingmcdonate.promo.PromoConfig.Promo("x", 100.0, now - 1000, now + 60_000)),
+            listOf(net.kingmc.plugin.kingmcdonate.promo.PromoConfig.Promo("x", 100.0, 0, 2_000)),
         )
         service = buildServiceWithPromo(promoCfg)
-        val (uuid, ref) = newOrder(amount = 50_000) // base 50 points at rate 1.0
+        val (uuid, ref) = newOrder(amount = 50_000) // base 50 points at rate 1.0, created at t=1000
         service.confirm(BankConfirmation(ref, "TXP", 50_000))
-        assertEquals(100L, fakeCurrency.balance(uuid)) // 50 * (1 + 100/100)
+        assertEquals(100L, fakeCurrency.balance(uuid)) // 50 * (1 + 100/100), promo active at creation
         assertEquals(50_000L, totalAll(uuid))          // amount_vnd is face, unaffected by promo
         assertEquals(100L, bank.findByReference(ref)!!.point) // persisted point matches credited amount
     }
