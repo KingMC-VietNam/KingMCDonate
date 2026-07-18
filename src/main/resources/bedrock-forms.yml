@@ -1,12 +1,15 @@
-# Cấu hình form Bedrock (Floodgate/Geyser).
-# LƯU Ý: form Bedrock KHÔNG hỗ trợ màu/MiniMessage -> không dùng mã màu (&a, <green>...).
-#        Tiếng Việt có dấu thì DÙNG BÌNH THƯỜNG (Unicode hiển thị tốt trên client Bedrock).
-# enabled (tổng): bật/tắt toàn bộ form Bedrock; mỗi form có enabled riêng bên dưới.
-# Người chơi Java luôn dùng GUI rương như cũ; chỉ người chơi Bedrock nhận form.
+# ============================================================
+#  FORM BEDROCK (Floodgate / Geyser)
+# ============================================================
+# Người chơi Java luôn dùng GUI rương như cũ; chỉ người chơi Bedrock nhận các form dưới đây.
+# ⚠ Form Bedrock KHÔNG hỗ trợ màu/MiniMessage -> ĐỪNG dùng mã màu (&a, <green>...).
+#    Tiếng Việt CÓ DẤU dùng bình thường (Unicode hiển thị tốt trên client Bedrock).
+# Mỗi form có công tắc enabled riêng; "enabled" ngoài cùng là công tắc tổng.
 
+# Bật/tắt toàn bộ form Bedrock.  Giá trị: true | false   ·   Mặc định: true
 enabled: true
 
-# Form nạp thẻ (gộp chọn loại thẻ -> mệnh giá -> nhập seri/pin vào một form duy nhất)
+# ----- Form nạp thẻ (chọn loại thẻ -> mệnh giá -> nhập seri/pin trong một form) -----
 card:
   enabled: true
   title: "KingMCDonate - Nạp thẻ cào"
@@ -19,23 +22,23 @@ card:
   pin-placeholder: "Nhập mã thẻ cào (dãy số bị cào)"
   submit-label: "Bấm gửi để nạp thẻ"
 
-# Form lịch sử nạp
+# ----- Form lịch sử nạp -----
 history:
   enabled: true
   title: "Lịch sử nạp của bạn"
-  # Placeholder: {time} {label} {amount} {status}
+  # Biến: {time} {label} {amount} {status}
   entry-format: "{time} - {label} - {amount} - {status}"
   empty: "Bạn chưa có giao dịch nạp nào"
   close: "Đóng"
 
-# Form top nạp (đổi chỉ số Tiền/Điểm và kỳ Tất cả/Hôm nay/Tuần/Tháng)
+# ----- Form top nạp (đổi chỉ số Tiền/Điểm và kỳ Tất cả/Hôm nay/Tuần/Tháng) -----
 leaderboard:
   enabled: true
   title: "Bảng xếp hạng nạp"
-  # Dòng tiêu đề hiển thị phía trên danh sách; {metric} = chỉ số đang xem, {period} = kỳ đang xem.
+  # Dòng tiêu đề phía trên danh sách. Biến: {metric} = chỉ số đang xem, {period} = kỳ đang xem.
   # Để trống ("") nếu không muốn hiện.
   header: "Đang xem: {metric} — Kỳ: {period}"
-  # Placeholder: {rank} {name} {value}
+  # Biến: {rank} {name} {value}
   entry-format: "#{rank}  {name}  —  {value}"
   empty: "Chưa có ai nạp trong kỳ này"
   metric-button: "Đổi chỉ số xếp hạng (đang xem: {metric})"

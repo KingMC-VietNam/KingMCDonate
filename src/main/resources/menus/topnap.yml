@@ -1,10 +1,12 @@
 # ============================================================
-#  Menu bảng xếp hạng nạp (mở bằng /topnap)
+#  MENU BẢNG XẾP HẠNG NẠP (mở bằng /topnap)
 # ============================================================
+# layout: mỗi dòng 9 ô. Ô để trống / ký tự không khai trong "items" -> nhận "filler".
 #   T = vùng top người chơi (phân trang) — mỗi ô là một head
-#   M = đổi cách xếp (Tiền / Điểm), K = đổi kỳ (Tất cả/Hôm nay/Tuần/Tháng)
-#   P = trang trước, N = trang sau, C = đóng
-# "entry-item" là mẫu cho mỗi ô top; biến: {rank} {player} {metric} {value}.
+#   M = đổi cách xếp (Tiền / Điểm) · K = đổi kỳ (Tất cả/Hôm nay/Tuần/Tháng)
+#   P = trang trước · N = trang sau · C = đóng
+# ⚠ Giữ nguyên các ký tự layout (T, M, K, P, N, C) khớp với key trong "items".
+# "entry-item" là mẫu cho mỗi ô top. Biến: {rank} {player} {metric} {value}.
 title: "&8» &6&lTOP NẠP &8«"
 rows: 6
 
@@ -42,7 +44,7 @@ items:
     name: "&c&lĐóng"
     sound: "BLOCK_NOTE_BLOCK_BASS"
 
-# Mẫu mỗi ô top. Material PLAYER_HEAD hiện head mặc định, hệ thống vá head thật sau.
+# Mẫu mỗi ô top. PLAYER_HEAD hiện head mặc định, hệ thống vá head thật sau.
 entry-item:
   material: PLAYER_HEAD
   name: "&e#{rank} &f{player}"
@@ -54,7 +56,7 @@ empty-item:
   material: GRAY_DYE
   name: "&7Chưa có ai nạp"
 
-# Nhãn tiếng Việt cho nút đổi cách xếp / đổi kỳ.
+# Nhãn tiếng Việt cho nút đổi cách xếp (metric) và đổi kỳ (period).
 metric-labels:
   AMOUNT: "Tiền nạp"
   POINT: "Điểm"
@@ -65,6 +67,7 @@ period-labels:
   WEEK: "Tuần này"
   MONTH: "Tháng này"
 
+# Ô lấp chỗ trống (mọi ô không khai ở trên).
 filler:
   enabled: true
   material: GRAY_STAINED_GLASS_PANE

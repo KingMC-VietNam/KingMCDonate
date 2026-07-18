@@ -1,32 +1,33 @@
 # ============================================================
-#  KingMCDonate — tin nhắn gửi người chơi
+#  KingMCDonate — TIN NHẮN GỬI NGƯỜI CHƠI
 # ============================================================
-# Hỗ trợ mã màu & và mã hex &#RRGGBB. Mọi tin nhắn được ghép thêm "prefix" ở config.yml.
-# {biến} trong ngoặc nhọn được thay tự động (vd {amount}, {point}, {reason}) — giữ nguyên tên biến.
-# Sau khi sửa, chạy /kingmcdonate reload (không cần khởi động lại server).
+# Mọi tin nhắn tự được ghép thêm "prefix" ở config.yml.
+# Hỗ trợ mã màu & và mã hex &#RRGGBB.
+# ⚠ Giữ nguyên tên biến {trong ngoặc nhọn} — chúng được thay tự động (vd {amount} {point} {reason}).
+# Sau khi sửa, chạy /kingmcdonate reload.
 
-# Chung
+# ----- Chung -----
 no-permission: "&cBạn không có quyền dùng lệnh này."
 player-only: "&cLệnh này chỉ dùng được trong game."
 unknown-command: "&cLệnh không hợp lệ. Gõ &e/kingmcdonate&c để xem trợ giúp."
 
-# Quản trị
+# ----- Quản trị -----
 reload-success: "&aĐã tải lại cấu hình &#55FFFF(config + messages + provider trả thưởng)&a."
 reload-failed: "&cTải lại thất bại: &e{error}&c. Giữ nguyên cấu hình cũ."
 reload-config-warnings: "&eCó &c{count}&e cảnh báo cấu hình — xem console để biết chi tiết."
 
-# Trả thưởng / provider
+# ----- Trả thưởng / provider -----
 currency-unavailable: "&cHệ thống trả thưởng đang không khả dụng, vui lòng liên hệ quản trị."
 order-in-progress: "&cBạn đang có một đơn nạp chưa hoàn tất, vui lòng chờ xử lý xong."
 order-cooldown: "&cBạn thao tác quá nhanh, vui lòng đợi giây lát rồi thử lại."
 
-# Trạng thái giao dịch (hiển thị trong lịch sử)
+# ----- Trạng thái giao dịch (hiển thị trong lịch sử) -----
 status-success: "&aThành công"
 status-failed: "&cThất bại"
 status-waiting: "&eĐang xử lý"
 status-pending: "&7Đang chờ"
 
-# Nạp thẻ
+# ----- Nạp thẻ -----
 card-charging: "&7Đang xử lý thẻ của bạn, vui lòng đợi giây lát..."
 card-success: "&aNạp thẻ thành công! &f+{amount} &a(&e{point} point&a)."
 card-failed: "&cNạp thẻ thất bại: &e{reason}&c."
@@ -45,7 +46,7 @@ card-input-cancelled: "&7Đã hủy nạp thẻ."
 anvil-serial-title: "&8Nhập seri thẻ"
 anvil-pin-title: "&8Nhập mã thẻ (PIN)"
 
-# Nạp ngân hàng (QR)
+# ----- Nạp ngân hàng (QR) -----
 bank-created: "&aĐã tạo mã QR nạp &f{amount}&a. Mã giao dịch: &e{ref}&a. Quét QR và chuyển đúng số tiền, hệ thống sẽ tự xác nhận."
 bank-success: "&aNạp ngân hàng thành công! &f+{amount} &a(&e{point} point&a)."
 bank-expired: "&cĐơn nạp ngân hàng đã hết hạn. Vui lòng tạo lại nếu bạn chưa chuyển khoản."
@@ -54,20 +55,20 @@ bank-unavailable: "&cCổng nạp ngân hàng đang không khả dụng, vui lò
 bank-amount-range: "&cSố tiền phải từ &e{min}&c đến &e{max}&c."
 bank-usage: "&cDùng: &e/bank <số tiền>"
 
-# Lịch sử nạp
+# ----- Lịch sử nạp -----
 history-header: "&#55FFFF===== Lịch sử nạp ====="
 history-entry: "&7- &f{type} &7| &e{amount} &7| {status} &7| &8{time}"
 history-empty: "&7Chưa có giao dịch nào."
 history-bank-label: "Ngân hàng"
 
-# Test (admin)
+# ----- Test (admin) -----
 fakecard-usage: "&cDùng: &e/kingmcdonate fakecard <player> <số tiền>"
 fakecard-done: "&aĐã mô phỏng nạp thẻ &e{amount} &acho &e{player}&a."
 fakecard-player-not-found: "&cKhông tìm thấy người chơi &e{player}&c đang online."
 fakebank-usage: "&cDùng: &e/kingmcdonate fakebank <player> <số tiền>"
 fakebank-done: "&aĐã mô phỏng nạp bank &e{amount} &acho &e{player}&a."
 
-# Nạp tay (cấp credit thật cho người chơi, kể cả offline)
+# ----- Nạp tay (cấp credit thật cho người chơi, kể cả offline) -----
 give-usage: "&cDùng: &e/kingmcdonate give <card|bank> <player> <số tiền> [point] [-f]"
 give-done: "&aĐã cấp &e{amount} &acho &e{player}&a (nạp tay)."
 give-invalid-bucket: "&cLoại không hợp lệ. Dùng &ecard &choặc &ebank&c."
@@ -75,13 +76,13 @@ give-offline-needs-force: "&e{player}&c đang offline. Thêm &e-f &cở cuối l
 give-never-joined: "&cNgười chơi &e{player}&c chưa từng vào server — không thể cấp."
 manual-success: "&aBạn được cấp &f+{amount} &a(&e{point} point&a) từ quản trị viên."
 
-# Bossbar mốc nạp
+# ----- Bossbar mốc nạp -----
 bossbar-disabled: "&cThanh tiến độ mốc nạp đang tắt trên server."
 bossbar-shown: "&aĐã bật thanh tiến độ mốc nạp."
 bossbar-hidden: "&7Đã ẩn thanh tiến độ mốc nạp."
 milestone-reached: "&aChúc mừng! Bạn đã đạt mốc nạp &e{threshold}đ&a!"
 
-# Top nạp
+# ----- Top nạp -----
 topnap-header: "&6===== &eTOP NẠP &6====="
 topnap-entry: "&e#{rank} &f{player} &7- &a{value}"
 topnap-empty: "&7Chưa có ai nạp."

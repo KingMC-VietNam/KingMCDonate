@@ -1,10 +1,9 @@
 # ============================================================
-#  Mốc nạp TOÀN SERVER (tổng mọi người chơi)
+#  MỐC NẠP TOÀN SERVER (tổng mọi người chơi)
 # ============================================================
-# Khi tổng nạp toàn server (theo kỳ) đạt mốc -> chạy commands MỘT LẦN cho cả mạng.
-# Lệnh server thường không gắn người chơi cụ thể (chạy console). {player} = người kích hoạt mốc.
-#
-# KEY mỗi mốc chính là SỐ TIỀN ngưỡng. Kỳ: all, day, week, month.
+# Khi TỔNG nạp toàn server (theo kỳ) đạt mốc -> chạy commands MỘT LẦN cho cả mạng.
+# Lệnh thường chạy console (không gắn người cụ thể). {player} = người kích hoạt mốc.
+# Kỳ tính: all · day · week · month.  KEY mỗi mốc = SỐ TIỀN ngưỡng.
 milestones:
   all: {}
 #    10000000:

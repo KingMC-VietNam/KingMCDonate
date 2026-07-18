@@ -1,10 +1,10 @@
 # ============================================================
-#  Khuyến mãi nạp theo lịch
+#  KHUYẾN MÃI NẠP THEO LỊCH
 # ============================================================
-# Mỗi mục là một khung khuyến mãi: cộng thêm % POINT cho mọi giao dịch xác nhận trong
-# khoảng [from, to]. Trùng khung -> ưu tiên rate cao nhất. Chỉ cộng vào point (không đổi
-# số tiền nạp face). Định dạng thời gian: "dd/MM/yyyy HH:mm" (ngày/tháng/năm) theo giờ máy chủ.
-#
+# Mỗi mục là một khung thời gian cộng thêm % POINT cho mọi giao dịch xác nhận trong khung đó.
+#   • Chỉ cộng vào point, KHÔNG đổi số tiền nạp (VNĐ).
+#   • Trùng nhiều khung -> ưu tiên rate cao nhất.
+#   • Thời gian: "dd/MM/yyyy HH:mm" theo giờ máy chủ.
 # KEY mỗi mục (vd "cuoi-tuan-x2") là tên gợi nhớ do bạn tự đặt, KHÔNG hiện cho người chơi.
 promotions: {}
 #  cuoi-tuan-x2:

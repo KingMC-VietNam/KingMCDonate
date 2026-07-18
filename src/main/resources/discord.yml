@@ -1,22 +1,27 @@
 # ============================================================
-#  Discord Webhook — thông báo nạp & mốc
+#  DISCORD WEBHOOK — thông báo nạp & mốc
 # ============================================================
-# enabled: bật/tắt toàn bộ thông báo Discord.
-# serial-visible-chars: số ký tự CUỐI của seri/PIN còn hiện (phần còn lại thay bằng *).
+# Gửi thông báo sang Discord mỗi khi có giao dịch / đạt mốc.
 #
-# Mỗi webhook là một mục có KEY tên gợi nhớ (vd "main") dưới "default" hoặc "events.<event>".
-# "payload" chính là JSON webhook của Discord, viết thẳng dạng YAML (embeds/fields giữ dạng
-# danh sách "-" vì là mảng JSON chuẩn của Discord). Thiết kế tại https://discohook.org/ rồi dán.
-# Placeholder thay tự động trong mọi chuỗi:
+# Cách hoạt động:
+#   • Mỗi webhook là một mục có KEY gợi nhớ (vd "main") đặt dưới "default" hoặc "events.<event>".
+#   • "payload" chính là JSON webhook của Discord viết thẳng dạng YAML (embeds/fields giữ dạng
+#     danh sách "-" vì là mảng JSON). Thiết kế tại https://discohook.org/ rồi dán vào.
+#   • Định tuyến: mỗi event (card-success, bank-success, player-milestone, server-milestone) có
+#     thể có webhook riêng dưới "events"; không khai báo -> dùng "default".
+#
+# Biến thay tự động trong mọi chuỗi:
 #   %PLAYER% %AMOUNT% %POINT% %POINT_UNIT% %BALANCE% %METHOD% %SERVER% %TIME% %REF%
-#   (card thêm %SERIAL% %PIN% đã che; mốc thêm %THRESHOLD%)
-# color của embed: "#RRGGBB" (tự đổi sang số Discord).
-#
-# Định tuyến: mỗi event (card-success, bank-success, player-milestone, server-milestone)
-# có thể có webhook riêng dưới "events"; không khai -> dùng "default".
+#   (card thêm %SERIAL% %PIN% đã che ·  mốc thêm %THRESHOLD%)
+# Màu embed (color): "#RRGGBB" (tự đổi sang số Discord).
+
+# Bật/tắt toàn bộ thông báo Discord.  Giá trị: true | false   ·   Mặc định: false
 enabled: false
+
+# Số ký tự CUỐI của seri/PIN còn hiện (phần còn lại thay bằng *).
 serial-visible-chars: 3
 
+# Webhook mặc định — dùng cho mọi event không được khai riêng ở "events".
 default:
   main:
     enabled: true
@@ -46,6 +51,8 @@ default:
           footer:
             text: "%TIME% • %REF%"
 
+# Webhook riêng cho từng event. Bỏ trống {} = mọi event dùng "default".
+# Ví dụ ghi đè cho event đạt mốc của người chơi:
 events: {}
 #  player-milestone:
 #    main:

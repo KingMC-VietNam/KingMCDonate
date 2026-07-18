@@ -1,9 +1,11 @@
 # ============================================================
-#  Menu chọn mệnh giá (mở sau khi chọn nhà mạng)
+#  MENU CHỌN MỆNH GIÁ (mở sau khi chọn nhà mạng)
 # ============================================================
+# layout: mỗi dòng 9 ô. Ô để trống / ký tự không khai trong "items" -> nhận "filler".
 #   X = vùng mệnh giá động (đổ từ card.denominations trong config.yml)
 #   B = nút quay lại menu chọn nhà mạng
-# "price-item" là mẫu dùng chung cho mọi mệnh giá; biến: {amount} {point}.
+# ⚠ Giữ nguyên các ký tự layout (X, B) khớp với key trong "items".
+# "price-item" là mẫu dùng chung cho mọi mệnh giá. Biến: {amount} {point}.
 title: "&8» &b&lCHỌN MỆNH GIÁ &8«"
 rows: 4
 
@@ -25,7 +27,7 @@ items:
     actions:
       - "open:card-type"
 
-# Mẫu hiển thị cho mỗi mệnh giá.
+# Mẫu hiển thị cho mỗi mệnh giá. Biến: {amount} {point}.
 price-item:
   material: SUNFLOWER
   name: "&e&l{amount}"
@@ -35,6 +37,7 @@ price-item:
     - "&8Nhấn để chọn mệnh giá này"
   glow: true
 
+# Ô lấp chỗ trống (mọi ô không khai ở trên).
 filler:
   enabled: true
   material: GRAY_STAINED_GLASS_PANE

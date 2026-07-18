@@ -1,29 +1,26 @@
 # ============================================================
-#  card2k — cổng gạch thẻ cào (giao thức Nencer)
+#  CARD2K — cổng gạch thẻ cào (giao thức Nencer)
 # ============================================================
-# Lấy partner-id / partner-key tại bảng điều khiển card2k.net.
-# Cùng giao thức với thesieure; base-url của card2k cố định nên không cần khai báo ở đây.
+# Kích hoạt bằng card.provider = "card2k" trong config.yml.
+# Lấy credential tại bảng điều khiển card2k.net. base-url cố định nên không cần khai ở đây.
 
-# ID đối tác (partner id) do card2k cấp.
+# ID đối tác do card2k cấp.
 partner-id: ""
 
-# Khoá đối tác (partner key) do card2k cấp.
-# Dùng để KÝ request gửi thẻ VÀ verify callback: md5(partner_key + code + serial).
-# KHÔNG commit key thật lên source code.
+# Khoá đối tác do card2k cấp. Dùng để KÝ request gạch thẻ VÀ verify callback:
+# md5(partner_key + code + serial).
+# ⚠ KHÔNG commit key thật lên source code.
 partner-key: ""
 
-# ----- Sandbox (môi trường test) -----
-# false (mặc định): gạch thẻ thật tại https://card2k.net.
-# true: gửi thẻ tới cổng test https://sandbox.card2k.net — KHÔNG tốn tiền, dùng để chạy thử
-#       toàn bộ luồng nạp thẻ + trả thưởng trước khi go-live.
-#
-# Quy ước kết quả của sandbox dựa trên 3 ký tự CUỐI của mã thẻ (code):
-#   • kết thúc bằng 001  -> thẻ ĐÚNG mệnh giá (status 1, thành công).
-#   • kết thúc bằng 002  -> thẻ SAI mệnh giá (status 2, thất bại).
-#   • 3 ký tự khác       -> thẻ LỖI (thất bại).
-# Serial nhập tuỳ ý. NHỚ đặt lại sandbox: false trước khi chạy production.
+# Môi trường test (sandbox.card2k.net) — KHÔNG tốn tiền, chạy thử toàn bộ luồng trước go-live.
+# Kết quả sandbox dựa vào 3 ký tự CUỐI của mã thẻ (code):
+#   001         -> thẻ ĐÚNG mệnh giá (thành công)
+#   002         -> thẻ SAI mệnh giá (thất bại)
+#   khác        -> thẻ LỖI (thất bại)
+# Serial nhập tuỳ ý.  ⚠ Nhớ đặt lại false trước khi chạy production.
+# Giá trị: true | false   ·   Mặc định: false
 sandbox: false
 
 # ----- Callback (chỉ dùng khi card.confirmation = "webhook" hoặc "both") -----
-# card2k gọi callback về <public-base-url><base-path>/card2k (cấu hình ở dashboard card2k).
-# Callback được xác thực bằng chính partner-key ở trên nên KHÔNG cần khai báo thêm secret.
+# card2k gọi callback về <public-base-url><base-path>/card2k (cấu hình ở dashboard card2k),
+# xác thực bằng chính partner-key ở trên nên KHÔNG cần khai thêm secret.

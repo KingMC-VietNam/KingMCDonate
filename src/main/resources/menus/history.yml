@@ -1,9 +1,11 @@
 # ============================================================
-#  Menu lịch sử nạp (mở bằng /lichsunap) — gồm cả thẻ và ngân hàng
+#  MENU LỊCH SỬ NẠP (mở bằng /lichsunap) — gồm cả thẻ và ngân hàng
 # ============================================================
+# layout: mỗi dòng 9 ô. Ô để trống / ký tự không khai trong "items" -> nhận "filler".
 #   X = vùng các giao dịch (phân trang)
-#   P = trang trước, N = trang sau, C = đóng
-# "entry-item" là mẫu cho mỗi dòng lịch sử; biến: {material} {label} {amount} {status} {time}.
+#   P = trang trước · N = trang sau · C = đóng
+# ⚠ Giữ nguyên các ký tự layout (X, P, N, C) khớp với key trong "items".
+# "entry-item" là mẫu cho mỗi dòng lịch sử. Biến: {material} {label} {amount} {status} {time}.
 title: "&8» &b&lLỊCH SỬ NẠP &8«"
 rows: 6
 
@@ -37,7 +39,7 @@ items:
     actions:
       - "close"
 
-# Mẫu cho mỗi dòng lịch sử. {material} do hệ thống quyết định (thẻ vs ngân hàng).
+# Mẫu cho mỗi dòng lịch sử. {material} do hệ thống chọn (thẻ vs ngân hàng).
 entry-item:
   material: "{material}"
   name: "&f{label} &7- &e{amount}"
@@ -50,6 +52,7 @@ loading-item:
   material: CLOCK
   name: "&7Đang tải lịch sử..."
 
+# Ô lấp chỗ trống (mọi ô không khai ở trên).
 filler:
   enabled: true
   material: GRAY_STAINED_GLASS_PANE

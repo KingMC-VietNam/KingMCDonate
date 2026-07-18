@@ -1,31 +1,35 @@
 # ============================================================
-#  Web2M — cổng QR ngân hàng (API Bank V3, api.web2m.com)
+#  WEB2M — cổng QR ngân hàng (API Bank V3, api.web2m.com)
 # ============================================================
-# Xác nhận giao dịch bằng cách poll lịch sử giao dịch V3 (outbound), và/hoặc webhook Web2M.
+# Kích hoạt bằng bank.provider = "web2m" trong config.yml.
+# Xác nhận bằng cách poll lịch sử giao dịch V3 (outbound) và/hoặc webhook Web2M.
 # Lấy Token tại web2m.com. QR dùng bộ sinh ảnh VietQR công khai (qr.sepay.vn/img), không cần tài khoản SePay.
-# Nhiều node chung 1 database: chỉ node confirmer (bank.confirmation = poll/webhook/both) cần token/webhook
-# này; các node bank.confirmation = "passive" chỉ nhận kết quả từ DB (xem chú thích bank.confirmation trong config.yml).
+# Multi-node chung 1 database: chỉ node confirmer (bank.confirmation = poll/webhook/both) cần
+# token/webhook này; node bank.confirmation = "passive" chỉ đọc kết quả từ DB.
 
 # Số tài khoản ngân hàng nhận tiền — dùng cho cả URL API V3 lẫn ảnh QR.
 account-number: "YOUR_BANK_ACCOUNT_NUMBER"
 
-# Tên chủ tài khoản, hiển thị trong tin nhắn chuyển khoản thủ công (để trống thì ẩn dòng này).
+# Tên chủ tài khoản, hiển thị trong tin nhắn chuyển khoản thủ công (để trống = ẩn dòng này).
 account-holder: ""
 
-# Ngân hàng: VCB | BIDV | BIDV_OPENAPI | MBBANK_OPENAPI | ACB | TECHCOMBANK | MBBANK_LSGD | MBBANK_NOTI | TPBANK
+# Ngân hàng.  Giá trị: VCB | BIDV | BIDV_OPENAPI | MBBANK_OPENAPI | ACB | TECHCOMBANK | MBBANK_LSGD | MBBANK_NOTI | TPBANK
 bank-type: "ACB"
 
 # Mật khẩu ngân hàng cấu hình trên Web2M. Để trống với bank one-param (BIDV_OPENAPI, MBBANK_OPENAPI).
 password: ""
 
-# Token Web2M để gọi API Bank V3. KHÔNG commit token thật lên source code.
+# Token Web2M để gọi API Bank V3.  ⚠ KHÔNG commit token thật lên source code.
 token: "YOUR_WEB2M_TOKEN"
 
 # ----- Webhook (chỉ dùng khi bank.confirmation = "webhook" hoặc "both") -----
-# Cách xác thực webhook Web2M gửi tới: "bearer" (Authorization: Bearer <token>) | "none" (chỉ test).
-# Lưu ý: payload Web2M không có số tài khoản nhận nên không cross-check được — tính xác thực dựa hoàn toàn vào token này.
-# BẮT BUỘC khi webhook đang bật: bỏ trống / xoá dòng này thì MỌI webhook đều bị từ chối (401) —
-# fail-closed để một khoá thiếu không vô tình mở cửa cho xác nhận giả mạo. Chọn "none" là tự tắt xác thực.
+# Cách xác thực webhook Web2M gửi tới:
+#   bearer  header "Authorization: Bearer <token>"
+#   none    tắt xác thực — chỉ dùng để test
+# ⚠ Payload Web2M không có số tài khoản nhận nên không cross-check được — tính xác thực dựa
+#   HOÀN TOÀN vào token này. BẮT BUỘC khi webhook bật: bỏ trống thì MỌI webhook bị từ chối
+#   (401) — fail-closed để một khoá thiếu không vô tình mở cửa cho xác nhận giả mạo.
+# Giá trị: bearer | none   ·   Mặc định: bearer
 webhook-auth: "bearer"
 # Access Token khớp cấu hình webhook trên Web2M.
 webhook-token: ""

@@ -1,13 +1,13 @@
 # ============================================================
-#  Mốc nạp NGƯỜI CHƠI (tích lũy theo từng người)
+#  MỐC NẠP NGƯỜI CHƠI (tích luỹ theo từng người)
 # ============================================================
-# Tính theo số tiền nạp (VNĐ face). Đạt mốc -> chạy commands MỘT LẦN (chống trùng theo kỳ).
-# Mỗi kỳ: all (toàn thời gian), day, week, month.
+# Tính theo tổng tiền nạp (VNĐ) của mỗi người chơi. Đạt mốc -> chạy commands MỘT LẦN.
+# Kỳ tính (mỗi kỳ reset độc lập): all (toàn thời gian) · day · week · month.
 #
-# KEY mỗi mốc chính là SỐ TIỀN ngưỡng (giống denominations / rewards trong config.yml).
-# Biến: {player} {amount} {point} {ref} {threshold} {current}.
-# Prefix mỗi lệnh: console: (mặc định) | player:.
-# bossbar: hiện thanh tiến độ tới mốc kế (color: BarColor, style: BarStyle của Bukkit).
+# KEY mỗi mốc = SỐ TIỀN ngưỡng (giống denominations/rewards trong config.yml).
+# Biến: {player} {amount} {point} {ref} {threshold} {current}
+# Prefix mỗi lệnh: console: (mặc định) | player:
+# bossbar: thanh tiến độ tới mốc kế — color = BarColor, style = BarStyle của Bukkit.
 milestones:
   all: {}
 #    100000:

@@ -1,10 +1,11 @@
 # ============================================================
-#  SePay — cổng QR ngân hàng (tài khoản cá nhân OK)
+#  SEPAY — cổng QR ngân hàng (tài khoản cá nhân OK)
 # ============================================================
+# Kích hoạt bằng bank.provider = "sepay" trong config.yml.
 # Xác nhận giao dịch bằng cách poll SePay API v2 (outbound, KHÔNG cần webhook / IP public).
 # Tạo API Token tại my.sepay.vn -> Cấu hình Công ty -> API Access.
-# Nhiều node chung 1 database: chỉ node confirmer (bank.confirmation = poll/webhook/both) cần token/webhook
-# này; các node bank.confirmation = "passive" chỉ nhận kết quả từ DB (xem chú thích bank.confirmation trong config.yml).
+# Multi-node chung 1 database: chỉ node confirmer (bank.confirmation = poll/webhook/both) cần
+# token/webhook này; node bank.confirmation = "passive" chỉ đọc kết quả từ DB.
 
 # Số tài khoản ngân hàng nhận tiền.
 account-number: "YOUR_BANK_ACCOUNT_NUMBER"
@@ -12,21 +13,26 @@ account-number: "YOUR_BANK_ACCOUNT_NUMBER"
 # Mã / tên viết tắt ngân hàng theo SePay (vd: ACB, Vietcombank, MBBank, TPBank...).
 bank: "ACB"
 
-# Tên chủ tài khoản, hiển thị trong tin nhắn chuyển khoản thủ công (để trống thì ẩn dòng này).
+# Tên chủ tài khoản, hiển thị trong tin nhắn chuyển khoản thủ công (để trống = ẩn dòng này).
 account-holder: ""
 
-# API Token (Bearer) để gọi SePay API v2. KHÔNG commit token thật lên source code.
+# API Token (Bearer) để gọi SePay API v2.  ⚠ KHÔNG commit token thật lên source code.
 api-token: "YOUR_API_TOKEN"
 
-# Bật để dùng môi trường thử nghiệm (userapi-sandbox.sepay.vn). Token sandbox và production KHÔNG dùng chung.
+# Môi trường thử nghiệm (userapi-sandbox.sepay.vn). Token sandbox và production KHÔNG dùng chung.
+# Giá trị: true | false   ·   Mặc định: false
 sandbox: false
 
 # ----- Webhook (chỉ dùng khi bank.confirmation = "webhook" hoặc "both") -----
-# Cách xác thực webhook SePay gửi tới: "hmac" (khuyến nghị) | "apikey" | "none" (chỉ test).
-# BẮT BUỘC khi webhook đang bật: bỏ trống / xoá dòng này thì MỌI webhook đều bị từ chối (401) —
-# fail-closed để một khoá thiếu không vô tình mở cửa cho xác nhận giả mạo. Chọn "none" là tự tắt xác thực.
+# Cách xác thực webhook SePay gửi tới:
+#   hmac    khuyến nghị (ký bằng webhook-secret)
+#   apikey  header "Authorization: Apikey <key>"
+#   none    tắt xác thực — chỉ dùng để test
+# ⚠ BẮT BUỘC khi webhook bật: bỏ trống dòng này thì MỌI webhook bị từ chối (401) — fail-closed
+#   để một khoá thiếu không vô tình mở cửa cho xác nhận giả mạo.
+# Giá trị: hmac | apikey | none   ·   Mặc định: hmac
 webhook-auth: "hmac"
 # Secret Key của webhook (dùng cho hmac). Lấy ở dashboard SePay khi tạo webhook; chỉ hiện 1 lần.
 webhook-secret: ""
-# API Key (dùng cho apikey). SePay gửi header "Authorization: Apikey <key>".
+# API Key (dùng cho apikey).
 webhook-api-key: ""

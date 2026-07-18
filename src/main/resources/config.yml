@@ -1,71 +1,82 @@
 # ============================================================
-#  KingMCDonate — cấu hình chính
+#  KingMCDonate — CẤU HÌNH CHÍNH
 # ============================================================
+# File điều khiển toàn bộ plugin: CSDL, nạp thẻ, nạp bank, trả thưởng, webhook...
+# Sau khi sửa, chạy /kingmcdonate reload để áp dụng (không cần khởi động lại).
+# Giao diện các menu nằm ở thư mục menus/ — không sửa ở đây.
 
-# Tiền tố hiển thị ở đầu mọi tin nhắn gửi người chơi.
-# Hỗ trợ màu & và mã hex &#RRGGBB (gradient tự ghép nhiều mã hex thủ công).
+# Tiền tố đứng đầu mọi tin nhắn gửi người chơi.
+# Hỗ trợ mã màu & và mã hex &#RRGGBB.
 prefix: "&#55FFFF[KingMCDonate]&r "
 
-# Bật log debug để dựng lại toàn bộ luồng một giao dịch khi cần truy vết.
-# Khi tắt, các log mức debug sẽ không hiện (cảnh báo/lỗi vẫn luôn hiện).
+# Bật log debug để lần lại toàn bộ luồng một giao dịch khi cần truy vết.
+# Tắt: chỉ ẩn log mức debug (cảnh báo/lỗi vẫn luôn hiện).
+# Giá trị: true | false   ·   Mặc định: false
 debug: false
 
-# Định danh DUY NHẤT của node này trong mạng nhiều server.
-# Bắt buộc đặt khác nhau cho mỗi server con khi chạy multi-server (dùng chung MySQL).
+# Định danh DUY NHẤT của server này trong mạng nhiều node.
+# ⚠ Chạy multi-server (chung 1 MySQL): mỗi node BẮT BUỘC đặt một giá trị khác nhau.
 server-id: "default"
 
+# ============================================================
+#  CƠ SỞ DỮ LIỆU
+# ============================================================
 database:
-  # Loại CSDL: "sqlite" (mặc định, nhúng sẵn) hoặc "mysql".
-  # Multi-server BẮT BUỘC dùng mysql.
+  # Loại CSDL. sqlite dùng file nhúng sẵn, không cần cài gì thêm.
+  # ⚠ Multi-server BẮT BUỘC dùng mysql (các node chia sẻ chung dữ liệu).
+  # Giá trị: sqlite | mysql   ·   Mặc định: sqlite
   type: "sqlite"
 
-  # Áp dụng khi type = sqlite. File lưu trong thư mục plugin.
+  # Dùng khi type = sqlite. File lưu ngay trong thư mục plugin.
   sqlite:
     file: "data.db"
 
-  # Áp dụng khi type = mysql.
+  # Dùng khi type = mysql.
   mysql:
     host: "localhost"
     port: 3306
     database: "kingmcdonate"
     username: "root"
     password: ""
-    # Số kết nối tối đa trong pool.
+    # Số kết nối tối đa giữ trong pool.
     pool-size: 10
 
+# ============================================================
+#  TIỀN TỆ (cách cộng point cho người chơi)
+# ============================================================
 currency:
-  # Cổng trả thưởng đang dùng: "playerpoints" | "command" | "vault".
+  # Nguồn cộng point chính.
+  # Giá trị: playerpoints | command | vault   ·   Mặc định: playerpoints
   provider: "playerpoints"
-  # Cổng dự phòng khi provider chính không khả dụng (để trống = chặn nhận giao dịch).
-  # Khuyến nghị đặt "command" để không bao giờ trao thưởng thất bại âm thầm.
+
+  # Nguồn dự phòng khi provider chính lỗi. Để trống = chặn nhận giao dịch.
+  # ⚠ Khuyến nghị "command" để không bao giờ trao thưởng thất bại âm thầm.
   fallback: "command"
-  # Lệnh console chạy khi dùng provider "command" (hoặc fallback).
-  # Biến: {player} = tên người chơi, {amount} = số point/tiền.
+
+  # Lệnh console chạy khi provider (hoặc fallback) = command.
+  # Biến: {player} {amount}
   commands:
     - "points give {player} {amount}"
 
 # ============================================================
-#  Nạp thẻ
+#  NẠP THẺ
 # ============================================================
-# Giao diện (GUI) các menu nằm ở thư mục "menus/" (card-type.yml, card-price.yml,
-# history.yml). Sửa tiêu đề/màu/biểu tượng/bố cục ở đó rồi /kingmcdonate reload —
-# không cần khởi động lại. Danh sách loại thẻ & mệnh giá vẫn lấy từ mục "card" dưới đây.
 card:
-  # Cổng gạch thẻ đang dùng: "card2k" | "thesieure". Credential đặt trong providers/<tên>.yml.
-  # (Cả hai cùng giao thức Nencer; thesieure cần thêm "base-url" trong providers/thesieure.yml.)
+  # Cổng gạch thẻ đang dùng. Credential đặt ở providers/<tên>.yml.
+  # (Cả hai cùng giao thức Nencer; thesieure cần thêm base-url trong providers/thesieure.yml.)
+  # Giá trị: card2k | thesieure   ·   Mặc định: card2k
   provider: "card2k"
 
-  # Cách xác nhận đơn thẻ: "poll" | "webhook" | "both".
-  #   poll    = tự hỏi cổng theo chu kỳ (mặc định; chạy sau NAT, không cần IP public).
-  #   webhook = nhận callback GET của card2k (cần webhook.* bật + URL public cấu hình ở dashboard card2k).
-  #   both    = vừa poll vừa nhận callback (callback cho nhanh, poll làm lưới an toàn) — không trao trùng.
-  # Lưu ý: "passive" là mode CHỈ DÀNH CHO BANK (đơn thẻ luôn được gạch tại node người chơi, per-order,
-  # không có nút cổ chai chung để passive giúp). Nếu đặt "passive" cho card, plugin sẽ tự dùng "poll".
-  # Dù chọn mode nào, đơn quá hạn vẫn tự huỷ và đơn còn dở vẫn được resume khi khởi động lại.
+  # Cách xác nhận đơn thẻ:
+  #   poll     hỏi cổng theo chu kỳ (mặc định, chạy sau NAT, không cần IP public)
+  #   webhook  nhận callback GET (cần bật webhook.* + URL public ở dashboard card2k)
+  #   both     poll + webhook (callback cho nhanh, poll làm lưới an toàn, không trao trùng)
+  # ⚠ passive chỉ dành cho BANK — đặt cho card sẽ tự về "poll".
+  # Dù chọn mode nào: đơn quá hạn tự huỷ, đơn còn dở tự resume khi khởi động lại.
   confirmation: "poll"
 
-  # Các loại thẻ được mở. Mọi loại dùng chung bộ mệnh giá ở "denominations" bên dưới.
-  # Loại hợp lệ: VIETTEL, MOBIFONE, VINAPHONE, GARENA, VCOIN, ZING, GATE.
+  # Các loại thẻ mở cho người chơi. Mọi loại dùng chung bộ mệnh giá bên dưới.
+  # Loại hợp lệ: VIETTEL MOBIFONE VINAPHONE GARENA VCOIN ZING GATE
   card-types:
     - VIETTEL
     - MOBIFONE
@@ -74,9 +85,8 @@ card:
     - VCOIN
     - ZING
 
-  # Mệnh giá (VNĐ) -> số point trao thưởng (NGUỒN POINT của thẻ; chiết khấu đã tính sẵn ở đây).
-  # Bộ mệnh giá chuẩn nhà mạng VN, nhỏ -> lớn. Người chơi tự chọn đúng mệnh giá thẻ của mình.
-  # Point của nạp bank tính theo tỉ lệ riêng (bank.point-rate) — thường cao hơn thẻ cùng số tiền.
+  # Bảng: mệnh giá thẻ (VNĐ) -> point trao thưởng. Chiết khấu cổng đã tính sẵn ở đây.
+  # Người chơi tự chọn đúng mệnh giá thẻ của mình. (Nạp bank tính theo bank.point-rate riêng.)
   denominations:
     10000: 100
     20000: 200
@@ -88,49 +98,49 @@ card:
     500000: 5000
     1000000: 10000
 
-  # Tạm khoá nhận đơn thẻ mới + báo người chơi đang bảo trì.
-  # Các đơn đang xử lý dở vẫn được poll tới khi xong (không bị ảnh hưởng).
+  # Tạm khoá nhận đơn thẻ MỚI + báo bảo trì. Đơn đang xử lý dở vẫn chạy tiếp bình thường.
+  # Giá trị: true | false   ·   Mặc định: false
   maintenance: false
 
   # Chu kỳ poll lại các đơn đang chờ cổng xử lý (giây).
   poll-interval: 15
 
-  # Giãn cách giữa mỗi request check trong một lượt poll (mili-giây), tránh bắn dồn
-  # khi nhiều đơn cùng chờ và giảm nguy cơ chạm rate limit của cổng. 0 = tắt.
+  # Giãn cách giữa mỗi request trong một lượt poll (mili-giây), tránh bắn dồn & chạm rate limit.
+  # Giá trị: 0 = tắt   ·   Mặc định: 200
   poll-spacing-millis: 200
 
-  # Đơn chờ quá thời gian này sẽ bị đánh dấu thất bại (phút).
+  # Đơn chờ quá thời gian này bị đánh dấu thất bại (phút).
   timeout: 30
 
-  # Dùng AnvilGUI để nhập seri/PIN; false = nhập qua chat.
+  # true = nhập seri/PIN qua AnvilGUI ·  false = nhập qua chat.
   use-anvil: true
 
 # ============================================================
-#  Nạp ngân hàng (QR qua SePay)
+#  NẠP NGÂN HÀNG (QR qua SePay)
 # ============================================================
 bank:
-  # Cổng ngân hàng đang dùng: "sepay". Credential đặt trong providers/sepay.yml.
+  # Cổng ngân hàng đang dùng. Credential đặt ở providers/sepay.yml.
+  # Giá trị: sepay   ·   Mặc định: sepay
   provider: "sepay"
 
-  # Cách xác nhận đơn bank: "poll" | "webhook" | "both" | "passive".
-  #   poll    = poll SePay API v2 theo chu kỳ (mặc định; không cần IP public).
-  #   webhook = nhận webhook POST của SePay (cần webhook.* bật + URL public cấu hình ở dashboard SePay).
-  #   both    = vừa poll vừa nhận webhook (webhook cho nhanh, poll làm lưới an toàn) — không trao trùng.
-  #   passive = KHÔNG poll, KHÔNG mở webhook — chỉ nhận kết quả từ database. Dùng khi chạy NHIỀU node
-  #             chung 1 database: đặt ĐÚNG MỘT node là confirmer (poll/webhook/both), các node còn lại
-  #             "passive" để khỏi cùng gọi API (tránh rate-limit). Confirmer xác nhận cho cả mạng; mỗi
-  #             node vẫn tự trao thưởng cho người chơi của mình. CẢNH BÁO: nếu MỌI node đều passive thì
-  #             không ai xác nhận và đơn sẽ hết hạn.
+  # Cách xác nhận đơn bank:
+  #   poll     poll SePay API v2 theo chu kỳ (mặc định, không cần IP public)
+  #   webhook  nhận webhook POST (cần bật webhook.* + URL public ở dashboard SePay)
+  #   both     poll + webhook (webhook cho nhanh, poll làm lưới an toàn, không trao trùng)
+  #   passive  KHÔNG poll, KHÔNG webhook — chỉ đọc kết quả từ database
+  # Dùng passive khi chạy NHIỀU node chung 1 database: đặt ĐÚNG MỘT node làm confirmer
+  # (poll/webhook/both), các node còn lại passive để khỏi cùng gọi API (tránh rate-limit).
+  # Confirmer xác nhận cho cả mạng; mỗi node vẫn tự trao thưởng cho người chơi của mình.
+  # ⚠ Nếu MỌI node đều passive thì không ai xác nhận, đơn sẽ hết hạn.
   confirmation: "poll"
 
-  # Nội dung chuyển khoản đứng TRƯỚC mã tham chiếu, tuỳ biến được (vd "UNG HO TT").
-  # Tự chuẩn hoá: viết HOA, chỉ giữ A-Z 0-9 và khoảng trắng (bỏ dấu tiếng Việt & ký tự lạ),
-  # gộp khoảng trắng, tối đa 11 ký tự. Người chơi thấy = prefix + mã 8 ký tự dính liền
-  # (vd "UNG HO TT" -> "UNG HO TTA1B2C3D4"). KHÔNG cần trùng "mã thanh toán" trên dashboard SePay;
-  # đối soát chỉ cần nội dung chuyển khoản CHỨA mã tham chiếu.
+  # Nội dung chuyển khoản đứng TRƯỚC mã tham chiếu (vd "UNG HO TT"). Tuỳ biến được.
+  # Tự chuẩn hoá: viết HOA, chỉ giữ A-Z 0-9 và khoảng trắng, tối đa 11 ký tự.
+  # Người chơi thấy = prefix + mã 8 ký tự (vd "KMD" -> "KMDA1B2C3D4").
+  # Không cần trùng "mã thanh toán" trên dashboard SePay; đối soát chỉ cần nội dung CHỨA mã tham chiếu.
   prefix: "KMD"
 
-  # Số point trao thưởng cho mỗi 1000đ chuyển khoản (point bank = số tiền/1000 × point-rate, làm tròn).
+  # Point trao thưởng cho mỗi 1000đ chuyển khoản (point = số tiền/1000 × point-rate, làm tròn).
   # Thường cao hơn thẻ cùng số tiền (thẻ có chiết khấu cổng, bank thì không).
   point-rate: 1.2
 
@@ -138,18 +148,20 @@ bank:
   min: 10000
   max: 50000000
 
-  # Tạm khoá nhận đơn bank mới + báo người chơi đang bảo trì. Đơn PENDING vẫn được poll tới khi xong.
+  # Tạm khoá nhận đơn bank MỚI + báo bảo trì. Đơn PENDING vẫn được poll tới khi xong.
+  # Giá trị: true | false   ·   Mặc định: false
   maintenance: false
 
-  # Chu kỳ poll SePay để xác nhận giao dịch (giây). SePay giới hạn 3 request/giây.
+  # Chu kỳ poll SePay để xác nhận giao dịch (giây). ⚠ SePay giới hạn 3 request/giây.
   poll-interval: 20
 
-  # Đơn chưa chuyển khoản quá thời gian này sẽ bị huỷ (phút). Đặt rộng để hiếm khi tiền về sau khi đã huỷ.
+  # Đơn chưa chuyển khoản quá thời gian này bị huỷ (phút). Đặt rộng để hiếm khi tiền về sau khi đã huỷ.
   timeout: 30
 
   # Tin nhắn hướng dẫn chuyển khoản thủ công gửi kèm QR (áp dụng cả Java lẫn Bedrock).
-  # Placeholder: {bank} {account} {amount} {ref} {holder}. Dòng có {holder} sẽ bị bỏ nếu chưa đặt
-  # account-holder trong providers/sepay.yml. Nội dung {ref} PHẢI được nhập đúng để hệ thống đối soát.
+  # Biến: {bank} {account} {amount} {ref} {holder}
+  # Dòng có {holder} tự ẩn nếu chưa đặt account-holder ở providers/sepay.yml.
+  # ⚠ Người chơi PHẢI nhập đúng {ref} thì hệ thống mới đối soát được.
   manual-transfer:
     enabled: true
     lines:
@@ -161,31 +173,34 @@ bank:
       - "&7Noi dung: &f{ref} &c(bat buoc nhap dung)"
 
 # ============================================================
-#  Trao thưởng đa server (outbox)
+#  TRAO THƯỞNG ĐA SERVER (outbox)
 # ============================================================
-# Chu kỳ quét hàng đợi trao thưởng cần người chơi hiện diện (ticks; 20 ticks = 1 giây).
+# Chu kỳ quét hàng đợi trao thưởng cần người chơi có mặt (ticks; 20 ticks = 1 giây).
 reward-delivery-interval: 40
-# Số ngày giữ lại các dòng outbox đã trao xong trước khi dọn (chống phình bảng). 0 = không dọn.
+# Số ngày giữ các dòng outbox ĐÃ trao xong trước khi dọn (chống phình bảng).
+# Giá trị: 0 = không dọn   ·   Mặc định: 30
 reward-outbox-retention-days: 30
 
 # ============================================================
-#  Chống spam tạo đơn (áp dụng cho cả thẻ và bank, theo từng người chơi)
+#  CHỐNG SPAM TẠO ĐƠN (áp dụng cả thẻ lẫn bank, tính theo từng người chơi)
 # ============================================================
 anti-spam:
-  # Số đơn đang mở (PENDING/WAITING) tối đa mỗi người chơi cho mỗi phương thức. 0 = tắt.
+  # Số đơn đang mở (PENDING/WAITING) tối đa mỗi người chơi cho mỗi phương thức.
+  # Giá trị: 0 = tắt   ·   Mặc định: 1
   max-in-flight: 1
-  # Số giây tối thiểu giữa hai lần tạo đơn của cùng một người chơi. 0 = tắt.
+  # Số giây tối thiểu giữa hai lần tạo đơn của cùng một người chơi.
+  # Giá trị: 0 = tắt   ·   Mặc định: 5
   cooldown-seconds: 5
 
 # ============================================================
-#  Lệnh thưởng theo mốc (dùng chung thẻ + bank)
+#  THƯỞNG THÊM THEO MỐC (dùng chung thẻ + bank)
 # ============================================================
-# Lệnh thưởng THÊM (ngoài point) chạy theo MỐC số tiền nạp. Khác currency.commands ở trên
-# (vốn là cơ chế cộng point của provider "command"); đây là phần thưởng kèm như quà/rank.
+# Lệnh thưởng THÊM (ngoài point) chạy theo MỐC số tiền nạp — quà/rank... Khác currency.commands
+# (vốn là cơ chế cộng point của provider "command").
 rewards:
   # Khoá theo ngưỡng VNĐ. Mỗi lần nạp chỉ chạy MỐC CAO NHẤT <= số tiền (vd nạp 100k -> mốc 100000).
   # Prefix mỗi dòng: console: (mặc định) | player: (chạy dưới quyền người chơi).
-  # Biến: {player} {amount} (VNĐ) {point} (point thực nhận) {ref} (mã giao dịch).
+  # Biến: {player} {amount} {point} {ref}
   commands:
     # 0:
     #   - "console: broadcast &e{player} &7vừa ủng hộ &a{amount}đ"
@@ -202,56 +217,58 @@ http:
   max-retries: 3
 
 # ============================================================
-#  Webhook / Callback (DÙNG CHUNG cho mọi cổng — chỉ MỘT cổng/port)
+#  WEBHOOK / CALLBACK (dùng chung mọi cổng — chỉ MỘT port)
 # ============================================================
 # Bộ nhận callback nhúng sẵn: mở DUY NHẤT 1 port, định tuyến theo đường dẫn cho mọi cổng
-# (card2k, sepay, và các cổng thêm sau). Chỉ dùng khi card.confirmation / bank.confirmation
-# có chứa "webhook" hoặc "both"; mặc định cả hai là "poll" nên KHÔNG mở port nào.
-#
-# Webhook cần 1 node có địa chỉ public (hoặc reverse proxy lo HTTPS). Khác với poll vốn
-# chạy sau NAT không cần port. SePay production YÊU CẦU HTTPS hợp lệ — đặt nginx/Caddy phía
-# trước rồi forward về port dưới đây.
+# (card2k, sepay, và cổng thêm sau). Chỉ dùng khi card/bank.confirmation chứa "webhook" hoặc
+# "both"; mặc định cả hai là "poll" nên KHÔNG mở port nào.
+# ⚠ Webhook cần 1 node có địa chỉ public (hoặc reverse proxy lo HTTPS). SePay production YÊU CẦU
+# HTTPS hợp lệ — đặt nginx/Caddy phía trước rồi forward về port dưới đây.
 webhook:
-  # Tắt = bỏ qua mọi cấu hình webhook (mọi subsystem coi như "poll", không mở port).
+  # Tắt = bỏ qua mọi cấu hình webhook (mọi cổng coi như "poll", không mở port).
+  # Giá trị: true | false   ·   Mặc định: true
   enabled: true
-  # Địa chỉ bind. 0.0.0.0 = mọi card mạng. Đổi nếu muốn chỉ nghe nội bộ (reverse proxy).
+  # Địa chỉ bind. 0.0.0.0 = mọi card mạng. Đổi nếu chỉ muốn nghe nội bộ (reverse proxy).
   host: "0.0.0.0"
-  # Port lắng nghe. Mỗi node con phải dùng port KHÁC nhau nếu chạy chung 1 máy.
+  # Port lắng nghe. ⚠ Nhiều node chung 1 máy: mỗi node phải dùng port KHÁC nhau.
   port: 9123
   # Tiền tố đường dẫn. Endpoint từng cổng = <base-path>/<tên cổng> (vd /kmd/sepay, /kmd/card2k).
   base-path: "/kmd"
-  # URL public của server (kèm domain/HTTPS). Chỉ để THAM KHẢO: dán
-  # <public-base-url><base-path>/<cổng> vào dashboard SePay/card2k. Vd "https://napthe.example.com".
+  # URL public của server (kèm domain/HTTPS). Chỉ để THAM KHẢO khi dán endpoint vào dashboard.
+  # Dán <public-base-url><base-path>/<cổng>. Vd "https://napthe.example.com".
   public-base-url: ""
 
 # ============================================================
-#  Đơn vị point (hiển thị ở Discord / placeholder)
+#  ĐƠN VỊ POINT (hiển thị ở Discord / placeholder)
 # ============================================================
 point-unit: "point"
 
 # ============================================================
-#  Thưởng nạp lần đầu (first-topup)
+#  THƯỞNG NẠP LẦN ĐẦU (first-topup)
 # ============================================================
 first-topup:
   # Bật để chạy danh sách lệnh MỘT LẦN ở giao dịch thành công đầu tiên của mỗi người chơi.
+  # Giá trị: true | false   ·   Mặc định: false
   enabled: false
-  # Biến: {player} {amount} {point} {ref}. Prefix console:/player:.
+  # Biến: {player} {amount} {point} {ref}. Prefix console: / player:.
   commands:
     - "console: broadcast &e{player} &7lần đầu ủng hộ server!"
 
 # ============================================================
-#  Thông báo toàn server khi nạp thành công (broadcast)
+#  THÔNG BÁO TOÀN SERVER KHI NẠP THÀNH CÔNG (broadcast)
 # ============================================================
 broadcast:
+  # Giá trị: true | false   ·   Mặc định: false
   on-success: false
   # Biến: {player} {amount} {point} {method}. Hỗ trợ màu & và &#RRGGBB.
   format: "&a{player} &7vừa ủng hộ &e{amount} &7(&b{point} point&7)!"
 
 # ============================================================
-#  Thanh tiến độ mốc nạp (bossbar)
+#  THANH TIẾN ĐỘ MỐC NẠP (bossbar)
 # ============================================================
 bossbar:
-  # Công tắc tổng. Người chơi có thể tự ẩn/hiện bằng /napbossbar.
+  # Công tắc tổng. Người chơi tự ẩn/hiện bằng /napbossbar.
+  # Giá trị: true | false   ·   Mặc định: true
   enabled: true
   # Chu kỳ cập nhật tiến độ (ticks).
   update-interval: 40
@@ -259,7 +276,7 @@ bossbar:
   cycle-interval: 6
 
 # ============================================================
-#  Bảng xếp hạng (top nạp)
+#  BẢNG XẾP HẠNG (top nạp)
 # ============================================================
 leaderboard:
   # Thời gian cache mỗi bảng (giây).
@@ -268,14 +285,14 @@ leaderboard:
   size: 10
 
 # ============================================================
-#  Nhật ký hoạt động (activity log) — ghi ra file riêng
+#  NHẬT KÝ HOẠT ĐỘNG (activity log — ghi ra file riêng)
 # ============================================================
-# Ghi các sự kiện vận hành (webhook nhận về, lệnh admin, lệnh console trả thưởng,
-# biến động điểm) ra file logs/activity.*.log — tách khỏi console để admin rà soát.
-# Ghi bất đồng bộ (không chặn server). Đổi cấu hình cần khởi động lại plugin.
-# Lưu ý: đây KHÁC với sổ cái điểm trong CSDL (bảng point_log) — bảng đó luôn ghi.
+# Ghi các sự kiện vận hành (webhook nhận về, lệnh admin, lệnh console trả thưởng, biến động
+# point) ra logs/activity.*.log — tách khỏi console để admin rà soát. Ghi bất đồng bộ (không
+# chặn server). ⚠ Đổi cấu hình mục này cần khởi động lại plugin.
+# Lưu ý: KHÁC với sổ cái point trong CSDL (bảng point_log) — bảng đó luôn ghi.
 activity-log:
-  # Công tắc tổng (mặc định bật).
+  # Giá trị: true | false   ·   Mặc định: true
   enabled: true
   # Kích thước tối đa mỗi file (KB) trước khi xoay vòng.
   max-size-kb: 5120

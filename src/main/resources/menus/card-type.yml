@@ -1,9 +1,10 @@
 # ============================================================
-#  Menu chọn nhà mạng (mở bằng /napthe)
+#  MENU CHỌN NHÀ MẠNG (mở bằng /napthe)
 # ============================================================
-# layout: lưới ký tự, mỗi dòng 9 ô. Ô trống / ký tự không khai báo -> nhận "filler".
+# layout: lưới ký tự, mỗi dòng 9 ô. Ô để trống / ký tự không khai trong "items" -> nhận "filler".
 #   X = vùng nội dung động (các nhà mạng được đổ vào đây)
 #   C = nút đóng
+# ⚠ Giữ nguyên các ký tự layout (X, C) khớp với key trong "items".
 # Biểu tượng từng nhà mạng nằm ở "card-items" (key = tên loại thẻ).
 title: "&8» &b&lCHỌN NHÀ MẠNG &8«"
 rows: 3
@@ -25,7 +26,7 @@ items:
     actions:
       - "close"
 
-# Biểu tượng cho từng nhà mạng (đổ vào vùng X theo thứ tự bật trong config.yml).
+# Biểu tượng cho từng nhà mạng (đổ vào vùng X theo thứ tự bật trong config.yml → card.card-types).
 card-items:
   VIETTEL:
     material: GREEN_WOOL
@@ -56,6 +57,7 @@ card-items:
     name: "&e&lGate"
     lore: ["&7Nhấn để nạp thẻ &eGate"]
 
+# Ô lấp chỗ trống (mọi ô không khai ở trên).
 filler:
   enabled: true
   material: GRAY_STAINED_GLASS_PANE
