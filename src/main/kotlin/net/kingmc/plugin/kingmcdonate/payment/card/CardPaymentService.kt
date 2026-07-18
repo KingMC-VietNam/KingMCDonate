@@ -278,8 +278,11 @@ class CardPaymentService(
      * they are online (a card can fail asynchronously — via poll/timeout — after the player has left).
      */
     private fun notifyFailure(referenceCode: String, uuid: UUID, key: String, vararg vars: Pair<String, String>) {
-        if (onlineHere(uuid)) {
-            message(uuid, key, *vars)
+        // Resolve the player once. Null means offline here *or* disconnected between the online check and
+        // now — either way the toast would be lost, so it goes to the outbox instead of being dropped.
+        val player = if (onlineHere(uuid)) Bukkit.getPlayer(uuid) else null
+        if (player != null) {
+            scheduler.runAtEntity(player) { messages().send(player, key, *vars) }
         } else {
             rewardSink.enqueue(uuid, referenceCode, RewardPayload(messageKey = key, messageVars = vars.toMap()))
         }

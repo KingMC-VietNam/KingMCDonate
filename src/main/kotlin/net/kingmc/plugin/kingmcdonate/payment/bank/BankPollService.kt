@@ -78,6 +78,19 @@ class BankPollService(
             }
         }
 
+        // Dead-node safety net: any live node fails PENDING orders older than a longer, network-wide grace,
+        // so a node that died with open orders does not strand them. A live owner fails its own at the
+        // shorter grace above, so by this cutoff only genuinely orphaned orders remain PENDING.
+        val orphaned = bankPaymentDao.findExpiredPendingAllServers(now - timeoutMillis * DEAD_NODE_TIMEOUT_FACTOR)
+        for (order in orphaned) {
+            if (bankPaymentDao.markFailed(order.referenceCode, now) == 1) {
+                logger.warn("Bank order ${order.referenceCode} (owner=${order.ownerServer}) orphaned past the dead-node grace; marked FAILED.")
+                KingMCDonateContext.activityLogOrNull?.log("TXN", "bank FAILED ref=${order.referenceCode} reason=dead-node-timeout")
+                notifyExpired(order.playerUuid, order.referenceCode)
+                onFailed(order.playerUuid, order.amount, order.referenceCode, "expired")
+            }
+        }
+
         if (queryGateway() && providers.isAvailable) {
             // The confirmer matches the whole network's PENDING orders (plus recently-failed ones so a
             // late transfer is surfaced, not dropped) in a single gateway call — own-expired orders were
@@ -118,5 +131,7 @@ class BankPollService(
     companion object {
         private const val TICKS_PER_SECOND = 20L
         private const val LATE_WINDOW_FACTOR = 2L
+        // Orphaned-order grace as a multiple of the owner timeout — strictly larger so the owner reclaims first.
+        private const val DEAD_NODE_TIMEOUT_FACTOR = 3L
     }
 }

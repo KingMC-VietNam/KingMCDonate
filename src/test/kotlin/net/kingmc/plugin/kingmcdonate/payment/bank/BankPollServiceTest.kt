@@ -120,6 +120,36 @@ class BankPollServiceTest {
     }
 
     @Test
+    fun `a dead node's PENDING order is failed by a live node past the longer grace`() {
+        // Owner is node-b; this node is node-a. Owner-scoped timeout never touches it, but past the
+        // dead-node grace (3x the 30-min timeout = 90 min) any live node expires it so it is not stranded.
+        val uuid = UUID.randomUUID()
+        val sink = CapturingSink()
+        PlayerDao(database).upsert(uuid, "Alice")
+        val ref = bank.insertPending(uuid, 50_000, "sepay", "node-b", System.currentTimeMillis() - 100 * 60_000L)
+
+        buildService(sink, onlineHere = { false }).pollOnce()
+
+        assertEquals(PaymentStatus.FAILED, bank.findByReference(ref)!!.status)
+        assertEquals(listOf(ref), sink.refs, "the orphaned order's expiry notice is made durable")
+    }
+
+    @Test
+    fun `another node's PENDING order within the dead-node grace is left for its owner`() {
+        // 40 min old: past the 30-min owner grace (node-b will fail its own) but within the 90-min
+        // dead-node grace, so node-a must not pre-empt it.
+        val uuid = UUID.randomUUID()
+        val sink = CapturingSink()
+        PlayerDao(database).upsert(uuid, "Alice")
+        val ref = bank.insertPending(uuid, 50_000, "sepay", "node-b", System.currentTimeMillis() - 40 * 60_000L)
+
+        buildService(sink, onlineHere = { false }).pollOnce()
+
+        assertEquals(PaymentStatus.PENDING, bank.findByReference(ref)!!.status)
+        assertTrue(sink.refs.isEmpty(), "a live owner still inside the dead-node grace keeps its order")
+    }
+
+    @Test
     fun `an order still inside its timeout is left open and never notified`() {
         val uuid = UUID.randomUUID()
         val sink = CapturingSink()

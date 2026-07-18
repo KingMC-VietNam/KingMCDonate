@@ -102,6 +102,24 @@ class BankPaymentDao(database: Database) : PaymentDao<BankPayment>(database, "ba
     }
 
     /**
+     * PENDING orders across ALL owners created before [cutoff], oldest first — the dead-node timeout
+     * sweep. Owner-scoped timeout ([findPendingByServer]) never fails a dead node's orders, so a node
+     * that died with open orders would strand them forever. Called with a grace longer than the owner
+     * timeout, so a live owner has already failed its own by the time an order reaches this cutoff and
+     * only genuinely orphaned orders are caught.
+     */
+    fun findExpiredPendingAllServers(cutoff: Long): List<BankPayment> = withConnection { conn ->
+        conn.prepareStatement(
+            "SELECT * FROM bank_payments WHERE status = ? AND created_at < ? ORDER BY created_at LIMIT ?",
+        ).use { ps ->
+            ps.setString(1, PaymentStatus.PENDING.storageValue)
+            ps.setLong(2, cutoff)
+            ps.setInt(3, MAX_BATCH)
+            ps.executeQuery().use { rs -> rs.mapAll { toModel() } }
+        }
+    }
+
+    /**
      * FAILED orders network-wide updated at or after [since] — added to the confirmer's match set so a
      * late transfer for a just-expired order is still surfaced, not dropped, whichever node owns it.
      */
