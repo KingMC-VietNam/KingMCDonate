@@ -83,6 +83,8 @@ tasks {
         // Deterministic output: no build timestamps, stable entry order → identical checksum per source.
         isPreserveFileTimestamps = false
         isReproducibleFileOrder = true
+
+        archiveClassifier = ""
     }
 
     runServer {
