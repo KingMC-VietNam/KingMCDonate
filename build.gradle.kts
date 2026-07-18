@@ -1,5 +1,5 @@
 plugins {
-    kotlin("jvm") version "2.4.0-Beta2"
+    kotlin("jvm") version "2.4.0"
     id("com.gradleup.shadow") version "9.4.1"
     id("xyz.jpenilla.run-paper") version "3.0.2"
 }
@@ -49,13 +49,13 @@ dependencies {
 
     // --- Unit tests: JUnit 5 + a real SQLite-backed pool for the migration runner ---
     // stdlib is provided at runtime via libraries: for the plugin, but tests run in a plain JVM.
-    testImplementation("org.jetbrains.kotlin:kotlin-stdlib:2.4.0-Beta2")
+    testImplementation("org.jetbrains.kotlin:kotlin-stdlib:2.4.0")
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-    testImplementation("com.zaxxer:HikariCP:5.1.0")
-    testImplementation("org.xerial:sqlite-jdbc:3.45.1.0")
+    testImplementation("com.zaxxer:HikariCP:7.0.2")
+    testImplementation("org.xerial:sqlite-jdbc:3.53.2.0")
     // Gson is provided at runtime via libraries: for the plugin; tests exercise the card adapters directly.
-    testImplementation("com.google.code.gson:gson:2.10.1")
+    testImplementation("com.google.code.gson:gson:2.14.0")
     // paper-api on the test classpath so the typed config holders (which reference Bukkit types) load.
     testImplementation("com.destroystokyo.paper:paper-api:1.16.5-R0.1-SNAPSHOT")
 }
@@ -69,11 +69,20 @@ tasks {
         dependsOn(shadowJar)
     }
 
+    jar {
+        // Deterministic output: no build timestamps, stable entry order → identical checksum per source.
+        isPreserveFileTimestamps = false
+        isReproducibleFileOrder = true
+    }
+
     shadowJar {
         // Only the two non-Central libs are bundled; relocate to avoid conflicts.
         val libBase = "net.kingmc.plugin.kingmcdonate.lib"
         relocate("com.tcoded.folialib", "$libBase.folialib")
         relocate("net.wesjd.anvilgui", "$libBase.anvilgui")
+        // Deterministic output: no build timestamps, stable entry order → identical checksum per source.
+        isPreserveFileTimestamps = false
+        isReproducibleFileOrder = true
     }
 
     runServer {
