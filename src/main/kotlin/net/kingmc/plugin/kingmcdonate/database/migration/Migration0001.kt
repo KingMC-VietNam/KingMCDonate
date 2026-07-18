@@ -129,7 +129,8 @@ class Migration0001 : Migration {
                 actor          VARCHAR(64),
                 server         VARCHAR(64) NOT NULL DEFAULT '',
                 content        VARCHAR(255),
-                created_at     BIGINT      NOT NULL
+                created_at     BIGINT      NOT NULL,
+                UNIQUE (reference_code, method)
             )
             """,
         )

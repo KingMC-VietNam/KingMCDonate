@@ -38,6 +38,7 @@ class PointLogDaoTest {
         method: String = "bank",
         provider: String? = "sepay",
         actor: String? = null,
+        referenceCode: String? = "REF-$amount",
         createdAt: Long,
     ) = PointLogEntry(
         playerUuid = uuid,
@@ -45,7 +46,7 @@ class PointLogDaoTest {
         amount = amount,
         method = method,
         provider = provider,
-        referenceCode = "REF-$amount",
+        referenceCode = referenceCode,
         actor = actor,
         server = "node-a",
         content = "Bank top-up sepay",
@@ -92,6 +93,37 @@ class PointLogDaoTest {
         val rows = dao.findByPlayer(uuid, 2)
         assertEquals(2, rows.size)
         assertEquals(listOf(2L, 3L), rows.map { it.amount }) // 300, then 200
+    }
+
+    @Test
+    fun `a re-entered reference and method books the ledger row once`() {
+        // D1: onSuccess can run twice (poll + webhook, retry). The (reference_code, method) key must
+        // dedup so revenue is not double-counted; the second record is swallowed, not an error.
+        val uuid = UUID.randomUUID()
+        dao.record(entry(uuid, amount = 50, method = "card", referenceCode = "REF-DUP", createdAt = 1000))
+        dao.record(entry(uuid, amount = 50, method = "card", referenceCode = "REF-DUP", createdAt = 2000))
+
+        assertEquals(1, dao.findByPlayer(uuid, 10).size)
+    }
+
+    @Test
+    fun `the same reference under a different method is a distinct ledger row`() {
+        val uuid = UUID.randomUUID()
+        dao.record(entry(uuid, amount = 50, method = "card", referenceCode = "REF-X", createdAt = 1))
+        dao.record(entry(uuid, amount = 50, method = "bank", referenceCode = "REF-X", createdAt = 2))
+
+        assertEquals(2, dao.findByPlayer(uuid, 10).size)
+    }
+
+    @Test
+    fun `rows with no reference are never deduped`() {
+        // Manual /give rows carry a null reference; NULLs are distinct in a UNIQUE index, so repeated
+        // admin gives must each be recorded rather than collapsing into one.
+        val uuid = UUID.randomUUID()
+        dao.record(entry(uuid, amount = 5, method = "give", referenceCode = null, createdAt = 1))
+        dao.record(entry(uuid, amount = 7, method = "give", referenceCode = null, createdAt = 2))
+
+        assertEquals(2, dao.findByPlayer(uuid, 10).size)
     }
 
     @Test

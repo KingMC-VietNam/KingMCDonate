@@ -3,6 +3,7 @@ package net.kingmc.plugin.kingmcdonate.database.dao
 import net.kingmc.plugin.kingmcdonate.database.Database
 import net.kingmc.plugin.kingmcdonate.payment.model.PointLogEntry
 import java.sql.ResultSet
+import java.sql.SQLException
 import java.util.UUID
 
 /**
@@ -11,24 +12,33 @@ import java.util.UUID
  */
 class PointLogDao(database: Database) : Dao(database) {
 
-    /** Append one ledger row for a point change. */
+    /**
+     * Append one ledger row for a point change, at most once per (reference_code, method).
+     * `onSuccess` can re-enter — a poll and a webhook resolving the same order, or a retry —
+     * so a duplicate reference is swallowed rather than booking revenue twice. A null reference
+     * (manual /give) is distinct under the UNIQUE index, so those rows are never deduped.
+     */
     fun record(entry: PointLogEntry): Unit = withConnection { conn ->
-        conn.prepareStatement(
-            "INSERT INTO point_log " +
-                "(player_uuid, player_name, amount, method, provider, reference_code, actor, server, content, created_at) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        ).use { ps ->
-            ps.setString(1, entry.playerUuid.toString())
-            ps.setString(2, entry.playerName)
-            ps.setLong(3, entry.amount)
-            ps.setString(4, entry.method)
-            ps.setString(5, entry.provider)
-            ps.setString(6, entry.referenceCode)
-            ps.setString(7, entry.actor)
-            ps.setString(8, entry.server)
-            ps.setString(9, entry.content)
-            ps.setLong(10, entry.createdAt)
-            ps.executeUpdate()
+        try {
+            conn.prepareStatement(
+                "INSERT INTO point_log " +
+                    "(player_uuid, player_name, amount, method, provider, reference_code, actor, server, content, created_at) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ).use { ps ->
+                ps.setString(1, entry.playerUuid.toString())
+                ps.setString(2, entry.playerName)
+                ps.setLong(3, entry.amount)
+                ps.setString(4, entry.method)
+                ps.setString(5, entry.provider)
+                ps.setString(6, entry.referenceCode)
+                ps.setString(7, entry.actor)
+                ps.setString(8, entry.server)
+                ps.setString(9, entry.content)
+                ps.setLong(10, entry.createdAt)
+                ps.executeUpdate()
+            }
+        } catch (e: SQLException) {
+            if (!isUniqueViolation(e)) throw e
         }
     }
 
