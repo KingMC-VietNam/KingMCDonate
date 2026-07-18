@@ -165,6 +165,8 @@ bank:
 # ============================================================
 # Chu kỳ quét hàng đợi trao thưởng cần người chơi hiện diện (ticks; 20 ticks = 1 giây).
 reward-delivery-interval: 40
+# Số ngày giữ lại các dòng outbox đã trao xong trước khi dọn (chống phình bảng). 0 = không dọn.
+reward-outbox-retention-days: 30
 
 # ============================================================
 #  Lệnh thưởng theo mốc (dùng chung thẻ + bank)

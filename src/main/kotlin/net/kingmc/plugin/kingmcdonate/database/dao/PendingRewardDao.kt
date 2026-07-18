@@ -79,4 +79,18 @@ class PendingRewardDao(database: Database) : Dao(database) {
         }
     }
 
+    /**
+     * Delete delivered rows created before [olderThan], bounding table growth; returns the row count
+     * removed. Retention-only: it touches `delivered = 1` rows exclusively, so an undelivered reward
+     * is never purged out from under a player who has not come back yet.
+     */
+    fun purgeDelivered(olderThan: Long): Int = withConnection { conn ->
+        conn.prepareStatement(
+            "DELETE FROM pending_reward WHERE delivered = 1 AND created_at < ?",
+        ).use { ps ->
+            ps.setLong(1, olderThan)
+            ps.executeUpdate()
+        }
+    }
+
 }

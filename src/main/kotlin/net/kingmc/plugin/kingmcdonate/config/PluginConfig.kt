@@ -23,6 +23,9 @@ class PluginConfig(root: ConfigurationSection) {
     /** How often the reward outbox is drained, in ticks. */
     val rewardDeliveryIntervalTicks: Long = root.getLong("reward-delivery-interval", 40L).coerceAtLeast(1L)
 
+    /** How long delivered outbox rows are kept before purge, in days; 0 or less disables the purge. */
+    val rewardOutboxRetentionDays: Long = root.getLong("reward-outbox-retention-days", 30L)
+
     val pointUnit: String = root.getString("point-unit", "point")!!
     val broadcast: BroadcastConfig = BroadcastConfig(root.getConfigurationSection("broadcast"))
     val firstTopup: FirstTopupConfig = FirstTopupConfig(root.getConfigurationSection("first-topup"))

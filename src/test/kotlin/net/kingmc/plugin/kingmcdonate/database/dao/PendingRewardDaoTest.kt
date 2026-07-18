@@ -5,6 +5,7 @@ import net.kingmc.plugin.kingmcdonate.database.Database
 import net.kingmc.plugin.kingmcdonate.util.PluginLogger
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -116,6 +117,29 @@ class PendingRewardDaoTest {
         assertTrue(row != null, "a row stranded by the old code must be claimable again")
         assertEquals(1, dao.claimAndDeliver(row!!.id, "node-b", 2_000))
         assertTrue(dao.findClaimableFor(listOf(uuid)).isEmpty())
+    }
+
+    private fun exists(ref: String): Boolean = database.withConnection { conn ->
+        conn.prepareStatement("SELECT 1 FROM pending_reward WHERE reference_code = ?").use { ps ->
+            ps.setString(1, ref)
+            ps.executeQuery().use { it.next() }
+        }
+    }
+
+    @Test
+    fun `purgeDelivered removes only delivered rows older than the cutoff`() {
+        val stale = enqueue(ref = "KMDSTALE01", at = 1_000)
+        dao.claimAndDeliver(stale, "node-a", 1_500) // delivered, old
+        val recent = enqueue(ref = "KMDRECENT1", at = 9_000)
+        dao.claimAndDeliver(recent, "node-a", 9_500) // delivered, but within retention
+        enqueue(ref = "KMDUNDEL01", at = 1_000) // old, but never delivered
+
+        val removed = dao.purgeDelivered(olderThan = 5_000)
+
+        assertEquals(1, removed, "only the stale delivered row is purged")
+        assertFalse(exists("KMDSTALE01"), "a delivered row past retention must be gone")
+        assertTrue(exists("KMDRECENT1"), "a delivered row within retention must survive")
+        assertTrue(exists("KMDUNDEL01"), "an undelivered row must never be purged")
     }
 
     @Test

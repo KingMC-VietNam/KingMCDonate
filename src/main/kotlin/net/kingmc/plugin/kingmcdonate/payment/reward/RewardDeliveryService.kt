@@ -42,6 +42,16 @@ class RewardDeliveryService(
     fun start() {
         val period = config().rewardDeliveryIntervalTicks.coerceAtLeast(1)
         scheduler.runTimerAsync({ scheduler.runIo(::drain) }, period, period)
+        scheduler.runTimerAsync({ scheduler.runIo(::purge) }, PURGE_PERIOD_TICKS, PURGE_PERIOD_TICKS)
+    }
+
+    /** Drop delivered rows past the configured retention so the outbox does not grow without bound. */
+    private fun purge() {
+        val retentionDays = config().rewardOutboxRetentionDays
+        if (retentionDays <= 0) return
+        val cutoff = System.currentTimeMillis() - retentionDays * MILLIS_PER_DAY
+        val removed = dao.purgeDelivered(cutoff)
+        if (removed > 0) logger.info("Outbox purge removed $removed delivered rows older than $retentionDays day(s).")
     }
 
     /** Deliver any outstanding rewards for a player who just joined this node. */
@@ -105,7 +115,10 @@ class RewardDeliveryService(
     }
 
     companion object {
-        private const val BATCH = 100
+        private const val BATCH = 200
+        private const val MILLIS_PER_DAY = 24L * 60 * 60 * 1000
+        // Hourly: retention is measured in days, so the outbox never grows more than an hour past cutoff.
+        private const val PURGE_PERIOD_TICKS = 20L * 60 * 60
         private val gson = Gson()
     }
 }
