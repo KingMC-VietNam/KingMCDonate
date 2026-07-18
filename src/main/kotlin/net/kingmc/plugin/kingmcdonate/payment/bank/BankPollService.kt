@@ -117,8 +117,10 @@ class BankPollService(
      * outbox — a message-only payload, mirroring the card-FAILED notice — and delivered on rejoin.
      */
     private fun notifyExpired(uuid: UUID, referenceCode: String) {
-        if (onlineHere(uuid)) {
-            val player = Bukkit.getPlayer(uuid) ?: return
+        // Resolve the player once. Null means offline here *or* disconnected between the online check and
+        // now — either way the toast would be lost, so it goes to the outbox instead of being dropped.
+        val player = if (onlineHere(uuid)) Bukkit.getPlayer(uuid) else null
+        if (player != null) {
             scheduler.runAtEntity(player) {
                 messages().send(player, MessageKeys.BANK_EXPIRED)
                 qrRenderer.clear(player)
