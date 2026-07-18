@@ -159,7 +159,7 @@ class KingMCDonate : JavaPlugin() {
         val bedrockForms = createBedrockForms()
 
         val card = setupCard(infra.http, infra.database, infra.currency, menus, infra.promo, donationSuccess, infra.rewardDelivery, bedrockForms)
-        val bank = setupBank(infra.http, infra.database, infra.currency, infra.promo, donationSuccess)
+        val bank = setupBank(infra.http, infra.database, infra.currency, infra.promo, donationSuccess, infra.rewardDelivery)
         startWebhookServer(config, listOfNotNull(card.webhookHandler, bank.webhookHandler))
         // Reload rebuilds the server so a new secret / host / port / base-path / enabled / mode applies live.
         webhookReload = {
@@ -361,6 +361,7 @@ class KingMCDonate : JavaPlugin() {
         currency: CurrencyRegistry,
         promo: PromoService,
         donationSuccess: DonationSuccessService,
+        rewardDelivery: RewardDeliveryService,
     ): BankSubsystem {
         val providers = BankProviderRegistry(
             pluginLogger,
@@ -398,7 +399,7 @@ class KingMCDonate : JavaPlugin() {
         }
         val pollService = BankPollService(
             bankPaymentDao, providers, confirmService, qrRenderer, scheduler, pluginLogger, configRef, messagesRef,
-            queryGateway,
+            rewardDelivery, queryGateway,
         )
         pluginLogger.debug {
             "Bank confirmation: mode=${configRef().bank.confirmation.name.lowercase()} " +

@@ -5,6 +5,8 @@ import net.kingmc.plugin.kingmcdonate.config.MessageKeys
 import net.kingmc.plugin.kingmcdonate.config.Messages
 import net.kingmc.plugin.kingmcdonate.config.PluginConfig
 import net.kingmc.plugin.kingmcdonate.database.dao.BankPaymentDao
+import net.kingmc.plugin.kingmcdonate.payment.reward.RewardPayload
+import net.kingmc.plugin.kingmcdonate.payment.reward.RewardSink
 import net.kingmc.plugin.kingmcdonate.payment.runExclusively
 import net.kingmc.plugin.kingmcdonate.provider.bank.BankProviderRegistry
 import net.kingmc.plugin.kingmcdonate.render.QrMapRenderer
@@ -35,7 +37,10 @@ class BankPollService(
     private val logger: PluginLogger,
     private val config: () -> PluginConfig,
     private val messages: () -> Messages,
+    private val rewardSink: RewardSink,
     private val queryGateway: () -> Boolean = { true },
+    // Seam: is the player online on THIS node right now? Injected so the durable-notice branch is testable.
+    private val onlineHere: (UUID) -> Boolean = { Bukkit.getPlayer(it) != null },
 ) {
 
     private val polling = AtomicBoolean(false)
@@ -57,7 +62,7 @@ class BankPollService(
         }
     }
 
-    private fun pollOnce() {
+    internal fun pollOnce() {
         val serverId = config().serverId
         val now = System.currentTimeMillis()
         val timeoutMillis = config().bank.timeoutMinutes.coerceAtLeast(1) * 60_000L
@@ -68,7 +73,7 @@ class BankPollService(
             if (bankPaymentDao.markFailed(order.referenceCode, now) == 1) {
                 logger.warn("Bank order ${order.referenceCode} timed out; marked FAILED.")
                 KingMCDonateContext.activityLogOrNull?.log("TXN", "bank FAILED ref=${order.referenceCode} reason=timeout")
-                notifyExpired(order.playerUuid)
+                notifyExpired(order.playerUuid, order.referenceCode)
                 onFailed(order.playerUuid, order.amount, order.referenceCode, "expired")
             }
         }
@@ -93,11 +98,20 @@ class BankPollService(
         bankPaymentDao.findSuccessUnrewardedByServer(serverId).forEach(confirmService::reapplyReward)
     }
 
-    private fun notifyExpired(uuid: UUID) {
-        val player = Bukkit.getPlayer(uuid) ?: return
-        scheduler.runAtEntity(player) {
-            messages().send(player, MessageKeys.BANK_EXPIRED)
-            qrRenderer.clear(player)
+    /**
+     * Tell the player their order expired. Online here: send now and clear the QR. Otherwise the notice
+     * would be lost (the player is offline or on another node), so it is made durable via the reward
+     * outbox — a message-only payload, mirroring the card-FAILED notice — and delivered on rejoin.
+     */
+    private fun notifyExpired(uuid: UUID, referenceCode: String) {
+        if (onlineHere(uuid)) {
+            val player = Bukkit.getPlayer(uuid) ?: return
+            scheduler.runAtEntity(player) {
+                messages().send(player, MessageKeys.BANK_EXPIRED)
+                qrRenderer.clear(player)
+            }
+        } else {
+            rewardSink.enqueue(uuid, referenceCode, RewardPayload(messageKey = MessageKeys.BANK_EXPIRED))
         }
     }
 
