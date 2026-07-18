@@ -35,6 +35,24 @@ abstract class PaymentDao<T>(database: Database, protected val table: String) : 
         }
     }
 
+    /** How many open (PENDING or WAITING) orders this player has right now — the anti-spam in-flight cap. */
+    fun countOpenByPlayer(playerUuid: UUID): Int = withConnection { conn ->
+        conn.prepareStatement("SELECT COUNT(*) FROM $table WHERE player_uuid = ? AND status IN (?, ?)").use { ps ->
+            ps.setString(1, playerUuid.toString())
+            ps.setString(2, PaymentStatus.PENDING.storageValue)
+            ps.setString(3, PaymentStatus.WAITING.storageValue)
+            ps.executeQuery().use { rs -> if (rs.next()) rs.getInt(1) else 0 }
+        }
+    }
+
+    /** Creation time of this player's most recent order of any status, or null if they have none (cooldown). */
+    fun latestCreatedAtByPlayer(playerUuid: UUID): Long? = withConnection { conn ->
+        conn.prepareStatement("SELECT MAX(created_at) FROM $table WHERE player_uuid = ?").use { ps ->
+            ps.setString(1, playerUuid.toString())
+            ps.executeQuery().use { rs -> if (rs.next() && rs.getObject(1) != null) rs.getLong(1) else null }
+        }
+    }
+
     /** SUCCESS orders owned by [serverId] whose external credit has not been applied yet (reconcile). */
     fun findSuccessUnrewardedByServer(serverId: String): List<T> = withConnection { conn ->
         conn.prepareStatement(

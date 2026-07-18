@@ -17,6 +17,8 @@ reload-config-warnings: "&eCó &c{count}&e cảnh báo cấu hình — xem conso
 
 # Trả thưởng / provider
 currency-unavailable: "&cHệ thống trả thưởng đang không khả dụng, vui lòng liên hệ quản trị."
+order-in-progress: "&cBạn đang có một đơn nạp chưa hoàn tất, vui lòng chờ xử lý xong."
+order-cooldown: "&cBạn thao tác quá nhanh, vui lòng đợi giây lát rồi thử lại."
 
 # Trạng thái giao dịch (hiển thị trong lịch sử)
 status-success: "&aThành công"

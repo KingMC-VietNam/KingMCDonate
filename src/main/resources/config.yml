@@ -169,6 +169,15 @@ reward-delivery-interval: 40
 reward-outbox-retention-days: 30
 
 # ============================================================
+#  Chống spam tạo đơn (áp dụng cho cả thẻ và bank, theo từng người chơi)
+# ============================================================
+anti-spam:
+  # Số đơn đang mở (PENDING/WAITING) tối đa mỗi người chơi cho mỗi phương thức. 0 = tắt.
+  max-in-flight: 1
+  # Số giây tối thiểu giữa hai lần tạo đơn của cùng một người chơi. 0 = tắt.
+  cooldown-seconds: 5
+
+# ============================================================
 #  Lệnh thưởng theo mốc (dùng chung thẻ + bank)
 # ============================================================
 # Lệnh thưởng THÊM (ngoài point) chạy theo MỐC số tiền nạp. Khác currency.commands ở trên

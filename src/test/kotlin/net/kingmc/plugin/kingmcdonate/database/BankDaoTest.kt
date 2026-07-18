@@ -117,6 +117,21 @@ class BankDaoTest {
     }
 
     @Test
+    fun `open-order count and latest-created lookups back the anti-spam guard`() {
+        val uuid = UUID.randomUUID()
+        assertEquals(0, bank.countOpenByPlayer(uuid), "no orders -> nothing open")
+        assertNull(bank.latestCreatedAtByPlayer(uuid), "no orders -> no last timestamp")
+
+        bank.insertPending(uuid, 50_000, "sepay", "node-a", 1_000) // open PENDING
+        val terminal = bank.insertPending(uuid, 50_000, "sepay", "node-a", 5_000)
+        bank.markFailed(terminal, 5_000) // terminal, and the newest row
+
+        assertEquals(1, bank.countOpenByPlayer(uuid), "only the still-PENDING order is counted as open")
+        assertEquals(5_000L, bank.latestCreatedAtByPlayer(uuid), "cooldown reads the newest order's creation time")
+        assertEquals(0, bank.countOpenByPlayer(UUID.randomUUID()), "another player's orders never count")
+    }
+
+    @Test
     fun `processed tx insert is unique and insertIfAbsent reports first vs duplicate`() {
         assertTrue(processed.insertIfAbsent("TX1", "REF1", 1_000))
         assertFalse(processed.insertIfAbsent("TX1", "REF1", 2_000))

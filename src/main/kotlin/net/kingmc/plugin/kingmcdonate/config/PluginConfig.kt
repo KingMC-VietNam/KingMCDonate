@@ -32,6 +32,16 @@ class PluginConfig(root: ConfigurationSection) {
     val bossbar: BossBarConfig = BossBarConfig(root.getConfigurationSection("bossbar"))
     val leaderboard: LeaderboardConfig = LeaderboardConfig(root.getConfigurationSection("leaderboard"))
     val activityLog: ActivityLogConfig = ActivityLogConfig(root.getConfigurationSection("activity-log"))
+    val antiSpam: AntiSpamConfig = AntiSpamConfig(root.getConfigurationSection("anti-spam"))
+
+    /** Per-player throttle on order creation (card + bank), applied before the PENDING insert. */
+    class AntiSpamConfig(section: ConfigurationSection?) {
+        /** Max concurrent open (PENDING/WAITING) orders per player per method; 0 or less disables the cap. */
+        val maxInFlight: Int = section?.getInt("max-in-flight", 1) ?: 1
+
+        /** Minimum seconds between a player's order submissions of one method; 0 or less disables the cooldown. */
+        val cooldownSeconds: Long = section?.getLong("cooldown-seconds", 5L) ?: 5L
+    }
 
     class DatabaseConfig(section: ConfigurationSection?) {
         /** `sqlite` (default) or `mysql`. */

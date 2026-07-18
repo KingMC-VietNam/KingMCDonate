@@ -24,6 +24,7 @@ import net.kingmc.plugin.kingmcdonate.util.PluginLogger
 import org.bukkit.configuration.file.YamlConfiguration
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -244,6 +245,31 @@ class CardPaymentServiceTest {
         assertEquals(50L, fakeCurrency.balance(uuid))
         assertEquals(50_000L, totalAll(uuid), "totals were committed once, at award time")
         assertTrue(card.findSuccessUnrewardedByServer("node-a").isEmpty(), "the order is no longer unrewarded")
+    }
+
+    @Test
+    fun `a second order while one is already open is rejected before any insert`() {
+        val uuid = UUID.randomUUID()
+        pending(uuid) // one open PENDING order (default cap is 1 in-flight)
+
+        assertEquals(MessageKeys.ORDER_IN_PROGRESS, service.spamRejection(uuid, System.currentTimeMillis()))
+    }
+
+    @Test
+    fun `a resubmit within the cooldown is rejected even with no order open`() {
+        val uuid = UUID.randomUUID()
+        val now = System.currentTimeMillis()
+        // A just-finished order: terminal (not counted as open) but created a second ago, inside the 5s cooldown.
+        PlayerDao(database).upsert(uuid, "Alice")
+        val ref = card.insertPending(uuid, "Alice", "VIETTEL", 50_000, "s", "p", "fakecard", "node-a", now - 1_000)
+        card.resolve(ref, PaymentStatus.FAILED, 0, now - 1_000)
+
+        assertEquals(MessageKeys.ORDER_COOLDOWN, service.spamRejection(uuid, now))
+    }
+
+    @Test
+    fun `a fresh player with no recent order may proceed`() {
+        assertNull(service.spamRejection(UUID.randomUUID(), System.currentTimeMillis()))
     }
 
     @Test

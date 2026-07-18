@@ -9,6 +9,8 @@ object MessageKeys {
     const val RELOAD_FAILED = "reload-failed"
     const val RELOAD_CONFIG_WARNINGS = "reload-config-warnings"
     const val CURRENCY_UNAVAILABLE = "currency-unavailable"
+    const val ORDER_IN_PROGRESS = "order-in-progress"
+    const val ORDER_COOLDOWN = "order-cooldown"
 
     const val STATUS_SUCCESS = "status-success"
     const val STATUS_FAILED = "status-failed"

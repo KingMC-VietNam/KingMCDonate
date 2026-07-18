@@ -88,6 +88,7 @@ class CardPaymentService(
             messages().send(player, MessageKeys.CARD_PIN_TOO_LONG)
             return
         }
+        spamRejection(player.uniqueId, System.currentTimeMillis())?.let { messages().send(player, it); return }
 
         val uuid = player.uniqueId
         val name = player.name
@@ -116,6 +117,23 @@ class CardPaymentService(
                 cardPaymentDao.markWaiting(referenceCode, null, System.currentTimeMillis())
             }
         }
+    }
+
+    /**
+     * The message key rejecting a new order for [uuid] at [now], or null if the player may proceed —
+     * the anti-spam guard, run before any PENDING insert so command, GUI and Bedrock paths throttle
+     * alike. Card and bank each check their own table, so the cap and cooldown are naturally per method.
+     */
+    internal fun spamRejection(uuid: UUID, now: Long): String? {
+        val antiSpam = config().antiSpam
+        if (antiSpam.maxInFlight > 0 && cardPaymentDao.countOpenByPlayer(uuid) >= antiSpam.maxInFlight) {
+            return MessageKeys.ORDER_IN_PROGRESS
+        }
+        if (antiSpam.cooldownSeconds > 0) {
+            val last = cardPaymentDao.latestCreatedAtByPlayer(uuid)
+            if (last != null && now - last < antiSpam.cooldownSeconds * 1000) return MessageKeys.ORDER_COOLDOWN
+        }
+        return null
     }
 
     /** Simulate a successful charge (admin test): record then run the full reward path. */

@@ -62,6 +62,7 @@ class BankPaymentService(
             )
             return
         }
+        spamRejection(player.uniqueId, System.currentTimeMillis())?.let { messages().send(player, it); return }
 
         val uuid = player.uniqueId
         val provider = providers.active
@@ -96,6 +97,23 @@ class BankPaymentService(
                 logger.error("Bank $referenceCode: could not build/render QR; order still valid.", e)
             }
         }
+    }
+
+    /**
+     * The message key rejecting a new order for [uuid] at [now], or null if the player may proceed —
+     * the anti-spam guard, run before the PENDING insert. Bank checks only its own table, so the cap
+     * and cooldown are per method (a player may have an open card order and still open a bank one).
+     */
+    internal fun spamRejection(uuid: UUID, now: Long): String? {
+        val antiSpam = config().antiSpam
+        if (antiSpam.maxInFlight > 0 && bankPaymentDao.countOpenByPlayer(uuid) >= antiSpam.maxInFlight) {
+            return MessageKeys.ORDER_IN_PROGRESS
+        }
+        if (antiSpam.cooldownSeconds > 0) {
+            val last = bankPaymentDao.latestCreatedAtByPlayer(uuid)
+            if (last != null && now - last < antiSpam.cooldownSeconds * 1000) return MessageKeys.ORDER_COOLDOWN
+        }
+        return null
     }
 
     /** Send the configured manual-transfer message (Java and Bedrock) so a player can transfer by hand. */
